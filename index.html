@@ -60,6 +60,8 @@ body{font-family:var(--sans);font-size:13px;background:var(--bg3);color:var(--tx
 .row-tog,.max-btn{width:100%;border:0.5px solid var(--bd);border-radius:4px;background:var(--bg2);cursor:pointer;font-size:9px;color:var(--tx3);display:flex;align-items:center;justify-content:center;user-select:none}
 .row-tog{flex:1;writing-mode:vertical-rl;padding:4px 0}
 .max-btn{height:22px;font-size:11px;font-weight:bold}
+.row-del{height:22px;width:100%;border:0.5px solid var(--bd);border-radius:4px;background:var(--bg2);cursor:pointer;font-size:11px;color:var(--tx3);display:flex;align-items:center;justify-content:center;user-select:none}
+.row-del:hover{background:var(--danger-bg);color:var(--danger);border-color:var(--danger)}
 .row-resizer{height:8px;cursor:row-resize;z-index:50;display:flex;align-items:center;justify-content:center}
 .row-resizer:hover,.row-resizer.drag{background:var(--accent-m);opacity:.3}
 .row-resizer::after{content:'⋯';color:var(--tx3);font-size:14px}
@@ -324,7 +326,8 @@ function renderGrid(){
     const rc=document.createElement('div');rc.className='row-controls';
     const rb=document.createElement('div');rb.className='row-tog';rb.textContent=G.cR.has(r)?'▶':`▼ r${r+1}`;rb.onclick=(rr=>()=>togCR(rr))(r);
     const mb=document.createElement('div');mb.className='max-btn';mb.innerHTML=G.maxRow===r?'⤡':'⤢';mb.onclick=(rr=>()=>togMax(rr))(r);
-    rc.appendChild(rb);rc.appendChild(mb);rw.appendChild(rc);
+    const db=document.createElement('div');db.className='row-del';db.title='Remove row';db.textContent='✕';db.onclick=(rr=>()=>removeRow(rr))(r);
+    rc.appendChild(rb);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
     const gr=document.createElement('div');gr.className='grid-row'+(G.cR.has(r)?' rcoll':'');gr.id='row-'+r;
     rw.appendChild(gr);
     ra.appendChild(rw); // append wrapper before adding cells so getElementById works
@@ -525,6 +528,26 @@ function togPrettyX(btn,ev){
   rebuildGP(id);
 }
 
+function removeRow(r){
+  syncAll();
+  if(G.rows<=1)return;
+  const newCells={};
+  Object.keys(G.cells).forEach(id=>{
+    const ri=parseInt(id.split('_')[0]),ci=parseInt(id.split('_')[1]);
+    if(ri<r)newCells[id]=G.cells[id];
+    else if(ri>r)newCells[(ri-1)+'_'+ci]=G.cells[id];
+  });
+  G.cells=newCells;
+  const newCR=new Set();
+  G.cR.forEach(cr=>{if(cr<r)newCR.add(cr);else if(cr>r)newCR.add(cr-1);});
+  G.cR=newCR;
+  if(G.maxRow===r)G.maxRow=null;else if(G.maxRow>r)G.maxRow--;
+  G.rowHeights.splice(r,1);G.rowHeights.push(1);
+  G.rows--;
+  document.getElementById('rv').textContent=G.rows;
+  renderGrid();saveAppState();
+}
+
 /* ══ CELL ACTIONS ══ */
 function adj(d,v){
   syncAll();
@@ -559,7 +582,8 @@ function patchGrid(oldRows,oldCols){
       const rc=document.createElement('div');rc.className='row-controls';
       const rb=document.createElement('div');rb.className='row-tog';rb.textContent=`▼ r${r+1}`;rb.onclick=(rr=>()=>togCR(rr))(r);
       const mb=document.createElement('div');mb.className='max-btn';mb.innerHTML='⤢';mb.onclick=(rr=>()=>togMax(rr))(r);
-      rc.appendChild(rb);rc.appendChild(mb);rw.appendChild(rc);
+      const db=document.createElement('div');db.className='row-del';db.title='Remove row';db.textContent='✕';db.onclick=(rr=>()=>removeRow(rr))(r);
+      rc.appendChild(rb);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
       const gr=document.createElement('div');gr.className='grid-row';gr.id='row-'+r;
       for(let c=0;c<G.cols;c++)addCellToRow(gr,r,c);
       rw.appendChild(gr);ra.appendChild(rw);
