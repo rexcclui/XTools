@@ -257,16 +257,16 @@ function prettySrc(val,ind,path,cid){
   if(typeof val==='string')return`<span class="js" ${pid}>"${escH(val)}"</span>`;
   if(Array.isArray(val)){
     if(!val.length)return`<span class="jbr" ${pid}>[]</span>`;
-    const open=_exp[path]!==false;
-    if(!open)return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" onclick="togPrettyX(this,event)">+ ${val.length}</button> <span class="jbr" ${pid}>[...]</span>`;
-    return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" onclick="togPrettyX(this,event)">−</button> <span class="jbr" ${pid}>[</span>\n${val.map((v,i)=>sp1+prettySrc(v,ind+1,path+'['+i+']',cid)).join('<span class="jbr">,</span>\n')}\n${sp}<span class="jbr">]</span>`;
+    const open=_exp[path]===true||(_exp[path]!==false&&ind<3);
+    if(!open)return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" data-open="0" onclick="togPrettyX(this,event)">+ ${val.length}</button> <span class="jbr" ${pid}>[...]</span>`;
+    return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" data-open="1" onclick="togPrettyX(this,event)">−</button> <span class="jbr" ${pid}>[</span>\n${val.map((v,i)=>sp1+prettySrc(v,ind+1,path+'['+i+']',cid)).join('<span class="jbr">,</span>\n')}\n${sp}<span class="jbr">]</span>`;
   }
   if(typeof val==='object'){
     const keys=Object.keys(val);
     if(!keys.length)return`<span class="jbr" ${pid}>{}</span>`;
-    const open=_exp[path]!==false;
-    if(!open)return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" onclick="togPrettyX(this,event)">+ ${keys.length}</button> <span class="jbr" ${pid}>{...}</span>`;
-    return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" onclick="togPrettyX(this,event)">−</button> <span class="jbr" ${pid}>{</span>\n${keys.map(k=>`${sp1}<span class="jk" data-p="${escA(path+'.'+k)}">"${escH(k)}"</span><span class="jbr">: </span>${prettySrc(val[k],ind+1,path+'.'+k,cid)}`).join('<span class="jbr">,</span>\n')}\n${sp}<span class="jbr">}</span>`;
+    const open=_exp[path]===true||(_exp[path]!==false&&ind<3);
+    if(!open)return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" data-open="0" onclick="togPrettyX(this,event)">+ ${keys.length}</button> <span class="jbr" ${pid}>{...}</span>`;
+    return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" data-open="1" onclick="togPrettyX(this,event)">−</button> <span class="jbr" ${pid}>{</span>\n${keys.map(k=>`${sp1}<span class="jk" data-p="${escA(path+'.'+k)}">"${escH(k)}"</span><span class="jbr">: </span>${prettySrc(val[k],ind+1,path+'.'+k,cid)}`).join('<span class="jbr">,</span>\n')}\n${sp}<span class="jbr">}</span>`;
   }
   return`<span ${pid}>${escH(String(val))}</span>`;
 }
@@ -350,6 +350,7 @@ function cellHTML(id,r,c,s){
   <div class="cell-bar">
     <span style="font-size:10px;color:var(--tx3)">${r+1},${c+1}</span>
     <button id="btn-pr-${id}" class="ib${pr?' on':''}" title="${pr?'Back to raw editor':'Format + render table'}" onclick="togPretty('${id}')">{}</button>
+    <button class="ib" title="Copy cell JSON" onclick="copyCell('${id}')">⎘</button>
     <button class="ib dx" title="Clear cell" onclick="clearCell('${id}')">✕</button>
     <input class="title-inp" value="${escH(s.title||'')}" oninput="G.cells['${id}'].title=this.value;lsSave('${id}');saveAppState();" placeholder="Untitled…"/>
     <div style="flex:1"></div>
@@ -379,10 +380,10 @@ function rV(val,level,path,cid,s){
   if(typeof val==='number')return`<span class="jv jv-n" ${dp}>${val}</span>`;
   if(typeof val==='string'){let d=val===''?'<em style="color:var(--tx3)">""</em>':escH(val);return`<span class="jv" ${dp}>${d}</span>`;}
   if(typeof val==='object'){
-    const open=_exp[path]!==false;
+    const open=_exp[path]===true||(_exp[path]!==false&&level<3);
     const count=Array.isArray(val)?val.length:Object.keys(val).length;
     const nest=open?(Array.isArray(val)?rArr(val,level+1,path,cid,s):rObj(val,level+1,path,cid,s)):'';
-    return`<div ${dp} style="display:flex;gap:4px;padding:2px;align-items:flex-start"><button class="nx" onclick="togX(this)" data-p="${escA(path)}" data-cid="${cid}">${open?'−':`+ ${count}`}</button><button class="cp-btn" onclick="copyNode(this)" data-p="${escA(path)}" data-cid="${cid}" title="Copy JSON">⎘</button><div style="flex:1;min-width:0">${nest}</div></div>`;
+    return`<div ${dp} style="display:flex;gap:4px;padding:2px;align-items:flex-start"><button class="nx" onclick="togX(this)" data-p="${escA(path)}" data-cid="${cid}" data-open="${open?'1':'0'}">${open?'−':`+ ${count}`}</button><button class="cp-btn" onclick="copyNode(this)" data-p="${escA(path)}" data-cid="${cid}" title="Copy JSON">⎘</button><div style="flex:1;min-width:0">${nest}</div></div>`;
   }
   return`<span class="jv" ${dp}>${escH(String(val))}</span>`;
 }
@@ -452,6 +453,15 @@ function cellIdFromCid(cid){
   const m=String(cid||'').match(/^t\d+_(.+)$/);
   return m?m[1]:String(cid||'');
 }
+function copyCell(id){
+  const s=cs(id);if(!s.text||!s.text.trim())return;
+  let text=s.text;
+  try{text=JSON.stringify(JSON.parse(s.text),null,2);}catch(e){}
+  const btn=document.querySelector(`#cell-${id} .ib[onclick*="copyCell"]`);
+  const done=()=>{if(btn){const o=btn.textContent;btn.textContent='✓';setTimeout(()=>btn.textContent=o,900);}};
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(done).catch(()=>{fbCopy(text);done();});}
+  else{fbCopy(text);done();}
+}
 function copyNode(btn){
   const v=getAt(btn.dataset.cid,btn.dataset.p);
   if(v===undefined)return;
@@ -462,7 +472,7 @@ function copyNode(btn){
 }
 function fbCopy(text){const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);}
 function togX(btn){
-  _exp[btn.dataset.p]=!(_exp[btn.dataset.p]!==false);
+  _exp[btn.dataset.p]=btn.dataset.open==='1'?false:true;
   const cellId=cellIdFromCid(btn.dataset.cid);
   rebuildGP(cellId);
   // Re-apply sel-node highlights that were wiped by DOM rebuild
@@ -509,7 +519,7 @@ function togCol(ev,btn,base,key,cid){
 }
 function togPrettyX(btn,ev){
   if(ev){ev.preventDefault();ev.stopPropagation();}
-  _exp[btn.dataset.p]=!(_exp[btn.dataset.p]!==false);
+  _exp[btn.dataset.p]=btn.dataset.open==='1'?false:true;
   const id=cellIdFromCid(btn.dataset.cid);
   renderPretty(id);
   rebuildGP(id);
