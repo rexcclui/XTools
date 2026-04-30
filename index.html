@@ -412,7 +412,11 @@ function rArr(arr,level,base,cid,s){
     });
     h+=`</tr></thead><tbody>`;
     arr.forEach((row,ri)=>{
-      h+=`<tr><td style="background:var(--bg2);padding:4px;font-size:10px;text-align:center">${ri}</td>`;
+      const rowHasNested=row&&typeof row==='object'&&Object.values(row).some(v=>v&&typeof v==='object');
+      let rowAnyOpen=false;
+      if(rowHasNested)Object.keys(row).forEach(k=>{const v=row[k];if(v&&typeof v==='object'&&_exp[base+'['+ri+'].'+k]!==false)rowAnyOpen=true;});
+      const rowBtn=rowHasNested?`<button class="col-tog" onclick="togRowColl('${escA(base)}',${ri},'${cid}')" title="${rowAnyOpen?'Collapse':'Expand'} row ${ri}">${rowAnyOpen?'−':'+'}</button> `:'';
+      h+=`<tr><td style="background:var(--bg2);padding:4px;font-size:10px;text-align:center;white-space:nowrap">${rowBtn}${ri}</td>`;
       keys.forEach(k=>h+=`<td data-p="${escA(base+'['+ri+'].'+k)}" data-cid="${cid}">${row.hasOwnProperty(k)?rV(row[k],level,base+'['+ri+'].'+k,cid,s):'—'}</td>`);
       h+=`</tr>`;
     });
@@ -450,6 +454,19 @@ function togX(btn){
   const cellId=cellIdFromCid(btn.dataset.cid);
   rebuildGP(cellId);
   // Re-apply sel-node highlights that were wiped by DOM rebuild
+  reapplySelNodes();
+}
+// Toggle expand/collapse for all nested values in a single row
+function togRowColl(base,ri,cid){
+  const arr=getAt(cid,base);
+  if(!Array.isArray(arr))return;
+  const row=arr[ri];
+  if(!row||typeof row!=='object')return;
+  let anyOpen=false;
+  Object.keys(row).forEach(k=>{const v=row[k];if(v&&typeof v==='object'&&_exp[base+'['+ri+'].'+k]!==false)anyOpen=true;});
+  const newState=!anyOpen;
+  Object.keys(row).forEach(k=>{const v=row[k];if(v&&typeof v==='object')_exp[base+'['+ri+'].'+k]=newState;});
+  rebuildGP(cellIdFromCid(cid));
   reapplySelNodes();
 }
 // Toggle expand/collapse for ALL nested values in a column
@@ -1004,7 +1021,7 @@ document.getElementById('cmp-modal').addEventListener('click',e=>{if(e.target===
 /* ══ LOCALSTORAGE ══ */
 const LS_PRE='jgw::',LS_MAX=200;
 const LS_APP='jgw::appstate';
-function lsKey(id){const s=cs(id),r=parseInt(id.split('_')[0]),c=parseInt(id.split('_')[1]);const label=s.title&&s.title.trim()?s.title.trim():`Untitled_${r+1}_${c+1}`;const tab=(App.tabs[App.activeTab]||{}).name||'Tab';return`${tab}:${label}`;}
+function lsKey(id){const s=cs(id),r=parseInt(id.split('_')[0]),c=parseInt(id.split('_')[1]);const label=s.title&&s.title.trim()?s.title.trim():`Untitled_${r+1}_${c+1}`;const tab=(App.tabs[App.activeTab]||{}).name||'Tab';return`${tab}/${label}`;}
 function lsSave(id){
   const s=cs(id);if(!s.text||!s.text.trim())return;
   try{localStorage.setItem(LS_PRE+lsKey(id),JSON.stringify({text:s.text,title:s.title||'',ts:Date.now()}));pruneLS();}catch(e){}
@@ -1016,7 +1033,7 @@ function lsSaveFor(tab,id){
   const r=parseInt(bits[0]||'0',10),c=parseInt(bits[1]||'0',10);
   const label=s.title&&s.title.trim()?s.title.trim():`Untitled_${r+1}_${c+1}`;
   const tabName=tab.name||'Tab';
-  try{localStorage.setItem(LS_PRE+`${tabName}:${label}`,JSON.stringify({text:s.text,title:s.title||'',ts:Date.now()}));pruneLS();}catch(e){}
+  try{localStorage.setItem(LS_PRE+`${tabName}/${label}`,JSON.stringify({text:s.text,title:s.title||'',ts:Date.now()}));pruneLS();}catch(e){}
 }
 function saveTabHistory(tab){
   if(!tab||!tab.cells)return;
@@ -1092,7 +1109,11 @@ function showStorageDrop(id){
     const item=document.createElement('div');item.className='sd-item';
     const prev=entry.text?entry.text.replace(/\s+/g,' ').slice(0,80):'';
     const d=entry.ts?new Date(entry.ts).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-    item.innerHTML=`<div style="display:flex;align-items:center;gap:4px"><span class="sd-key">${escH(entry.key)}</span><span class="sd-del" onclick="event.stopPropagation();lsDel('${escA(entry.fullKey)}');showStorageDrop('${id}')">✕</span></div><div style="display:flex;justify-content:space-between;gap:6px"><span class="sd-preview">${escH(prev)}</span><span style="font-size:9px;color:var(--tx3);white-space:nowrap">${d}</span></div>`;
+    const sepIdx=entry.key.indexOf('/');
+    const tabPart=sepIdx>-1?entry.key.slice(0,sepIdx):'';
+    const namePart=sepIdx>-1?entry.key.slice(sepIdx+1):entry.key;
+    const keyDisplay=tabPart?`<span style="color:var(--tx3);font-size:10px">${escH(tabPart)}/</span><span class="sd-key">${escH(namePart)}</span>`:`<span class="sd-key">${escH(entry.key)}</span>`;
+    item.innerHTML=`<div style="display:flex;align-items:center;gap:4px">${keyDisplay}<span class="sd-del" onclick="event.stopPropagation();lsDel('${escA(entry.fullKey)}');showStorageDrop('${id}')">✕</span></div><div style="display:flex;justify-content:space-between;gap:6px"><span class="sd-preview">${escH(prev)}</span><span style="font-size:9px;color:var(--tx3);white-space:nowrap">${d}</span></div>`;
     item.addEventListener('mousedown',e=>{e.preventDefault();hideStorageDrop();const s=cs(id);s.text=entry.text||'';if(entry.title)s.title=entry.title;const ta2=document.getElementById('ta-'+id);if(ta2)ta2.value=s.text;const cell=document.getElementById('cell-'+id);if(cell&&entry.title){const ti=cell.querySelector('.title-inp');if(ti)ti.value=entry.title;}rebuildGP(id);lsSave(id);saveAppState();});
     drop.appendChild(item);
   });
