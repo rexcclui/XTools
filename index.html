@@ -350,6 +350,7 @@ function cellHTML(id,r,c,s){
   <div class="cell-bar">
     <span style="font-size:10px;color:var(--tx3)">${r+1},${c+1}</span>
     <button id="btn-pr-${id}" class="ib${pr?' on':''}" title="${pr?'Back to raw editor':'Format + render table'}" onclick="togPretty('${id}')">{}</button>
+    <button class="ib" title="Copy cell JSON" onclick="copyCell('${id}')">⎘</button>
     <button class="ib dx" title="Clear cell" onclick="clearCell('${id}')">✕</button>
     <input class="title-inp" value="${escH(s.title||'')}" oninput="G.cells['${id}'].title=this.value;lsSave('${id}');saveAppState();" placeholder="Untitled…"/>
     <div style="flex:1"></div>
@@ -451,6 +452,15 @@ function getAt(cid,path){
 function cellIdFromCid(cid){
   const m=String(cid||'').match(/^t\d+_(.+)$/);
   return m?m[1]:String(cid||'');
+}
+function copyCell(id){
+  const s=cs(id);if(!s.text||!s.text.trim())return;
+  let text=s.text;
+  try{text=JSON.stringify(JSON.parse(s.text),null,2);}catch(e){}
+  const btn=document.querySelector(`#cell-${id} .ib[onclick*="copyCell"]`);
+  const done=()=>{if(btn){const o=btn.textContent;btn.textContent='✓';setTimeout(()=>btn.textContent=o,900);}};
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(done).catch(()=>{fbCopy(text);done();});}
+  else{fbCopy(text);done();}
 }
 function copyNode(btn){
   const v=getAt(btn.dataset.cid,btn.dataset.p);
