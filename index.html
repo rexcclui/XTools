@@ -113,6 +113,9 @@ body{font-family:var(--sans);font-size:13px;background:var(--bg3);color:var(--tx
 .jv{padding:4px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;font-family:var(--mono);font-size:12px;color:var(--tx);cursor:default}
 .jv-nu{color:var(--tx3);font-style:italic}.jv-t{color:#00ff88}.jv-f{color:#ff4444}.jv-n{color:#ff8c00}
 .nx{display:inline-flex;align-items:center;justify-content:center;min-width:14px;padding:0 4px;height:14px;border:0.5px solid var(--bd2);border-radius:3px;cursor:pointer;font-size:9px;font-weight:700;background:yellow;color:#1a1a18;user-select:none;flex-shrink:0;white-space:nowrap}
+.cp-btn{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:0.5px solid var(--bd2);border-radius:3px;cursor:pointer;font-size:9px;background:var(--bg2);color:var(--tx3);user-select:none;flex-shrink:0;opacity:0;transition:opacity .1s}
+.cp-btn:hover{background:var(--accent-l);color:var(--accent);border-color:var(--accent-m)}
+div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 
 /* Context menu */
 #ctx-menu{display:none;position:fixed;z-index:300;background:var(--bg);border:0.5px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.18);min-width:220px;overflow:hidden}
@@ -120,7 +123,7 @@ body{font-family:var(--sans);font-size:13px;background:var(--bg3);color:var(--tx
 .ctx-item:hover{background:var(--bg2)}
 
 /* Storage dropdown */
-.storage-drop{position:absolute;z-index:100;background:var(--bg);border:0.5px solid var(--bd2);border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,0.15);min-width:260px;max-width:380px;max-height:260px;overflow-y:auto;left:0;top:100%;margin-top:2px}
+.storage-drop{background:var(--bg);border:0.5px solid var(--bd2);border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,0.15);max-width:420px;max-height:260px;overflow-y:auto}
 .sd-head{padding:6px 10px;font-size:10px;color:var(--tx3);background:var(--bg2);border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;font-family:var(--sans);position:sticky;top:0}
 .sd-head button{font-size:10px;padding:1px 6px;border:0.5px solid var(--bd2);border-radius:4px;background:var(--bg);color:var(--tx2);cursor:pointer}
 .sd-item{padding:7px 10px;font-size:11px;cursor:pointer;border-bottom:0.5px solid var(--bd);display:flex;flex-direction:column;gap:2px}
@@ -379,7 +382,7 @@ function rV(val,level,path,cid,s){
     const open=_exp[path]!==false;
     const count=Array.isArray(val)?val.length:Object.keys(val).length;
     const nest=open?(Array.isArray(val)?rArr(val,level+1,path,cid,s):rObj(val,level+1,path,cid,s)):'';
-    return`<div ${dp} style="display:flex;gap:4px;padding:2px;align-items:flex-start"><button class="nx" onclick="togX(this)" data-p="${escA(path)}" data-cid="${cid}">${open?'−':`+ ${count}`}</button><div style="flex:1;min-width:0">${nest}</div></div>`;
+    return`<div ${dp} style="display:flex;gap:4px;padding:2px;align-items:flex-start"><button class="nx" onclick="togX(this)" data-p="${escA(path)}" data-cid="${cid}">${open?'−':`+ ${count}`}</button><button class="cp-btn" onclick="copyNode(this)" data-p="${escA(path)}" data-cid="${cid}" title="Copy JSON">⎘</button><div style="flex:1;min-width:0">${nest}</div></div>`;
   }
   return`<span class="jv" ${dp}>${escH(String(val))}</span>`;
 }
@@ -449,6 +452,15 @@ function cellIdFromCid(cid){
   const m=String(cid||'').match(/^t\d+_(.+)$/);
   return m?m[1]:String(cid||'');
 }
+function copyNode(btn){
+  const v=getAt(btn.dataset.cid,btn.dataset.p);
+  if(v===undefined)return;
+  const text=typeof v==='object'?JSON.stringify(v,null,2):String(v);
+  const done=()=>{const o=btn.textContent;btn.textContent='✓';setTimeout(()=>btn.textContent=o,900);};
+  if(navigator.clipboard){navigator.clipboard.writeText(text).then(done).catch(()=>{fbCopy(text);done();});}
+  else{fbCopy(text);done();}
+}
+function fbCopy(text){const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);}
 function togX(btn){
   _exp[btn.dataset.p]=!(_exp[btn.dataset.p]!==false);
   const cellId=cellIdFromCid(btn.dataset.cid);
@@ -985,7 +997,7 @@ document.addEventListener('click',e=>{
   const panel=e.target.closest('.grid-panel,.src-pretty');
   if(!panel)return;
   // Skip expand/resize buttons
-  if(e.target.closest('.nx,.cr'))return;
+  if(e.target.closest('.nx,.cr,.cp-btn'))return;
   // Find closest element with data-p
   const el=e.target.closest('[data-p]');
   if(!el||!el.dataset.p)return;
@@ -1099,9 +1111,10 @@ function lsAll(){
 function showStorageDrop(id){
   hideStorageDrop();
   const ta=document.getElementById('ta-'+id);if(!ta)return;
-  const src=ta.closest('.src-panel');if(!src)return;
   const all=lsAll();if(!all.length)return;
+  const rect=ta.getBoundingClientRect();
   const drop=document.createElement('div');drop.className='storage-drop';drop.id='sdrop-'+id;
+  drop.style.cssText=`position:fixed;left:${rect.left}px;top:${rect.bottom+2}px;width:${Math.max(280,rect.width)}px;z-index:2000`;
   const head=document.createElement('div');head.className='sd-head';
   head.innerHTML=`<span>Saved (${all.length}) — click to load</span><button onclick="hideStorageDrop()">✕</button>`;
   drop.appendChild(head);
@@ -1117,7 +1130,7 @@ function showStorageDrop(id){
     item.addEventListener('mousedown',e=>{e.preventDefault();hideStorageDrop();const s=cs(id);s.text=entry.text||'';if(entry.title)s.title=entry.title;const ta2=document.getElementById('ta-'+id);if(ta2)ta2.value=s.text;const cell=document.getElementById('cell-'+id);if(cell&&entry.title){const ti=cell.querySelector('.title-inp');if(ti)ti.value=entry.title;}rebuildGP(id);lsSave(id);saveAppState();});
     drop.appendChild(item);
   });
-  src.appendChild(drop);
+  document.body.appendChild(drop);
   setTimeout(()=>document.addEventListener('mousedown',_outsideDD,{capture:false}),50);
 }
 function _outsideDD(e){const d=document.querySelector('.storage-drop');if(!d){document.removeEventListener('mousedown',_outsideDD);return;}if(!d.contains(e.target)&&!e.target.closest('textarea')){hideStorageDrop();document.removeEventListener('mousedown',_outsideDD);}}
