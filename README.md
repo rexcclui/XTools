@@ -4,6 +4,8 @@ An interactive, browser-based workspace for viewing, editing, and comparing JSON
 
 Zero dependencies. Single HTML file. Works offline.
 
+**Live demo: [jsongrid.rex-cclui.workers.dev](https://jsongrid.rex-cclui.workers.dev/)**
+
 ---
 
 ## Features
