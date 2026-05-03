@@ -274,6 +274,7 @@
 
 <div id="node-context-menu">
     <div class="ctx-item" id="ctx-toggle-nodes"><i class="fa-solid fa-eye-slash"></i><span id="ctx-toggle-label">Hide Nodes</span></div>
+    <div class="ctx-item" id="ctx-hide-children" style="display:none"><i class="fa-solid fa-circle-nodes"></i><span id="ctx-hide-children-label">Hide Children</span></div>
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
@@ -755,6 +756,12 @@
     });
 
     // ── Load class from ghost node ─────────────────────────────────────────────
+    function getLoadedChildren(className) {
+        if (!registry[className]) return [];
+        const flows = aggregateFlows(registry[className].raw, registry[className].varMap, className);
+        return Object.keys(flows).filter(t => registry[t] && t !== className);
+    }
+
     function ghostClassFromNode(node) {
         const label = node.querySelector('.nodeLabel') || node.querySelector('text');
         const text = (label?.textContent || '').trim();
@@ -1590,6 +1597,29 @@
                 const cn = getClassNameFromNode(node);
                 if (cn) setView(cn);
             };
+
+            // Hide / Show Children — only for loaded classes in overview
+            const cn = getClassNameFromNode(node);
+            const hideChildEl = document.getElementById('ctx-hide-children');
+            if (cn && registry[cn]) {
+                const children = getLoadedChildren(cn);
+                if (children.length) {
+                    const anyVisible = children.some(c => !hiddenClasses.has(c));
+                    document.getElementById('ctx-hide-children-label').textContent = anyVisible ? 'Hide Children' : 'Show Children';
+                    hideChildEl.querySelector('i').className = anyVisible ? 'fa-solid fa-circle-nodes' : 'fa-solid fa-circle-nodes';
+                    hideChildEl.style.display = 'flex';
+                    hideChildEl.onclick = () => {
+                        hideNodeContextMenu();
+                        if (anyVisible) children.forEach(c => hiddenClasses.add(c));
+                        else children.forEach(c => hiddenClasses.delete(c));
+                        render();
+                    };
+                } else {
+                    hideChildEl.style.display = 'none';
+                }
+            } else {
+                hideChildEl.style.display = 'none';
+            }
         }
 
         // Load Class option — only for ghost (unloaded) nodes
