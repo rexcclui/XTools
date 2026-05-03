@@ -60,14 +60,15 @@ Cell content is automatically saved to `localStorage` with a timestamp. Focus a 
 
 ---
 
-### Apex Class Diagram (`apexflow.html`)
+### Apex / Java Class Diagram (`apexflow.html`)
 
-A Salesforce Apex call-flow visualizer. Drop `.cls` files to generate interactive Mermaid.js class relationship diagrams and drill into per-method call trees.
+A call-flow visualizer for Salesforce Apex (`.cls`) and Java (`.java`) files. Drop source files anywhere on the page to generate interactive Mermaid.js class relationship diagrams and drill into per-method call trees.
 
 **Features**
 
-- **Multi-file drop zone** — Drag one or more `.cls` Apex files onto the sidebar to load them
-- **Architecture map** — Automatically generates a system-level diagram showing dependencies between all loaded classes
+- **Whole-page drop zone** — Drag one or more `.cls` or `.java` files anywhere onto the page; a green overlay confirms the drop target
+- **Mixed-language support** — Apex and Java files can be loaded together; cross-language dependencies appear in the same diagram
+- **Architecture map** — Automatically generates a system-level diagram showing dependencies between all loaded classes, interfaces, enums, and records
 - **Analyze Flow mode** — Select a class and choose individual methods to visualize their call chains (up to 3 levels deep)
 - **Collapsible nodes** — Click any entry or depth-1 node to collapse/expand its children; toggle icons (⊕/⊖) indicate state
 - **Color-coded edges** — Each method's call path uses a distinct color; dashed lines indicate nested (depth-2) calls
@@ -81,7 +82,7 @@ A Salesforce Apex call-flow visualizer. Drop `.cls` files to generate interactiv
 
 **Usage**
 
-1. Drag one or more Salesforce `.cls` files onto the **drag zone** in the sidebar.
+1. Drag one or more `.cls` or `.java` files anywhere onto the page.
 2. The **System Architecture Map** renders automatically, showing inter-class dependencies.
 3. Click a class card to highlight it in the diagram. Click **Analyze Flow** to drill into its methods.
 4. In Analyze Flow mode, toggle methods on/off in the sidebar to compose the call-flow diagram.
@@ -142,7 +143,7 @@ python -m http.server 8000
 ```
 jsonGrid/
 ├── index.html          # JSON Grid — multi-cell JSON viewer/editor/diff
-├── apexflow.html       # Apex Class Diagram — call-flow visualizer for Salesforce .cls files
+├── apexflow.html       # Apex / Java Class Diagram — call-flow visualizer for .cls and .java files
 └── sf-debug-viewer.html # SF Debug Viewer — Salesforce debug log parser and tree viewer
 ```
 
