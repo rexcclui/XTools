@@ -1184,6 +1184,7 @@
                 });
                 attachEvents();
                 attachEdgeEvents(svgEl);
+                attachClusterEvents(svgEl);
                 if (selectedClassName) applyDiagramHighlight(selectedClassName);
             }
         } catch (err) { console.error(err); }
@@ -1735,6 +1736,44 @@
                     const items = flows[targetName] || [];
                     showEdgeContextMenu(e, sourceName, targetName, items);
                 });
+            });
+        });
+    }
+
+    function attachClusterEvents(svgEl) {
+        svgEl.querySelectorAll('g.cluster').forEach(cluster => {
+            // Resolve class name: prefer label text match against registry / known unloaded names
+            const labelEl = cluster.querySelector('.cluster-label text, .nodeLabel, foreignObject span, text');
+            const rawLabel = (labelEl?.textContent || '').trim();
+            const labelName = rawLabel.startsWith('? ') ? rawLabel.slice(2).trim() : rawLabel;
+
+            // Match against registry or safeId reverse-lookup
+            const known = Object.keys(registry).find(k => k === labelName || safeId(k) === safeId(labelName));
+
+            // Only attach to unloaded (ghost) class subgraphs — label starts with "? " or not in registry
+            const isGhost = rawLabel.startsWith('? ') || (labelName && !known);
+            if (!isGhost || !labelName) return;
+
+            cluster.style.cursor = 'context-menu';
+            const rect = cluster.querySelector('rect');
+            if (rect) rect.style.cursor = 'context-menu';
+
+            cluster.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                hideEdgeContextMenu();
+                const menu = document.getElementById('node-context-menu');
+                document.getElementById('ctx-toggle-nodes').style.display = 'none';
+                document.getElementById('ctx-hide-children').style.display = 'none';
+                document.getElementById('ctx-view-code').style.display = 'none';
+                const loadEl = document.getElementById('ctx-load-class');
+                loadEl.style.display = 'flex';
+                loadEl.querySelector('span').textContent = `Load "${labelName}"`;
+                loadEl.onclick = () => { hideNodeContextMenu(); loadClassByName(labelName); };
+                const mw = 200, mh = 50;
+                menu.style.left = Math.min(e.clientX, window.innerWidth - mw) + 'px';
+                menu.style.top = Math.min(e.clientY, window.innerHeight - mh) + 'px';
+                menu.style.display = 'block';
             });
         });
     }
