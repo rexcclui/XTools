@@ -60,7 +60,9 @@
         #fe-folder-name { width: 100%; padding: 4px 7px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; color: #94a3b8; font-size: 11px; font-family: monospace; outline: none; }
         #fe-folder-name::placeholder { color: #475569; font-style: italic; }
         #fe-folder-name:focus { border-color: var(--primary); color: var(--text-main); }
-        #edge-label-tooltip { position: fixed; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; padding: 7px 11px; font-size: 11px; color: var(--text-main); max-width: 300px; word-break: break-word; pointer-events: none; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: none; line-height: 1.5; }
+        #edge-label-tooltip { position: fixed; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 11px; color: var(--text-main); max-width: 300px; pointer-events: none; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: none; }
+        #edge-label-tooltip ul { margin: 0; padding: 0 0 0 14px; list-style: disc; }
+        #edge-label-tooltip li { padding: 1px 0; line-height: 1.6; word-break: break-word; }
         #fe-search { margin: 0 10px 8px; padding: 5px 9px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 5px; color: var(--text-main); font-size: 12px; outline: none; width: calc(100% - 20px); }
         #fe-search:focus { border-color: var(--primary); }
         #fe-tree { flex: 1; overflow-y: auto; padding: 0 6px 8px; min-height: 0; }
@@ -891,7 +893,7 @@
             const full = fullLabels[i];
             el.style.cursor = 'help';
             el.addEventListener('mouseenter', e => {
-                tooltip.textContent = full;
+                tooltip.innerHTML = '<ul>' + full.split(', ').map(r => `<li>${r}</li>`).join('') + '</ul>';
                 tooltip.style.display = 'block';
                 tooltip.style.left = (e.clientX + 14) + 'px';
                 tooltip.style.top = (e.clientY - 10) + 'px';
