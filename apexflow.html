@@ -223,6 +223,28 @@
         }
         .btn-toggle:hover { background: var(--primary); color: white; }
 
+        /* CLASS HISTORY PANEL */
+        #class-history-panel {
+            position: absolute; top: 68px; right: 12px; z-index: 500;
+            width: 260px; background: var(--bg-sidebar); border: 1px solid var(--border);
+            border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            display: none; flex-direction: column; overflow: hidden;
+        }
+        #class-history-panel.open { display: flex; }
+        #chp-header { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; font-size: 12px; font-weight: 700; color: #94a3b8; }
+        #chp-header span { flex: 1; }
+        #chp-close-btn { background: none; border: none; color: #64748b; cursor: pointer; font-size: 13px; padding: 0 3px; }
+        #chp-close-btn:hover { color: var(--text-main); }
+        #chp-list { max-height: 320px; overflow-y: auto; padding: 6px; }
+        .chp-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: background 0.1s; }
+        .chp-item:hover { background: rgba(255,255,255,0.05); }
+        .chp-item i { font-size: 11px; color: var(--primary); flex-shrink: 0; }
+        .chp-name { flex: 1; font-size: 12px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chp-meta { font-size: 10px; color: #64748b; flex-shrink: 0; }
+        .chp-del { background: none; border: none; color: #475569; cursor: pointer; font-size: 11px; padding: 0 3px; flex-shrink: 0; }
+        .chp-del:hover { color: var(--danger); }
+        #chp-empty { padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
+
         #drop-overlay {
             position: fixed; inset: 0; z-index: 9999;
             background: rgba(16, 185, 129, 0.12);
@@ -253,8 +275,19 @@
 <div id="node-context-menu">
     <div class="ctx-item" id="ctx-toggle-nodes"><i class="fa-solid fa-eye-slash"></i><span id="ctx-toggle-label">Hide Nodes</span></div>
     <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
 </div>
+
+<div id="class-history-panel">
+    <div id="chp-header">
+        <span>Class History</span>
+        <button id="chp-close-btn">✕</button>
+    </div>
+    <div id="chp-list"></div>
+</div>
+
+<input id="ctx-file-picker" type="file" accept=".cls,.java" style="display:none">
 
 <button class="btn-toggle" onclick="toggleSidebar()" title="Toggle Sidebar"><i class="fa-solid fa-bars"></i></button>
 
@@ -291,6 +324,7 @@
     <div class="toolbar">
         <h3 id="view-title" style="margin-left: 50px; font-size: 0.9rem; color: var(--text-dim);">Ready</h3>
         <div style="display: flex; gap: 10px;">
+            <button class="btn" id="history-btn" title="Class history"><i class="fa-solid fa-clock-rotate-left"></i></button>
             <button class="btn" id="copy-mermaid-btn" onclick="copyCurrentMermaid()" title="Copy Mermaid code">
                 <i class="fa-regular fa-copy"></i>
             </button>
@@ -642,6 +676,119 @@
         renderFileTree();
     });
 
+    // ── Class history ──────────────────────────────────────────────────────────
+    const LS_HIST_KEY = 'apexflow-class-history';
+    const MAX_HIST = 50;
+
+    function getClassHistory() {
+        try { return JSON.parse(localStorage.getItem(LS_HIST_KEY) || '[]'); } catch { return []; }
+    }
+
+    function saveClassToHistory(name, content) {
+        const hist = getClassHistory().filter(h => h.name !== name);
+        hist.unshift({ name, content, ts: Date.now() });
+        if (hist.length > MAX_HIST) hist.length = MAX_HIST;
+        localStorage.setItem(LS_HIST_KEY, JSON.stringify(hist));
+    }
+
+    function deleteClassFromHistory(name) {
+        const hist = getClassHistory().filter(h => h.name !== name);
+        localStorage.setItem(LS_HIST_KEY, JSON.stringify(hist));
+        renderClassHistory();
+    }
+
+    function renderClassHistory() {
+        const list = document.getElementById('chp-list');
+        const hist = getClassHistory();
+        list.innerHTML = '';
+        if (!hist.length) {
+            list.innerHTML = '<div id="chp-empty">No class history yet</div>';
+            return;
+        }
+        hist.forEach(h => {
+            const item = document.createElement('div');
+            item.className = 'chp-item';
+            const alreadyLoaded = !!registry[h.name];
+            item.innerHTML = `
+                <i class="fa-solid ${alreadyLoaded ? 'fa-circle-check' : 'fa-file-code'}"></i>
+                <span class="chp-name" title="${h.name}">${h.name}</span>
+                <span class="chp-meta">${alreadyLoaded ? 'loaded' : timeAgo(h.ts)}</span>
+                <button class="chp-del" title="Remove from history">✕</button>`;
+            item.querySelector('.chp-del').addEventListener('click', e => {
+                e.stopPropagation();
+                deleteClassFromHistory(h.name);
+            });
+            item.addEventListener('click', () => {
+                parseApex(h.content);
+                render();
+                toggleClassHistory(false);
+                feState.loadedNames.add(h.name + '.cls');
+                feState.loadedNames.add(h.name + '.java');
+                renderFileTree();
+            });
+            list.appendChild(item);
+        });
+    }
+
+    function timeAgo(ts) {
+        const s = Math.floor((Date.now() - ts) / 1000);
+        if (s < 60) return 'just now';
+        if (s < 3600) return `${Math.floor(s/60)}m ago`;
+        if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+        return `${Math.floor(s/86400)}d ago`;
+    }
+
+    function toggleClassHistory(forceOpen) {
+        const panel = document.getElementById('class-history-panel');
+        const shouldOpen = forceOpen !== undefined ? forceOpen : !panel.classList.contains('open');
+        panel.classList.toggle('open', shouldOpen);
+        if (shouldOpen) renderClassHistory();
+    }
+
+    document.getElementById('history-btn').addEventListener('click', () => toggleClassHistory());
+    document.getElementById('chp-close-btn').addEventListener('click', () => toggleClassHistory(false));
+    document.addEventListener('click', e => {
+        const panel = document.getElementById('class-history-panel');
+        if (!panel.contains(e.target) && e.target.id !== 'history-btn') {
+            panel.classList.remove('open');
+        }
+    });
+
+    // ── Load class from ghost node ─────────────────────────────────────────────
+    function ghostClassFromNode(node) {
+        const label = node.querySelector('.nodeLabel') || node.querySelector('text');
+        const text = (label?.textContent || '').trim();
+        if (!text.startsWith('?')) return null;
+        const name = text.replace(/^\?\s*/, '').trim();
+        return name && !registry[name] ? name : null;
+    }
+
+    function findFileInTree(className) {
+        if (!feState.tree) return null;
+        const targets = [`${className}.cls`, `${className}.java`].map(s => s.toLowerCase());
+        return flatFiles(feState.tree).find(f => targets.includes(f.name.toLowerCase())) || null;
+    }
+
+    async function loadClassByName(className) {
+        // 1. Try file explorer tree
+        const fileNode = findFileInTree(className);
+        if (fileNode) {
+            await loadFileNode(fileNode, null);
+            return;
+        }
+        // 2. Fallback: single file picker
+        const picker = document.getElementById('ctx-file-picker');
+        picker.onchange = async () => {
+            const file = picker.files[0];
+            if (!file) return;
+            const text = await file.text();
+            parseApex(text);
+            render();
+            picker.value = '';
+        };
+        picker.click();
+    }
+
     function toggleSidebar() {
         const sb = document.getElementById('sidebar');
         sb.classList.toggle('collapsed');
@@ -683,6 +830,7 @@
             methods[mName] = nextMatch > -1 ? content.slice(start, start + nextMatch) : content.slice(start);
         }
         registry[className] = { varMap, methods, raw: content };
+        saveClassToHistory(className, content);
     }
 
     function cleanLabel(text) {
@@ -1444,6 +1592,17 @@
             };
         }
 
+        // Load Class option — only for ghost (unloaded) nodes
+        const ghostName = ghostClassFromNode(node);
+        const loadEl = document.getElementById('ctx-load-class');
+        loadEl.style.display = ghostName ? 'flex' : 'none';
+        if (ghostName) {
+            const inTree = !!findFileInTree(ghostName);
+            loadEl.querySelector('span').textContent = inTree ? `Load "${ghostName}"` : `Load "${ghostName}"…`;
+            loadEl.querySelector('i').className = inTree ? 'fa-solid fa-file-import' : 'fa-solid fa-folder-open';
+            loadEl.onclick = () => { hideNodeContextMenu(); loadClassByName(ghostName); };
+        }
+
         // View Code option — only if method body exists
         const hasCode = className && methodName && registry[className]?.methods?.[methodName];
         document.getElementById('ctx-view-code').style.display = hasCode ? 'flex' : 'none';
@@ -1461,7 +1620,7 @@
 
         // Position and show
         menu.style.display = 'block';
-        const menuW = 180, menuH = 90;
+        const menuW = 200, menuH = 110;
         menu.style.left = Math.min(e.clientX, window.innerWidth - menuW) + 'px';
         menu.style.top = Math.min(e.clientY, window.innerHeight - menuH) + 'px';
     }
