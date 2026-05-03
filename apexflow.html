@@ -51,15 +51,15 @@
         #fe-open-btn { padding: 4px 10px; font-size: 11px; border-radius: 5px; border: 1px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; white-space: nowrap; }
         #fe-open-btn:hover { background: var(--primary); color: #fff; }
         #fe-fallback { display: none; }
-        #fe-folder-path { padding: 3px 12px 7px; font-size: 11px; color: #64748b; display: none; align-items: center; gap: 6px; min-width: 0; }
-        #fe-folder-path i { color: #f59e0b; flex-shrink: 0; }
-        #fe-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94a3b8; cursor: text; border-bottom: 1px dashed transparent; transition: border-color 0.15s; }
-        #fe-folder-name:empty::before { content: attr(data-placeholder); color: #475569; font-style: italic; }
-        #fe-folder-name:hover { border-bottom-color: #475569; }
-        #fe-folder-name:focus { outline: none; color: var(--text-main); border-bottom-color: var(--primary); white-space: normal; overflow: visible; }
-        #fe-reopen-btn { padding: 2px 7px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: #64748b; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+        #fe-folder-path { padding: 4px 10px 6px; display: none; flex-direction: column; gap: 3px; }
+        #fe-folder-path-label { font-size: 10px; color: #64748b; display: flex; align-items: center; gap: 5px; }
+        #fe-folder-path-label i { color: #f59e0b; }
+        #fe-folder-path-label span { flex: 1; }
+        #fe-reopen-btn { padding: 2px 7px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: #64748b; cursor: pointer; white-space: nowrap; }
         #fe-reopen-btn:hover { border-color: var(--primary); color: var(--primary); }
-        #fe-folder-edit-hint { font-size: 9px; color: #475569; flex-shrink: 0; pointer-events: none; }
+        #fe-folder-name { width: 100%; padding: 4px 7px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; color: #94a3b8; font-size: 11px; font-family: monospace; outline: none; }
+        #fe-folder-name::placeholder { color: #475569; font-style: italic; }
+        #fe-folder-name:focus { border-color: var(--primary); color: var(--text-main); }
         #edge-label-tooltip { position: fixed; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; padding: 7px 11px; font-size: 11px; color: var(--text-main); max-width: 300px; word-break: break-word; pointer-events: none; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: none; line-height: 1.5; }
         #fe-search { margin: 0 10px 8px; padding: 5px 9px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 5px; color: var(--text-main); font-size: 12px; outline: none; width: calc(100% - 20px); }
         #fe-search:focus { border-color: var(--primary); }
@@ -304,10 +304,12 @@
             <input id="fe-fallback" type="file" accept=".cls,.java" webkitdirectory multiple>
         </div>
         <div id="fe-folder-path">
-            <i class="fa-solid fa-folder"></i>
-            <span id="fe-folder-name" contenteditable="true" spellcheck="false" title="Click to enter or edit the full folder path" data-placeholder="click to enter path…"></span>
-            <span id="fe-folder-edit-hint" title="Editable">✎</span>
-            <button id="fe-reopen-btn" title="Re-open this folder">↺ Reopen</button>
+            <div id="fe-folder-path-label">
+                <i class="fa-solid fa-folder"></i>
+                <span>Folder path</span>
+                <button id="fe-reopen-btn" title="Re-open this folder">↺ Reopen</button>
+            </div>
+            <input id="fe-folder-name" type="text" spellcheck="false" placeholder="Paste full path here, e.g. /home/user/project/src" autocomplete="off">
         </div>
         <input id="fe-search" placeholder="Search files…" autocomplete="off">
         <div id="fe-tree"><div id="fe-empty">Open a folder to browse source files</div></div>
@@ -506,25 +508,28 @@
     // ── Folder path display ────────────────────────────────────────────────────
     const LS_PATH_KEY = 'apexflow-folder-path';
 
-    function showFolderPath(folderName) {
+    function showFolderPath(folderName, autoFocus = false) {
         const bar = document.getElementById('fe-folder-path');
         const nameEl = document.getElementById('fe-folder-name');
-        // Use stored custom path if it was set for this folder, else show folder name
         const stored = localStorage.getItem(LS_PATH_KEY);
-        nameEl.textContent = stored || folderName;
+        nameEl.value = stored || folderName;
         bar.style.display = 'flex';
+        if (autoFocus) {
+            // Select-all so user can immediately paste or type the full path
+            setTimeout(() => { nameEl.focus(); nameEl.select(); }, 80);
+        }
     }
 
-    // Save custom path edits to localStorage
-    document.getElementById('fe-folder-name').addEventListener('blur', e => {
-        const val = e.target.textContent.trim();
+    // Save path edits to localStorage on change
+    document.getElementById('fe-folder-name').addEventListener('change', e => {
+        const val = e.target.value.trim();
         if (val) localStorage.setItem(LS_PATH_KEY, val);
     });
     document.getElementById('fe-folder-name').addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+        if (e.key === 'Enter') e.target.blur();
         if (e.key === 'Escape') {
             const stored = localStorage.getItem(LS_PATH_KEY);
-            e.target.textContent = stored || feState.dirHandle?.name || '';
+            e.target.value = stored || feState.dirHandle?.name || '';
             e.target.blur();
         }
     });
@@ -539,7 +544,7 @@
         feState.dirHandle = dirHandle;
         feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
         if (!isReopen) localStorage.removeItem(LS_PATH_KEY);
-        showFolderPath(dirHandle.name);
+        showFolderPath(dirHandle.name, !isReopen);
         renderFileTree();
         await idbSaveHandle(dirHandle);
     }
@@ -570,8 +575,6 @@
         if (!handle) return;
         feState.dirHandle = handle;
         showFolderPath(handle.name);
-        // Show reopen prompt instead of auto-loading (permission may have lapsed)
-        document.getElementById('fe-folder-path').style.display = 'flex';
         document.getElementById('fe-empty').textContent = `Click ↺ Reopen to reload "${handle.name}"`;
     });
 
