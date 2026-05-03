@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Apex Class Diagram</title>
+    <title>Java Class Diagram</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
@@ -217,8 +217,8 @@
 <button class="btn-toggle" onclick="toggleSidebar()" title="Toggle Sidebar"><i class="fa-solid fa-bars"></i></button>
 
 <div id="sidebar">
-    <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex Class Diagram</h2></div>
-    <div id="drop-zone">Drag .cls Files Here</div>
+    <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Java Class Diagram</h2></div>
+    <div id="drop-zone">Drag .java Files Here</div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>
         <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()">Clear All</button></div>
@@ -278,8 +278,8 @@
     let tooltipResizeState = { isResizing: false, startX: 0, startY: 0, startWidth: 0, startHeight: 0 };
     let tooltipInteractionGuardUntil = 0;
 
-    const SYSTEM_TYPES = new Set(['list', 'set', 'map', 'string', 'integer', 'long', 'decimal', 'double', 'boolean', 'id', 'blob', 'date', 'datetime', 'time', 'object', 'database', 'schema', 'sobject', 'system', 'limits', 'userinfo', 'exception', 'selectoption', 'pagereference', 'json', 'pattern', 'matcher', 'crypto', 'http', 'httprequest', 'httpresponse']);
-    const BANNED_METHODS = new Set(['add', 'get', 'put', 'putall', 'addall', 'size', 'contains', 'containskey', 'isempty', 'remove', 'clear', 'values', 'keyset', 'clone', 'sort', 'indexof', 'substring', 'length', 'tolowercase', 'touppercase', 'trim', 'split', 'replace', 'format', 'valueof']);
+    const SYSTEM_TYPES = new Set(['list', 'set', 'map', 'string', 'integer', 'long', 'double', 'float', 'boolean', 'byte', 'short', 'char', 'void', 'object', 'number', 'math', 'system', 'runtime', 'thread', 'runnable', 'callable', 'exception', 'runtimeexception', 'throwable', 'error', 'optional', 'stream', 'collectors', 'collections', 'arrays', 'objects', 'stringbuilder', 'stringbuffer', 'iterable', 'iterator', 'comparable', 'comparator', 'arraylist', 'linkedlist', 'hashmap', 'linkedhashmap', 'treemap', 'hashset', 'linkedhashset', 'treeset', 'queue', 'deque', 'stack', 'vector', 'properties', 'date', 'calendar', 'localdate', 'localdatetime', 'instant', 'duration', 'pattern', 'matcher', 'scanner', 'printstream', 'inputstream', 'outputstream', 'reader', 'writer', 'file', 'path', 'files', 'paths', 'json', 'logger', 'log']);
+    const BANNED_METHODS = new Set(['add', 'get', 'put', 'putall', 'addall', 'size', 'contains', 'containskey', 'isempty', 'remove', 'clear', 'values', 'keyset', 'entryset', 'clone', 'sort', 'indexof', 'substring', 'length', 'tolowercase', 'touppercase', 'trim', 'strip', 'split', 'replace', 'replaceall', 'format', 'valueof', 'tostring', 'equals', 'hashcode', 'compareto', 'iterator', 'stream', 'foreach', 'println', 'print', 'printf', 'append', 'toarray', 'asList', 'aslist', 'ofnullable', 'isPresent', 'ispresent', 'orElse', 'orelse', 'getordefault']);
     const PATH_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e', '#14b8a6'];
 
     const dropZone = document.getElementById('drop-zone');
@@ -288,7 +288,7 @@
         e.preventDefault();
 
         const clsFiles = Array.from(e.dataTransfer.files)
-            .filter(file => file.name.toLowerCase().endsWith('.cls'));
+            .filter(file => file.name.toLowerCase().endsWith('.java'));
 
         if (clsFiles.length === 0) return;
 
@@ -318,7 +318,7 @@
         if (!classNameMatch) return;
         const className = classNameMatch[1];
         const varMap = {}; 
-        const varRegex = /(?:public|private|protected|global|(?:\s|^|[,(]))\s*([\w<>.]+)\s+(\w+)\s*[;=,)]/g;
+        const varRegex = /(?:public|private|protected|(?:\s|^|[,(]))\s*([\w<>.]+)\s+(\w+)\s*[;=,)]/g;
         let vMatch;
         while ((vMatch = varRegex.exec(content)) !== null) { 
             if(!['return','if','for'].includes(vMatch[1])) varMap[vMatch[2]] = vMatch[1];
@@ -331,7 +331,7 @@
             varMap[diMatch[1]] = diMatch[2]; // override with the real impl class
         }
         const methods = {};
-        const methodRegex = /\b(?:public|private|protected|global)\s+(?:(?:static|virtual|override|final|abstract|webservice|testmethod)\s+)*(?:[\w.\[\],<>\s]+?)\s+(\w+)\s*\(/g;
+        const methodRegex = /\b(?:public|private|protected)\s+(?:(?:static|final|abstract|synchronized|native|default|strictfp)\s+)*(?:[\w.\[\],<>\s]+?)\s+(\w+)\s*\(/g;
         let mMatch;
         while ((mMatch = methodRegex.exec(content)) !== null) {
             const mName = mMatch[1];
