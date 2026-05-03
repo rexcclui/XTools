@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Apex Class Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-main: #0f172a;        
+            --bg-sidebar: #1e293b;     
+            --primary: #10b981;        
+            --danger: #ef4444;
+            --text-main: #f1f5f9;
+            --border: #334155;
+            --highlight: #fbbf24; 
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+        body { display: flex; height: 100vh; width: 100vw; background: var(--bg-main); color: var(--text-main); }
+
+        /* TEXT SELECTION */
+        body, #sidebar, #code-tooltip, .class-card { user-select: text; -webkit-user-select: text; }
+
+        /* COLLAPSIBLE SIDEBAR */
+        #sidebar { 
+            width: 380px; min-width: 380px; background: var(--bg-sidebar); 
+            border-right: 1px solid var(--border); display: flex; flex-direction: column; 
+            height: 100%; z-index: 20; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar.collapsed { width: 0; min-width: 0; transform: translateX(-380px); }
+
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); }
+        #drop-zone { margin: 15px; padding: 20px; border: 2px dashed var(--primary); border-radius: 12px; text-align: center; color: var(--primary); cursor: pointer; background: rgba(16, 185, 129, 0.05); }
+
+        #registry-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .class-card { background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
+        .class-card.active { border-color: var(--highlight); background: rgba(251, 191, 36, 0.05); }
+        .class-card.hidden { opacity: 0.6; }
+
+        /* METHOD PICKER PANEL */
+        #method-picker { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+        #method-picker.visible { display: flex; }
+        #method-picker-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        #method-picker-classname { font-weight: 700; font-size: 0.95rem; color: var(--primary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #method-picker-list { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .method-pill { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); background: var(--bg-main); transition: 0.15s; user-select: none; }
+        .method-pill:hover { border-color: var(--primary); }
+        .method-pill.enabled { border-color: var(--primary); background: rgba(16,185,129,0.08); }
+        .method-pill .pill-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--border); background: transparent; flex-shrink: 0; transition: 0.15s; }
+        .method-pill.enabled .pill-dot { background: var(--primary); border-color: var(--primary); }
+        .method-pill .pill-name { font-size: 13px; font-weight: 600; flex: 1; }
+        .method-pill .pill-badge { font-size: 10px; color: #64748b; background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+
+        /* VIEWPORT & ASPECT RATIO */
+        #viewport { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; transition: margin-left 0.4s ease; }
+        .toolbar { height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; justify-content: space-between; align-items: center; z-index: 25; }
+
+        #diagram-wrapper { 
+            flex: 1; 
+            position: relative; 
+            overflow: auto;
+            background: var(--bg-main);
+            display: flex;
+            align-items: stretch;
+            justify-content: stretch;
+        }
+
+        #mermaid-area { 
+            width: auto;
+            height: 100%;
+            /* Allow SVG to expand and scroll horizontally */
+            overflow: auto;
+            min-width: 100%;
+            display: inline-flex;
+        }
+
+        #mermaid-area .nodeLabel,
+        #mermaid-area svg text {
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        /* Entry method nodes are clickable in focused flow */
+        #mermaid-area svg [id*="entry"] .node rect {
+            cursor: pointer;
+            transition: stroke 0.2s, fill 0.2s;
+        }
+        #mermaid-area svg [id*="entry"] .node:hover rect {
+            stroke: var(--primary) !important;
+            filter: drop-shadow(0 0 3px var(--primary));
+        }
+
+        /* HIGHLIGHT PULSE */
+        .node-focused rect, .node-focused polygon, .node-focused path, .node-focused circle {
+            stroke: var(--highlight) !important;
+            stroke-width: 6px !important;
+            filter: drop-shadow(0 0 10px var(--highlight));
+        }
+
+        #code-tooltip { 
+            position: fixed; 
+            display: none; 
+            z-index: 1000; 
+            background: #1d1d1d; 
+            border: 1px solid var(--primary); 
+            border-radius: 8px; 
+            padding: 0;
+            width: 720px;
+            height: 480px;
+            max-width: 90vw;
+            max-height: 90vh;
+            min-width: 300px;
+            min-height: 150px;
+            overflow: hidden;
+            pointer-events: auto; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            user-select: none;
+            -webkit-user-select: none;
+            flex-direction: column;
+        }
+        #code-tooltip-body, #code-tooltip-body * {
+            user-select: text;
+            -webkit-user-select: text;
+            cursor: text;
+        }
+        #tooltip-copy-btn { padding: 4px 10px; font-size: 11px; border-radius: 5px; border: 1px solid var(--border); background: transparent; color: var(--primary); cursor: pointer; transition: 0.15s; }
+        #tooltip-copy-btn:hover { background: var(--primary); color: #fff; }
+        #tooltip-close-btn { padding: 4px 8px; font-size: 13px; border-radius: 5px; border: none; background: transparent; color: #64748b; cursor: pointer; line-height: 1; }
+        #tooltip-close-btn:hover { color: #fff; }
+        #code-tooltip-header {
+            background: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 12px;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        #code-tooltip-body {
+            padding: 15px;
+            overflow: auto;
+            flex: 1;
+            min-height: 0;
+        }
+        #code-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: se-resize;
+            background: linear-gradient(135deg, transparent 50%, var(--primary) 50%);
+            pointer-events: auto;
+        }
+        #code-tooltip pre,
+        #code-tooltip code { font-size: 0.9rem; }
+
+        .btn { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-sidebar); color: var(--text-main); cursor: pointer; font-size: 11px; font-weight: 600; }
+        .btn-primary { background: var(--primary); color: white; border: none; }
+        
+        #node-context-menu {
+            position: fixed; display: none; z-index: 2000;
+            background: #1e293b; border: 1px solid #334155;
+            border-radius: 8px; overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            min-width: 170px;
+        }
+        .ctx-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; cursor: pointer; font-size: 13px;
+            color: #e2e8f0; transition: background 0.12s;
+        }
+        .ctx-item:hover { background: #334155; }
+        .ctx-item i { width: 14px; text-align: center; color: #10b981; }
+        .ctx-separator { height: 1px; background: #334155; margin: 2px 0; }
+        .btn-toggle { 
+            position: absolute; top: 12px; left: 12px; z-index: 100; 
+            background: var(--bg-sidebar); border: 1px solid var(--primary); 
+            color: var(--primary); width: 36px; height: 36px; border-radius: 8px; 
+            cursor: pointer; transition: 0.3s;
+        }
+        .btn-toggle:hover { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+
+<div id="code-tooltip">
+    <div id="code-tooltip-header">
+        <span id="tooltip-title">Code Snippet</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+            <button id="tooltip-copy-btn" onclick="copyTooltipCode()"><i class="fa-regular fa-copy"></i> Copy</button>
+            <button id="tooltip-close-btn" onclick="hideCodeTooltip()" title="Close">✕</button>
+        </div>
+    </div>
+    <div id="code-tooltip-body">
+        <pre><code class="language-java" id="tooltip-code"></code></pre>
+    </div>
+</div>
+
+<div id="node-context-menu">
+    <div class="ctx-item" id="ctx-toggle-nodes"><i class="fa-solid fa-eye-slash"></i><span id="ctx-toggle-label">Hide Nodes</span></div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
+</div>
+
+<button class="btn-toggle" onclick="toggleSidebar()" title="Toggle Sidebar"><i class="fa-solid fa-bars"></i></button>
+
+<div id="sidebar">
+    <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex Class Diagram</h2></div>
+    <div id="drop-zone">Drag .cls Files Here</div>
+    <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+        <div id="registry-list"></div>
+        <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()">Clear All</button></div>
+    </div>
+    <div id="method-picker">
+        <div id="method-picker-header">
+            <button class="btn" onclick="exitAnalyzeFlow()" style="padding:6px 10px;"><i class="fa-solid fa-arrow-left"></i></button>
+            <span id="method-picker-classname"></span>
+        </div>
+        <div id="method-picker-list"></div>
+    </div>
+</div>
+
+<div id="viewport">
+    <div class="toolbar">
+        <h3 id="view-title" style="margin-left: 50px; font-size: 0.9rem; color: var(--text-dim);">Ready</h3>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn" id="copy-mermaid-btn" onclick="copyCurrentMermaid()" title="Copy Mermaid code">
+                <i class="fa-regular fa-copy"></i>
+            </button>
+            <button class="btn btn-primary" id="reset-btn" onclick="exitAnalyzeFlow()" style="display:none;">Back to Overview</button>
+        </div>
+    </div>
+    <div id="diagram-wrapper">
+        <div id="mermaid-area"></div>
+    </div>
+</div>
+
+<script>
+    // Configured for portrait-friendly graph generation
+    mermaid.initialize({ 
+        startOnLoad: false, 
+        theme: 'dark', 
+        securityLevel: 'loose', 
+        flowchart: {
+            useMaxWidth: false,
+            defaultRenderer: 'elk',
+            rankSpacing: 80,
+            nodeSpacing: 25,
+            curve: 'basis'
+        } 
+    });
+    
+    const registry = {};
+    let focusedClass = null;
+    let panZoomInstance = null;
+    let selectedClassName = null;
+    let tooltipGlobalHandlersBound = false;
+    let currentMermaidDefinition = '';
+    let hiddenClasses = new Set();
+    let expandedMethods = new Map();
+    let activeMethods = new Set();
+    let collapsedMethods = new Set(); // Active methods whose subnodes are hidden
+    let collapsedDepth1 = new Set();  // Depth-1 node ids whose depth-2 subnodes are hidden
+    let currentRenderedEdgeStyles = [];
+    let tooltipDragState = { isDragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 };
+    let tooltipResizeState = { isResizing: false, startX: 0, startY: 0, startWidth: 0, startHeight: 0 };
+    let tooltipInteractionGuardUntil = 0;
+
+    const SYSTEM_TYPES = new Set(['list', 'set', 'map', 'string', 'integer', 'long', 'decimal', 'double', 'boolean', 'id', 'blob', 'date', 'datetime', 'time', 'object', 'database', 'schema', 'sobject', 'system', 'limits', 'userinfo', 'exception', 'selectoption', 'pagereference', 'json', 'pattern', 'matcher', 'crypto', 'http', 'httprequest', 'httpresponse']);
+    const BANNED_METHODS = new Set(['add', 'get', 'put', 'putall', 'addall', 'size', 'contains', 'containskey', 'isempty', 'remove', 'clear', 'values', 'keyset', 'clone', 'sort', 'indexof', 'substring', 'length', 'tolowercase', 'touppercase', 'trim', 'split', 'replace', 'format', 'valueof']);
+    const PATH_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e', '#14b8a6'];
+
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.addEventListener('dragover', e => e.preventDefault());
+    dropZone.addEventListener('drop', async e => {
+        e.preventDefault();
+
+        const clsFiles = Array.from(e.dataTransfer.files)
+            .filter(file => file.name.toLowerCase().endsWith('.cls'));
+
+        if (clsFiles.length === 0) return;
+
+        for (const file of clsFiles) {
+            const text = await file.text();
+            parseApex(text);
+        }
+
+        render();
+    });
+
+    function toggleSidebar() {
+        const sb = document.getElementById('sidebar');
+        sb.classList.toggle('collapsed');
+        // Wait for CSS transition to finish before resizing diagram
+        setTimeout(() => {
+            if(panZoomInstance) {
+                panZoomInstance.resize();
+                panZoomInstance.fit();
+                panZoomInstance.center();
+            }
+        }, 410);
+    }
+
+    function parseApex(content) {
+        const classNameMatch = content.match(/class\s+(\w+)/i);
+        if (!classNameMatch) return;
+        const className = classNameMatch[1];
+        const varMap = {}; 
+        const varRegex = /(?:public|private|protected|global|(?:\s|^|[,(]))\s*([\w<>.]+)\s+(\w+)\s*[;=,)]/g;
+        let vMatch;
+        while ((vMatch = varRegex.exec(content)) !== null) { 
+            if(!['return','if','for'].includes(vMatch[1])) varMap[vMatch[2]] = vMatch[1];
+        }
+        // DI pattern: new SomeWrapper(ActualClass.class) — map variable to the inner .class arg
+        // e.g. new pselib_Dependency(SMAC_ImpactAnalysisServiceImpl.class)
+        const diRegex = /(?:[\w<>]+)\s+(\w+)\s*=\s*new\s+\w[\w.<>]*\s*\(\s*(\w+)\.class\s*\)/g;
+        let diMatch;
+        while ((diMatch = diRegex.exec(content)) !== null) {
+            varMap[diMatch[1]] = diMatch[2]; // override with the real impl class
+        }
+        const methods = {};
+        const methodRegex = /\b(?:public|private|protected|global)\s+(?:(?:static|virtual|override|final|abstract|webservice|testmethod)\s+)*(?:[\w.\[\],<>\s]+?)\s+(\w+)\s*\(/g;
+        let mMatch;
+        while ((mMatch = methodRegex.exec(content)) !== null) {
+            const mName = mMatch[1];
+            if (['if','for','while','switch'].includes(mName)) continue;
+            const start = mMatch.index;
+            const nextMatch = content.slice(start + 1).search(/(?:public|private|protected|global)\s/);
+            methods[mName] = nextMatch > -1 ? content.slice(start, start + nextMatch) : content.slice(start);
+        }
+        registry[className] = { varMap, methods, raw: content };
+    }
+
+    function cleanLabel(text) {
+        if (!text) return "";
+        return text.replace(/"/g, "'").replace(/[\[\]\(\)]/g, "").trim();
+    }
+
+    function normalizeEdgeKeyPart(value) {
+        return String(value || '').replace(/[^\w]/g, '_');
+    }
+
+    function applyRenderedEdgeStyles(svgEl) {
+        if (!svgEl || !currentRenderedEdgeStyles.length) return;
+
+        const edgeUsageCount = new Map();
+        const allRenderedEdges = Array.from(svgEl.querySelectorAll('.edgePath'));
+        const fallbackVisibleEdges = allRenderedEdges.slice(-currentRenderedEdgeStyles.length);
+
+        currentRenderedEdgeStyles.forEach((edge, styleIndex) => {
+            const fromKey = normalizeEdgeKeyPart(edge.from);
+            const toKey = normalizeEdgeKeyPart(edge.to);
+            const selector = `.edgePath.LS-${fromKey}.LE-${toKey}`;
+            const matchingEdges = Array.from(svgEl.querySelectorAll(selector));
+
+            const edgeKey = `${fromKey}->${toKey}`;
+            const matchIndex = edgeUsageCount.get(edgeKey) || 0;
+            let edgeEl = matchingEdges[Math.min(matchIndex, Math.max(0, matchingEdges.length - 1))];
+            if (!edgeEl) {
+                edgeEl = fallbackVisibleEdges[styleIndex] || null;
+            }
+            edgeUsageCount.set(edgeKey, matchIndex + 1);
+            if (!edgeEl) return;
+
+            const pathEl = edgeEl.querySelector('path.path') || edgeEl.querySelector('path');
+            if (pathEl) {
+                pathEl.style.stroke = edge.color;
+                pathEl.style.strokeWidth = edge.width;
+                pathEl.style.fill = 'none';
+                pathEl.style.strokeDasharray = edge.dasharray || 'none';
+            }
+
+            const markerPaths = Array.from(svgEl.querySelectorAll('marker path'));
+            markerPaths.forEach(markerEl => {
+                const markerId = markerEl.closest('marker')?.id || '';
+                if (edgeEl.innerHTML.includes(markerId)) {
+                    markerEl.style.stroke = edge.color;
+                    markerEl.style.fill = edge.color;
+                }
+            });
+        });
+    }
+
+    function safeId(n) { return n ? n.replace(/[^\w]/g, '_') : "unknown"; }
+
+    async function render() {
+        const list = document.getElementById('registry-list');
+        list.innerHTML = "";
+        Object.keys(registry).sort().forEach(name => {
+            const isHidden = hiddenClasses.has(name);
+            const card = document.createElement('div');
+            card.className = 'class-card' + (selectedClassName === name ? ' active' : '') + (isHidden ? ' hidden' : '');
+            card.id = `card-${safeId(name)}`;
+            card.onclick = () => focusAndHighlight(name);
+            card.innerHTML = `<div style="font-weight:600; font-size:13px;">${name}</div>
+                <div style="display:flex; gap:8px; margin-top:10px;">
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); setView('${name}')" style="flex:1">Analyze Flow</button>
+                    <button class="btn" title="${isHidden ? 'Show in diagram' : 'Hide from diagram'}" onclick="event.stopPropagation(); toggleClassVisibility('${name}')">
+                        <i class="fa-solid ${isHidden ? 'fa-eye' : 'fa-eye-slash'}"></i>
+                    </button>
+                    <button class="btn" style="border-color:var(--danger); color:var(--danger);" onclick="event.stopPropagation(); delete registry['${name}']; render();">✖</button>
+                </div>`;
+            list.appendChild(card);
+        });
+
+        const wrapper = document.getElementById('mermaid-area');
+        let def = "";
+        let ghostNodes = new Set();
+        let linkCounter = 0;
+        let styleDirectives = [];
+        currentRenderedEdgeStyles = [];
+
+        if (!focusedClass) {
+            document.getElementById('view-title').innerText = "System Architecture Map";
+            document.getElementById('reset-btn').style.display = "none";
+            // LR (Left-Right) for rightward cascading flow
+            def = "graph LR\n";
+            Object.keys(registry).filter(cName => !hiddenClasses.has(cName)).forEach(cName => {
+                const flows = aggregateFlows(registry[cName].raw, registry[cName].varMap, cName);
+                Object.keys(flows).forEach(target => {
+                    if (hiddenClasses.has(target)) return;
+                    const label = cleanLabel(flows[target].length > 1 ? flows[target][0] + "..." : flows[target][0]);
+                    def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
+                    if (!registry[target]) ghostNodes.add(target);
+                });
+                def += `  ${safeId(cName)}["${cName}"]\n`;
+            });
+        } else {
+            document.getElementById('view-title').innerText = `Flow Analysis: ${focusedClass}`;
+            document.getElementById('reset-btn').style.display = "inline-block";
+            def = `graph LR\n`;
+
+            const firstLevelClasses = {};
+            const secondLevelClasses = {};
+            const entryEdges = [];
+            const downstreamEdges = [];
+            const blockColors = new Map();
+            let nextBlockColorIndex = 0;
+
+            function getBlockColor(blockKey) {
+                if (!blockColors.has(blockKey)) {
+                    blockColors.set(blockKey, PATH_COLORS[nextBlockColorIndex % PATH_COLORS.length]);
+                    nextBlockColorIndex++;
+                }
+                return blockColors.get(blockKey);
+            }
+
+            function buildNode(level, className, methodName) {
+                const classId = safeId(className);
+                if (methodName) return { id: `l${level}__${classId}___${safeId(methodName)}`, label: `${methodName}()`, className, methodName };
+                return { id: `l${level}__${classId}__class`, label: registry[className] ? className : `? ${className}`, className, methodName: null };
+            }
+
+            const activeMethodList = [...activeMethods];
+
+            if (activeMethodList.length === 0) {
+                def += `  empty["Select a method from the sidebar to view its call flow"]\n`;
+                def += `  style empty fill:#1e293b,stroke:#334155,color:#64748b\n`;
+            } else {
+                activeMethodList.forEach(entryMethod => {
+                    const entryNodeId = `${safeId(focusedClass)}___${safeId(entryMethod)}`;
+                    const isCollapsed = collapsedMethods.has(entryMethod);
+                    const icon = isCollapsed ? '⊕' : '⊖';
+                    def += `  ${entryNodeId}["${icon} ${entryMethod}()"]\n`;
+                    def += `  style ${entryNodeId} fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f1f5f9\n`;
+                });
+
+                let globalSeq = 0;
+
+                activeMethodList.forEach(entryMethod => {
+                    if (collapsedMethods.has(entryMethod)) return;
+                    const entryBlockColor = getBlockColor(`entry:${entryMethod}`);
+                    const depth1Calls = collectOrderedCalls(registry[focusedClass].methods[entryMethod], registry[focusedClass].varMap, focusedClass);
+
+                    depth1Calls.forEach(call => {
+                        const targetClass = call.target;
+                        if (hiddenClasses.has(targetClass)) return;
+                        const targetNode = buildNode(1, targetClass, call.method);
+                        const firstLevelBlockColor = getBlockColor(`depth1:${targetClass}:${call.method}`);
+                        const isD1Collapsed = collapsedDepth1.has(targetNode.id);
+                        if (!firstLevelClasses[targetNode.id]) {
+                            const d2Calls = registry[targetClass]?.methods?.[call.method]
+                                ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
+                                : [];
+                            const hasChildren = d2Calls.length > 0;
+                            const d1Icon = hasChildren ? (isD1Collapsed ? ' ⊕' : ' ⊖') : '';
+                            firstLevelClasses[targetNode.id] = {
+                                node: { ...targetNode, displayLabel: `${cleanLabel(targetNode.label)}${d1Icon}` },
+                                color: firstLevelBlockColor, seq: globalSeq++
+                            };
+                        }
+                        entryEdges.push({ from: `${safeId(focusedClass)}___${safeId(entryMethod)}`, to: targetNode.id, label: call.sequenceLabel, color: entryBlockColor });
+
+                        if (!isD1Collapsed && registry[targetClass]?.methods?.[call.method]) {
+                            collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass).forEach(nestedCall => {
+                                const nextClass = nestedCall.target;
+                                if (hiddenClasses.has(nextClass)) return;
+                                const downstreamNode = buildNode(2, nextClass, nestedCall.method);
+                                if (!secondLevelClasses[downstreamNode.id]) {
+                                    secondLevelClasses[downstreamNode.id] = { node: downstreamNode, color: getBlockColor(`depth2:${nextClass}`), seq: globalSeq++ };
+                                }
+                                downstreamEdges.push({ from: targetNode.id, to: downstreamNode.id, label: nestedCall.sequenceLabel, color: firstLevelBlockColor });
+                            });
+                        }
+                    });
+                });
+
+                function renderDepthBlocks(level, title, depthMethods) {
+                    const entries = Object.values(depthMethods).sort((a, b) => a.seq - b.seq);
+                    if (!entries.length) return;
+                    def += `  subgraph ${safeId(focusedClass)}___depth${level}["${title}"]\n    direction TB\n`;
+                    entries.forEach(e => { def += `    ${e.node.id}["${e.node.displayLabel || cleanLabel(e.node.label)}"]\n`; });
+                    def += `  end\n`;
+                }
+
+                renderDepthBlocks(1, 'Direct Method Calls', firstLevelClasses);
+                renderDepthBlocks(2, 'Nested Method Calls', secondLevelClasses);
+
+                entryEdges.forEach(edge => {
+                    def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
+                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:3px,fill:none`);
+                    linkCounter++;
+                });
+                downstreamEdges.forEach(edge => {
+                    def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
+                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:2px,fill:none,stroke-dasharray:6 3`);
+                    linkCounter++;
+                });
+            }
+        }
+
+        ghostNodes.forEach(ghost => {
+            def += `  ${safeId(ghost)}[["? ${ghost}"]]\n`;
+            def += `  style ${safeId(ghost)} stroke-dasharray: 5 5, fill: #1e293b, stroke: #10b981\n`;
+        });
+
+        if (styleDirectives.length) {
+            def += `\n${styleDirectives.join('\n')}\n`;
+        }
+
+        currentMermaidDefinition = def;
+
+        let savedPanZoom = null;
+        if (panZoomInstance) {
+            savedPanZoom = { pan: panZoomInstance.getPan(), zoom: panZoomInstance.getZoom() };
+            panZoomInstance.destroy(); panZoomInstance = null;
+        }
+        try {
+            const { svg } = await mermaid.render('graphDiv', def);
+            wrapper.innerHTML = svg;
+            const svgEl = wrapper.querySelector('svg');
+            if (svgEl) {
+                svgEl.removeAttribute('height'); svgEl.removeAttribute('width');
+                svgEl.style.width = "100%"; svgEl.style.height = "100%";
+                applyRenderedEdgeStyles(svgEl);
+                panZoomInstance = svgPanZoom(svgEl, {
+                    zoomEnabled: true,
+                    dblClickZoomEnabled: false,
+                    fit: false,
+                    center: false
+                });
+                requestAnimationFrame(() => {
+                    if (!panZoomInstance) return;
+                    panZoomInstance.resize();
+                    if (savedPanZoom) {
+                        panZoomInstance.zoom(savedPanZoom.zoom);
+                        panZoomInstance.pan(savedPanZoom.pan);
+                    } else {
+                        panZoomInstance.fit();
+                        panZoomInstance.center();
+                    }
+                });
+                attachEvents();
+                if (selectedClassName) applyDiagramHighlight(selectedClassName);
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    function selectNodeText(node) {
+        const label = node.querySelector('.nodeLabel') || node.querySelector('text');
+        if (!label) return;
+        const textNode = label.firstChild;
+        if (!textNode) return;
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    function focusAndHighlight(name) {
+        hideCodeTooltip();
+        selectedClassName = name;
+        document.querySelectorAll('.class-card').forEach(c => c.classList.remove('active'));
+        const card = document.getElementById(`card-${safeId(name)}`);
+        if (card) card.classList.add('active');
+        applyDiagramHighlight(name);
+        if (!panZoomInstance || focusedClass) return;
+
+        const node = getDiagramNodeByClassName(name);
+        if (node) {
+            const bbox = node.getBBox();
+            const area = document.getElementById('mermaid-area');
+            const viewportWidth = Math.max(1, area.clientWidth);
+            const viewportHeight = Math.max(1, area.clientHeight);
+
+            // Dynamic zoom tuned to avoid over-zooming.
+            const targetNodeWidth = Math.max(140, viewportWidth * 0.24);
+            const targetNodeHeight = Math.max(70, viewportHeight * 0.12);
+            const widthZoom = targetNodeWidth / Math.max(1, bbox.width);
+            const heightZoom = targetNodeHeight / Math.max(1, bbox.height);
+            const zoom = Math.max(0.9, Math.min(1.6, Math.min(widthZoom, heightZoom)));
+
+            panZoomInstance.zoom(zoom);
+            panZoomInstance.pan({
+                x: (viewportWidth / 2) - ((bbox.x + bbox.width / 2) * zoom),
+                y: (viewportHeight / 2) - ((bbox.y + bbox.height / 2) * zoom)
+            });
+
+            // Second pass: correct any residual offset in screen space.
+            requestAnimationFrame(() => {
+                const nodeRect = node.getBoundingClientRect();
+                const areaRect = area.getBoundingClientRect();
+                const deltaX = (areaRect.left + areaRect.width / 2) - (nodeRect.left + nodeRect.width / 2);
+                const deltaY = (areaRect.top + areaRect.height / 2) - (nodeRect.top + nodeRect.height / 2);
+                const currentPan = panZoomInstance.getPan();
+                panZoomInstance.pan({
+                    x: currentPan.x + deltaX,
+                    y: currentPan.y + deltaY
+                });
+            });
+        }
+    }
+
+    function toggleClassVisibility(name) {
+        if (hiddenClasses.has(name)) {
+            hiddenClasses.delete(name);
+        } else {
+            hiddenClasses.add(name);
+            if (focusedClass === name) focusedClass = null;
+            if (selectedClassName === name) selectedClassName = null;
+        }
+        render();
+    }
+
+    function applyDiagramHighlight(name) {
+        document.querySelectorAll('.node').forEach(n => n.classList.remove('node-focused'));
+        const node = getDiagramNodeByClassName(name);
+        if (node) node.classList.add('node-focused');
+    }
+
+    function getDiagramNodeByClassName(name) {
+        const wanted = (name || '').trim();
+        if (!wanted) return null;
+
+        const nodes = Array.from(document.querySelectorAll('.node'));
+
+        // Prefer exact label text match to avoid partial id collisions.
+        const byLabel = nodes.find(node => {
+            const label = node.querySelector('.nodeLabel') || node.querySelector('text');
+            return label && (label.textContent || '').trim() === wanted;
+        });
+        if (byLabel) return byLabel;
+
+        // Fallback to id pattern used by Mermaid.
+        return document.querySelector(`[id^="flowchart-${safeId(wanted)}-"]`);
+    }
+
+    function getClassNameFromNode(node) {
+        if (!node) return null;
+
+        const label = node.querySelector('.nodeLabel') || node.querySelector('text');
+        const labelText = label ? (label.textContent || '').trim() : '';
+        if (labelText && registry[labelText]) return labelText;
+
+        const idText = (node.id || '').toLowerCase();
+        const match = Object.keys(registry).find(name => idText.includes(safeId(name).toLowerCase()));
+        return match || null;
+    }
+
+    function hideCodeTooltip() {
+        document.getElementById('code-tooltip').style.display = 'none';
+    }
+
+    async function copyTooltipCode() {
+        const code = document.getElementById('tooltip-code').textContent;
+        const btn = document.getElementById('tooltip-copy-btn');
+        try {
+            if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(code);
+            else { const t = document.createElement('textarea'); t.value = code; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); }
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+            setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy'; }, 1500);
+        } catch { btn.innerHTML = '✕ Failed'; setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy'; }, 1500); }
+    }
+
+    function bindTooltipGlobalHandlers() {
+        if (tooltipGlobalHandlersBound) return;
+
+        const tooltip = document.getElementById('code-tooltip');
+        const header = document.getElementById('code-tooltip-header');
+
+        header.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            tooltipDragState.isDragging = true;
+            tooltipDragState.startX = e.clientX;
+            tooltipDragState.startY = e.clientY;
+            tooltipDragState.startLeft = tooltip.offsetLeft;
+            tooltipDragState.startTop = tooltip.offsetTop;
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (tooltipDragState.isDragging) {
+                const deltaX = e.clientX - tooltipDragState.startX;
+                const deltaY = e.clientY - tooltipDragState.startY;
+                const nextLeft = tooltipDragState.startLeft + deltaX;
+                const nextTop = tooltipDragState.startTop + deltaY;
+                const maxLeft = window.innerWidth - tooltip.offsetWidth;
+                const maxTop = window.innerHeight - tooltip.offsetHeight;
+                tooltip.style.left = Math.max(0, Math.min(maxLeft, nextLeft)) + 'px';
+                tooltip.style.top = Math.max(0, Math.min(maxTop, nextTop)) + 'px';
+            }
+            if (tooltipResizeState.isResizing) {
+                const deltaX = e.clientX - tooltipResizeState.startX;
+                const deltaY = e.clientY - tooltipResizeState.startY;
+                const maxWidth = window.innerWidth - tooltip.offsetLeft;
+                const maxHeight = window.innerHeight - tooltip.offsetTop;
+                tooltip.style.width = Math.max(300, Math.min(maxWidth, tooltipResizeState.startWidth + deltaX)) + 'px';
+                tooltip.style.height = Math.max(150, Math.min(maxHeight, tooltipResizeState.startHeight + deltaY)) + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (tooltipDragState.isDragging || tooltipResizeState.isResizing) {
+                tooltipInteractionGuardUntil = Date.now() + 250;
+            }
+            tooltipDragState.isDragging = false;
+            tooltipResizeState.isResizing = false;
+        });
+
+        tooltip.addEventListener('mousedown', (e) => {
+            const rect = tooltip.getBoundingClientRect();
+            const isResizeHandle = e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20;
+            if (isResizeHandle && e.button === 0) {
+                tooltipResizeState.isResizing = true;
+                tooltipResizeState.startX = e.clientX;
+                tooltipResizeState.startY = e.clientY;
+                tooltipResizeState.startWidth = tooltip.offsetWidth;
+                tooltipResizeState.startHeight = tooltip.offsetHeight;
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (Date.now() < tooltipInteractionGuardUntil) return;
+            if (window.getComputedStyle(tooltip).display === 'none') return;
+            if (tooltip.contains(e.target)) return;
+            hideCodeTooltip();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { hideCodeTooltip(); hideNodeContextMenu(); }
+        });
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('node-context-menu');
+            if (!menu.contains(e.target)) hideNodeContextMenu();
+        }, true);
+        document.addEventListener('scroll', () => hideNodeContextMenu(), true);
+
+        tooltipGlobalHandlersBound = true;
+    }
+
+    function aggregateFlows(content, vMap, sourceName) {
+        const aggregated = {};
+        const direct = /([\w.]+)\.(\w+)\s*\(/g;
+
+        function stripGeneric(typeName) {
+            return (typeName || '').replace(/<[^>]*>/g, '').trim();
+        }
+
+        function pickClassTarget(typeName) {
+            const cleaned = stripGeneric(typeName).replace(/[\[\]()]/g, '');
+            if (!cleaned) return null;
+
+            // Exact type match first, then outer type for Apex inner class names.
+            if (registry[cleaned]) return cleaned;
+            if (cleaned.includes('.')) {
+                const outer = cleaned.split('.')[0];
+                if (registry[outer]) return outer;
+            }
+
+            const base = cleaned.split('.')[0];
+            if (!base || !/^[A-Za-z_]\w*$/.test(base)) return null;
+            return base;
+        }
+
+        // Convert caller expressions into a dependency class target.
+        function normalizeTarget(caller) {
+            const rawCaller = (caller || '').trim();
+            if (!rawCaller) return null;
+
+            // this.someMember.method() should map to current class, not unknown members.
+            if (rawCaller.toLowerCase().startsWith('this.')) return sourceName;
+
+            const rootVar = rawCaller.split('.')[0];
+
+            // Prefer declared variable type when available (e.g., reqContext -> SMAC_ProjectTaskServiceContext.RequestContext).
+            if (vMap[rootVar]) {
+                return pickClassTarget(vMap[rootVar]);
+            }
+
+            // Fallback for direct static-style calls.
+            return pickClassTarget(rawCaller);
+        }
+
+        let m;
+        while ((m = direct.exec(content)) !== null) {
+            const caller = m[1];
+            const method = m[2];
+            const resTarget = normalizeTarget(caller);
+            if (!resTarget) continue;
+
+            const base = resTarget.toLowerCase();
+            if (resTarget !== sourceName && !SYSTEM_TYPES.has(base) && !BANNED_METHODS.has(method.toLowerCase()) && base !== 'this') {
+                if (!aggregated[resTarget]) aggregated[resTarget] = [];
+                if (!aggregated[resTarget].includes(method)) aggregated[resTarget].push(method);
+            }
+        }
+        return aggregated;
+    }
+
+    function collectOrderedCalls(rawContent, vMap, sourceName) {
+        // Parse only from the opening brace of the method body — skip the signature
+        // so the method name itself doesn't match as a bare call
+        const braceIdx = rawContent.indexOf('{');
+        const content = braceIdx >= 0 ? rawContent.slice(braceIdx) : rawContent;
+
+        // Build a local vMap copy extended with for-each loop variables
+        // e.g. "for (SMAC_ImpactAnalysisRequestContext context : contexts)" -> context -> SMAC_ImpactAnalysisRequestContext
+        const localVMap = Object.assign({}, vMap);
+        const forEachRegex = /\bfor\s*\(\s*([\w.<>\[\]]+)\s+(\w+)\s*:/g;
+        let fe;
+        while ((fe = forEachRegex.exec(content)) !== null) {
+            localVMap[fe[2]] = fe[1].replace(/<[^>]*>/g, '').replace(/[\[\]]/g, '').trim();
+        }
+
+        const calls = [];
+        const directCallRegex = /([\w.]+)\.(\w+)\s*\(/g;
+        const bareCallRegex = /\b([a-zA-Z_]\w*)\s*\(/g;
+
+        function stripGeneric(typeName) {
+            return (typeName || '').replace(/<[^>]*>/g, '').trim();
+        }
+
+        function pickClassTarget(typeName) {
+            const cleaned = stripGeneric(typeName).replace(/[\[\]()]/g, '');
+            if (!cleaned) return null;
+            if (registry[cleaned]) return cleaned;
+            if (cleaned.includes('.')) {
+                const outer = cleaned.split('.')[0];
+                if (registry[outer]) return outer;
+            }
+            const base = cleaned.split('.')[0];
+            if (!base || !/^[A-Za-z_]\w*$/.test(base)) return null;
+            return base;
+        }
+
+        function normalizeTarget(caller) {
+            const rawCaller = (caller || '').trim();
+            if (!rawCaller) return null;
+            if (rawCaller.toLowerCase().startsWith('this.')) return sourceName;
+            const rootVar = rawCaller.split('.')[0];
+            if (localVMap[rootVar]) return pickClassTarget(localVMap[rootVar]);
+            return pickClassTarget(rawCaller);
+        }
+
+        function findMatchingBrace(text, openPos) {
+            let depth = 0;
+            for (let i = openPos; i < text.length; i++) {
+                const ch = text[i];
+                if (ch === '{') depth++;
+                if (ch === '}') {
+                    depth--;
+                    if (depth === 0) return i;
+                }
+            }
+            return -1;
+        }
+
+        function detectLoopRanges(text) {
+            const ranges = [];
+            const loopStartRegex = /\b(for|while)\b[^{};]*\{|\bdo\s*\{/g;
+            let m;
+            while ((m = loopStartRegex.exec(text)) !== null) {
+                const openIdx = text.indexOf('{', m.index);
+                if (openIdx < 0) continue;
+                const closeIdx = findMatchingBrace(text, openIdx);
+                if (closeIdx < 0) continue;
+                ranges.push({ start: openIdx, end: closeIdx });
+            }
+            return ranges;
+        }
+
+        function getLoopTag(index, loopRanges) {
+            const containing = loopRanges.filter(r => index >= r.start && index <= r.end);
+            if (!containing.length) return '';
+            containing.sort((a, b) => (a.end - a.start) - (b.end - b.start));
+            const chosen = containing[0];
+            const loopIndex = loopRanges.indexOf(chosen);
+            const alphabet = 'NMPQRSTUVWXYZABCDEFGHIJKL';
+            return alphabet[loopIndex % alphabet.length];
+        }
+
+        const loopRanges = detectLoopRanges(content);
+        let seq = 1;
+        const seenCalls = new Set();
+
+        function addCall(target, methodName, index, options = {}) {
+            if (!target || !methodName) return;
+
+            const allowSelf = options.allowSelf === true;
+            const base = target.toLowerCase();
+            if ((!allowSelf && target === sourceName) || SYSTEM_TYPES.has(base) || BANNED_METHODS.has(methodName.toLowerCase()) || base === 'this') {
+                return;
+            }
+
+            const loopTag = getLoopTag(index, loopRanges);
+            const callKey = `${target}.${methodName}`;
+            if (seenCalls.has(callKey)) return;
+
+            seenCalls.add(callKey);
+            calls.push({
+                target,
+                method: methodName,
+                sequenceLabel: `${seq}${loopTag}`
+            });
+            seq++;
+        }
+
+        // Capture object.method() calls
+        let m;
+        while ((m = directCallRegex.exec(content)) !== null) {
+            const caller = m[1];
+            const method = m[2];
+            const target = normalizeTarget(caller);
+            addCall(target, method, m.index);
+        }
+
+        // Capture bare method() calls (same class or via vMap)
+        let bm;
+        while ((bm = bareCallRegex.exec(content)) !== null) {
+            const methodName = bm[1];
+            const loopTag = getLoopTag(bm.index, loopRanges);
+
+            if (['if', 'for', 'while', 'switch', 'return', 'new', 'class'].includes(methodName.toLowerCase())) {
+                continue;
+            }
+            if (BANNED_METHODS.has(methodName.toLowerCase())) {
+                continue;
+            }
+
+            // Check if it's an internal method in the same class
+            if (registry[sourceName] && registry[sourceName].methods && registry[sourceName].methods[methodName]) {
+                addCall(sourceName, methodName, bm.index, { allowSelf: true });
+            }
+        }
+
+        // Capture fluent chains that start from a constructor: new ClassName().method1().method2()...
+        const constructorChainRegex = /new\s+(\w+)\s*\([^)]*\)([\s\S]*?);/g;
+        let cc;
+        while ((cc = constructorChainRegex.exec(content)) !== null) {
+            const className = cc[1];
+            const target = pickClassTarget(className);
+            if (!target) continue;
+
+            const chainBody = cc[2] || '';
+            const chainMethodRegex = /\.\s*(\w+)\s*\(/g;
+            let chainMatch;
+            while ((chainMatch = chainMethodRegex.exec(chainBody)) !== null) {
+                addCall(target, chainMatch[1], cc.index + chainMatch.index);
+            }
+        }
+
+        return calls;
+    }
+
+    function attachEvents() {
+        bindTooltipGlobalHandlers();
+        document.querySelectorAll('.node').forEach(node => {
+            node.addEventListener('mouseenter', (e) => {
+                // Highlight cursor only — no auto-popup
+                node.style.cursor = 'pointer';
+            });
+            node.addEventListener('click', () => {
+                if (!focusedClass) return;
+                // Entry node: ClassName___methodName
+                const m1 = node.id.match(/flowchart-([^-]+)___([^-]+)-/);
+                if (m1 && !m1[1].startsWith('l1__') && !m1[1].startsWith('l2__')) {
+                    const className = Object.keys(registry).find(k => safeId(k) === m1[1]);
+                    if (className === focusedClass) {
+                        const methodName = Object.keys(registry[className].methods).find(m => safeId(m) === m1[2]);
+                        if (methodName && activeMethods.has(methodName)) {
+                            if (collapsedMethods.has(methodName)) collapsedMethods.delete(methodName);
+                            else collapsedMethods.add(methodName);
+                            render(); return;
+                        }
+                    }
+                }
+                // Depth-1 node: l1__ClassName___methodName
+                const m2 = node.id.match(/flowchart-l1__([^-]+)___([^-]+)-/);
+                if (m2) {
+                    const nodeId = `l1__${m2[1]}___${m2[2]}`;
+                    if (collapsedDepth1.has(nodeId)) collapsedDepth1.delete(nodeId);
+                    else collapsedDepth1.add(nodeId);
+                    render();
+                }
+            });
+            node.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                hideCodeTooltip();
+                showNodeContextMenu(e, node);
+            });
+            node.addEventListener('dblclick', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectNodeText(node);
+            });
+        });
+    }
+
+    function resolveNodeIdentity(node) {
+        let className, methodName;
+        const m1 = node.id.match(/flowchart-(.+)___(.+)-\d/);
+        if (m1 && !m1[1].startsWith('l1__') && !m1[1].startsWith('l2__')) {
+            className = Object.keys(registry).find(k => safeId(k) === m1[1]);
+            if (className) methodName = Object.keys(registry[className]?.methods || {}).find(m => safeId(m) === m1[2]);
+        }
+        if (!methodName) {
+            const m2 = node.id.match(/flowchart-l\d__(.+)___(.+)-\d/);
+            if (m2) {
+                className = Object.keys(registry).find(k => safeId(k) === m2[1]);
+                if (className) methodName = Object.keys(registry[className]?.methods || {}).find(m => safeId(m) === m2[2]);
+            }
+        }
+        return { className, methodName };
+    }
+
+    function showNodeContextMenu(e, node) {
+        const menu = document.getElementById('node-context-menu');
+        const { className, methodName } = resolveNodeIdentity(node);
+
+        // Determine toggle state for Hide/Show
+        let canToggle = false;
+        if (focusedClass) {
+            const m1 = node.id.match(/flowchart-([^-]+)___([^-]+)-/);
+            const isEntry = m1 && !m1[1].startsWith('l1__') && !m1[1].startsWith('l2__') && className === focusedClass && methodName && activeMethods.has(methodName);
+            const m2 = node.id.match(/flowchart-l1__([^-]+)___([^-]+)-/);
+            const nodeId = m2 ? `l1__${m2[1]}___${m2[2]}` : null;
+            const isD1 = !!nodeId;
+            if (isEntry || isD1) {
+                canToggle = true;
+                const isCollapsed = isEntry ? collapsedMethods.has(methodName) : collapsedDepth1.has(nodeId);
+                document.getElementById('ctx-toggle-label').textContent = isCollapsed ? 'Show Child Nodes' : 'Hide Child Nodes';
+                document.getElementById('ctx-toggle-nodes').style.display = 'flex';
+                document.getElementById('ctx-toggle-nodes').onclick = () => {
+                    hideNodeContextMenu();
+                    if (isEntry) {
+                        if (collapsedMethods.has(methodName)) collapsedMethods.delete(methodName);
+                        else collapsedMethods.add(methodName);
+                    } else {
+                        if (collapsedDepth1.has(nodeId)) collapsedDepth1.delete(nodeId);
+                        else collapsedDepth1.add(nodeId);
+                    }
+                    render();
+                };
+            } else {
+                document.getElementById('ctx-toggle-nodes').style.display = 'none';
+            }
+        } else {
+            // Outside analyze flow: toggle = open analyze flow
+            document.getElementById('ctx-toggle-label').textContent = 'Analyze Flow';
+            document.getElementById('ctx-toggle-nodes').style.display = 'flex';
+            document.getElementById('ctx-toggle-nodes').querySelector('i').className = 'fa-solid fa-diagram-project';
+            document.getElementById('ctx-toggle-nodes').onclick = () => {
+                hideNodeContextMenu();
+                const cn = getClassNameFromNode(node);
+                if (cn) setView(cn);
+            };
+        }
+
+        // View Code option — only if method body exists
+        const hasCode = className && methodName && registry[className]?.methods?.[methodName];
+        document.getElementById('ctx-view-code').style.display = hasCode ? 'flex' : 'none';
+        document.getElementById('ctx-view-code').onclick = () => {
+            hideNodeContextMenu();
+            document.getElementById('tooltip-title').textContent = `${className}.${methodName}()`;
+            document.getElementById('tooltip-code').textContent = registry[className].methods[methodName];
+            Prism.highlightElement(document.getElementById('tooltip-code'));
+            const tooltip = document.getElementById('code-tooltip');
+            tooltip.style.display = 'flex';
+            tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 420) + 'px';
+            tooltip.style.top = Math.min(e.clientY + 12, window.innerHeight - 300) + 'px';
+            tooltipInteractionGuardUntil = Date.now() + 300; // prevent immediate dismiss
+        };
+
+        // Position and show
+        menu.style.display = 'block';
+        const menuW = 180, menuH = 90;
+        menu.style.left = Math.min(e.clientX, window.innerWidth - menuW) + 'px';
+        menu.style.top = Math.min(e.clientY, window.innerHeight - menuH) + 'px';
+    }
+
+    function hideNodeContextMenu() {
+        document.getElementById('node-context-menu').style.display = 'none';
+    }
+
+    function setView(name) {
+        focusedClass = name;
+        selectedClassName = null;
+        activeMethods = new Set();
+        collapsedMethods = new Set();
+        collapsedDepth1 = new Set();
+        if (name) { openMethodPicker(name); } else { exitAnalyzeFlow(); }
+    }
+
+    function openMethodPicker(className) {
+        document.getElementById('class-panel').style.display = 'none';
+        document.getElementById('method-picker').classList.add('visible');
+        document.getElementById('method-picker-classname').textContent = className;
+        const listEl = document.getElementById('method-picker-list');
+        listEl.innerHTML = '';
+
+        // Find method with most lines to auto-enable
+        const methods = Object.keys(registry[className].methods);
+        let defaultMethod = methods[0];
+        let maxLines = 0;
+        methods.forEach(m => {
+            const lines = (registry[className].methods[m].match(/\n/g) || []).length;
+            if (lines > maxLines) { maxLines = lines; defaultMethod = m; }
+        });
+        if (defaultMethod) activeMethods.add(defaultMethod);
+
+        methods.forEach(m => {
+            const calls = collectOrderedCalls(registry[className].methods[m], registry[className].varMap, className);
+            const lines = (registry[className].methods[m].match(/\n/g) || []).length;
+            const pill = document.createElement('div');
+            pill.className = 'method-pill' + (activeMethods.has(m) ? ' enabled' : '');
+            pill.innerHTML = `<span class="pill-dot"></span><span class="pill-name">${m}()</span>${calls.length > 0 ? `<span class="pill-badge">${calls.length} calls</span>` : ''}<span class="pill-badge">${lines}L</span>`;
+            pill.addEventListener('click', () => {
+                if (activeMethods.has(m)) { activeMethods.delete(m); pill.classList.remove('enabled'); }
+                else { activeMethods.add(m); pill.classList.add('enabled'); }
+                render();
+            });
+            listEl.appendChild(pill);
+        });
+        render();
+    }
+
+    function exitAnalyzeFlow() {
+        focusedClass = null;
+        activeMethods = new Set();
+        collapsedMethods = new Set();
+        collapsedDepth1 = new Set();
+        document.getElementById('class-panel').style.display = '';
+        document.getElementById('method-picker').classList.remove('visible');
+        render();
+    }
+
+    async function copyCurrentMermaid() {
+        if (!currentMermaidDefinition) return;
+
+        const textToCopy = currentMermaidDefinition;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(textToCopy);
+            } else {
+                const temp = document.createElement('textarea');
+                temp.value = textToCopy;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                document.body.removeChild(temp);
+            }
+            flashCopyButton(true);
+        } catch (err) {
+            console.error('Failed to copy Mermaid code', err);
+            flashCopyButton(false);
+        }
+    }
+
+    function flashCopyButton(success) {
+        const btn = document.getElementById('copy-mermaid-btn');
+        if (!btn) return;
+
+        btn.innerHTML = success
+            ? '<i class="fa-solid fa-check"></i>'
+            : '<i class="fa-solid fa-triangle-exclamation"></i>';
+
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+        }, 1000);
+    }
+</script>
+</body>
+</html>
