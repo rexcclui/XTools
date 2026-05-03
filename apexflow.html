@@ -44,6 +44,30 @@
         .class-card.active { border-color: var(--highlight); background: rgba(251, 191, 36, 0.05); }
         .class-card.hidden { opacity: 0.6; }
 
+        /* FILE EXPLORER */
+        #file-explorer { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); flex-shrink: 0; max-height: 45%; min-height: 0; }
+        #file-explorer-header { padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        #file-explorer-header span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; flex: 1; }
+        #fe-open-btn { padding: 4px 10px; font-size: 11px; border-radius: 5px; border: 1px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; white-space: nowrap; }
+        #fe-open-btn:hover { background: var(--primary); color: #fff; }
+        #fe-fallback { display: none; }
+        #fe-search { margin: 0 10px 8px; padding: 5px 9px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 5px; color: var(--text-main); font-size: 12px; outline: none; width: calc(100% - 20px); }
+        #fe-search:focus { border-color: var(--primary); }
+        #fe-tree { flex: 1; overflow-y: auto; padding: 0 6px 8px; min-height: 0; }
+        #fe-empty { padding: 16px; text-align: center; font-size: 12px; color: #64748b; }
+        .fe-dir { user-select: none; }
+        .fe-dir-row { display: flex; align-items: center; gap: 5px; padding: 3px 4px; border-radius: 4px; cursor: pointer; font-size: 12px; color: #94a3b8; }
+        .fe-dir-row:hover { background: rgba(255,255,255,0.04); }
+        .fe-dir-arrow { font-size: 9px; width: 10px; text-align: center; flex-shrink: 0; transition: transform 0.15s; }
+        .fe-dir-arrow.open { transform: rotate(90deg); }
+        .fe-dir-children { margin-left: 14px; border-left: 1px solid var(--border); padding-left: 4px; }
+        .fe-dir-children.hidden { display: none; }
+        .fe-file { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; color: #cbd5e1; transition: background 0.1s; user-select: none; }
+        .fe-file:hover { background: rgba(16,185,129,0.08); color: var(--primary); }
+        .fe-file.loaded { color: var(--primary); font-weight: 600; }
+        .fe-file-icon { font-size: 10px; color: #64748b; flex-shrink: 0; }
+        .fe-file.loaded .fe-file-icon { color: var(--primary); }
+
         /* METHOD PICKER PANEL */
         #method-picker { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
         #method-picker.visible { display: flex; }
@@ -229,7 +253,15 @@
 
 <div id="sidebar">
     <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex / Java Class Diagram</h2></div>
-    <div id="drop-zone">Drag .cls / .java Files Here</div>
+    <div id="file-explorer">
+        <div id="file-explorer-header">
+            <span>File Explorer</span>
+            <button id="fe-open-btn"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
+            <input id="fe-fallback" type="file" accept=".cls,.java" webkitdirectory multiple>
+        </div>
+        <input id="fe-search" placeholder="Search files…" autocomplete="off">
+        <div id="fe-tree"><div id="fe-empty">Open a folder to browse source files</div></div>
+    </div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>
         <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()">Clear All</button></div>
@@ -313,7 +345,7 @@
 
     document.addEventListener('dragover', e => {
         e.preventDefault();
-        dropOverlay.classList.add('show');
+        if (!window._feDragNode) dropOverlay.classList.add('show');
     });
     document.addEventListener('dragleave', e => {
         if (!e.relatedTarget) dropOverlay.classList.remove('show');
@@ -321,6 +353,15 @@
     document.addEventListener('drop', async e => {
         e.preventDefault();
         dropOverlay.classList.remove('show');
+
+        // Drag from internal file explorer
+        if (window._feDragNode) {
+            await loadFileNode(window._feDragNode, null);
+            feState.loadedNames.add(window._feDragNode.name);
+            renderFileTree();
+            window._feDragNode = null;
+            return;
+        }
 
         const files = Array.from(e.dataTransfer.files)
             .filter(f => f.name.toLowerCase().endsWith('.cls') || f.name.toLowerCase().endsWith('.java'));
@@ -333,6 +374,176 @@
         }
 
         render();
+    });
+
+    // ── FILE EXPLORER ──────────────────────────────────────────────────────────
+    const feState = { tree: null, search: '', loadedNames: new Set() };
+
+    function isSourceFile(name) {
+        const n = name.toLowerCase();
+        return n.endsWith('.cls') || n.endsWith('.java');
+    }
+
+    async function openFolder() {
+        if (window.showDirectoryPicker) {
+            try {
+                const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+                feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
+                renderFileTree();
+            } catch (e) {
+                if (e.name !== 'AbortError') console.error(e);
+            }
+        } else {
+            // Firefox fallback — trigger the hidden <input webkitdirectory>
+            document.getElementById('fe-fallback').click();
+        }
+    }
+
+    async function buildHandleTree(handle, name) {
+        if (handle.kind === 'file') {
+            return isSourceFile(name) ? { kind: 'file', name, handle } : null;
+        }
+        const children = [];
+        for await (const [childName, childHandle] of handle.entries()) {
+            const node = await buildHandleTree(childHandle, childName);
+            if (node) children.push(node);
+        }
+        if (!children.length) return null;
+        children.sort((a, b) => {
+            if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+        return { kind: 'dir', name, children };
+    }
+
+    function flatFiles(node, out = []) {
+        if (!node) return out;
+        if (node.kind === 'file') { out.push(node); return out; }
+        node.children.forEach(c => flatFiles(c, out));
+        return out;
+    }
+
+    function renderFileTree() {
+        const treeEl = document.getElementById('fe-tree');
+        const emptyEl = document.getElementById('fe-empty');
+        const q = feState.search.toLowerCase();
+
+        if (!feState.tree) {
+            treeEl.innerHTML = '';
+            treeEl.appendChild(emptyEl || Object.assign(document.createElement('div'), { id: 'fe-empty', textContent: 'Open a folder to browse source files' }));
+            return;
+        }
+
+        const allFiles = flatFiles(feState.tree);
+        const matched = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : null;
+
+        treeEl.innerHTML = '';
+
+        if (q) {
+            // Flat search results
+            if (!matched.length) {
+                treeEl.innerHTML = `<div style="padding:12px;text-align:center;font-size:12px;color:#64748b">No files match "${feState.search}"</div>`;
+                return;
+            }
+            matched.forEach(f => treeEl.appendChild(makeFileRow(f)));
+        } else {
+            treeEl.appendChild(makeDirNode(feState.tree, true));
+        }
+    }
+
+    function makeDirNode(node, expanded = false) {
+        if (node.kind === 'file') return makeFileRow(node);
+        const wrap = document.createElement('div');
+        wrap.className = 'fe-dir';
+        const row = document.createElement('div');
+        row.className = 'fe-dir-row';
+        const arrow = document.createElement('span');
+        arrow.className = 'fe-dir-arrow' + (expanded ? ' open' : '');
+        arrow.textContent = '▶';
+        const icon = document.createElement('i');
+        icon.className = expanded ? 'fa-solid fa-folder-open' : 'fa-solid fa-folder';
+        icon.style.cssText = 'font-size:11px;color:#f59e0b;flex-shrink:0';
+        const label = document.createElement('span');
+        label.textContent = node.name;
+        row.appendChild(arrow); row.appendChild(icon); row.appendChild(label);
+        const children = document.createElement('div');
+        children.className = 'fe-dir-children' + (expanded ? '' : ' hidden');
+        node.children.forEach(c => children.appendChild(makeDirNode(c)));
+        row.addEventListener('click', () => {
+            const open = !children.classList.contains('hidden');
+            children.classList.toggle('hidden', open);
+            arrow.classList.toggle('open', !open);
+            icon.className = open ? 'fa-solid fa-folder' : 'fa-solid fa-folder-open';
+            icon.style.cssText = 'font-size:11px;color:#f59e0b;flex-shrink:0';
+        });
+        wrap.appendChild(row); wrap.appendChild(children);
+        return wrap;
+    }
+
+    function makeFileRow(fileNode) {
+        const row = document.createElement('div');
+        row.className = 'fe-file' + (feState.loadedNames.has(fileNode.name) ? ' loaded' : '');
+        row.draggable = true;
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-file-code fe-file-icon';
+        const label = document.createElement('span');
+        label.textContent = fileNode.name;
+        row.appendChild(icon); row.appendChild(label);
+        row.addEventListener('click', () => loadFileNode(fileNode, row));
+        row.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/fe-filename', fileNode.name);
+            e.dataTransfer.effectAllowed = 'copy';
+            // Store reference so the document drop handler can retrieve it
+            window._feDragNode = fileNode;
+        });
+        row.addEventListener('dragend', () => { window._feDragNode = null; });
+        return row;
+    }
+
+    async function loadFileNode(fileNode, rowEl) {
+        try {
+            const file = await fileNode.handle.getFile();
+            const text = await file.text();
+            parseApex(text);
+            feState.loadedNames.add(fileNode.name);
+            if (rowEl) { rowEl.classList.add('loaded'); rowEl.querySelector('.fe-file-icon').className = 'fa-solid fa-file-code fe-file-icon'; }
+            render();
+        } catch (e) { console.error('Failed to load', fileNode.name, e); }
+    }
+
+    // Firefox fallback: webkitdirectory input
+    document.getElementById('fe-fallback').addEventListener('change', async e => {
+        const files = Array.from(e.target.files).filter(f => isSourceFile(f.name));
+        if (!files.length) return;
+        // Build a virtual tree from webkitRelativePath
+        const root = { kind: 'dir', name: files[0].webkitRelativePath.split('/')[0], children: [] };
+        const dirMap = { '': root };
+        files.forEach(f => {
+            const parts = f.webkitRelativePath.split('/');
+            const fileName = parts.pop();
+            const dirPath = parts.join('/');
+            if (!dirMap[dirPath]) {
+                let cur = root;
+                parts.slice(1).forEach((seg, i) => {
+                    const path = parts.slice(0, i + 2).join('/');
+                    if (!dirMap[path]) {
+                        const dir = { kind: 'dir', name: seg, children: [] };
+                        cur.children.push(dir);
+                        dirMap[path] = dir;
+                    }
+                    cur = dirMap[path];
+                });
+            }
+            dirMap[dirPath].children.push({ kind: 'file', name: fileName, handle: { getFile: async () => f } });
+        });
+        feState.tree = root;
+        renderFileTree();
+    });
+
+    document.getElementById('fe-open-btn').addEventListener('click', openFolder);
+    document.getElementById('fe-search').addEventListener('input', e => {
+        feState.search = e.target.value;
+        renderFileTree();
     });
 
     function toggleSidebar() {
