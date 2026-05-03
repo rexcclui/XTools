@@ -928,7 +928,8 @@
                 const flows = aggregateFlows(registry[cName].raw, registry[cName].varMap, cName);
                 Object.keys(flows).forEach(target => {
                     if (hiddenClasses.has(target)) return;
-                    const label = cleanLabel(flows[target].length > 1 ? flows[target][0] + "..." : flows[target][0]);
+                    const items = flows[target];
+                    const label = cleanLabel(items.length > 2 ? items[0] + ', ' + items[1] + '…' : items.join(', '));
                     def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
                     if (!registry[target]) ghostNodes.add(target);
                 });
@@ -1351,7 +1352,7 @@
             const base = outer.toLowerCase();
             if (SYSTEM_TYPES.has(base)) continue;
             if (!aggregated[outer]) aggregated[outer] = [];
-            if (!aggregated[outer].includes(inner)) aggregated[outer].push(inner);
+            if (!aggregated[outer].includes(inner)) aggregated[outer].unshift(inner); // inner types shown first
         }
 
         return aggregated;
