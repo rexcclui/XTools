@@ -1422,6 +1422,34 @@
             if (!aggregated[outer].includes(inner)) aggregated[outer].unshift(inner); // inner types shown first
         }
 
+        // Detect constructor instantiations and chained builder calls:
+        // new SomeClass(...).method1().method2()...;
+        const constructorFlowRegex = /\bnew\s+([\w]+)\s*\([^)]*\)([\s\S]*?);/g;
+        let cf;
+        while ((cf = constructorFlowRegex.exec(content)) !== null) {
+            const className = cf[1];
+            if (!className || !/^[A-Z]/.test(className)) continue;
+            const base = className.toLowerCase();
+            if (SYSTEM_TYPES.has(base) || className === sourceName) continue;
+            if (!aggregated[className]) aggregated[className] = [];
+            // Collect chained method names on the constructor result
+            const chainBody = cf[2] || '';
+            const chainMethodRegex = /\.\s*(\w+)\s*\(/g;
+            let chainMatch;
+            let addedAny = false;
+            while ((chainMatch = chainMethodRegex.exec(chainBody)) !== null) {
+                const method = chainMatch[1];
+                if (BANNED_METHODS.has(method.toLowerCase())) continue;
+                if (!aggregated[className].includes(method)) {
+                    aggregated[className].push(method);
+                    addedAny = true;
+                }
+            }
+            if (!addedAny && !aggregated[className].includes('new')) {
+                aggregated[className].push('new');
+            }
+        }
+
         return aggregated;
     }
 
