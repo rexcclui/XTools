@@ -427,12 +427,17 @@
     const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null };
 
     // ── IndexedDB persistence for the directory handle ─────────────────────────
-    const IDB_NAME = 'apexflow', IDB_STORE = 'handles', IDB_KEY = 'lastDir';
+    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory';
+    const MAX_FILE_HIST = 30;
 
     function idbOpen() {
         return new Promise((res, rej) => {
-            const req = indexedDB.open(IDB_NAME, 1);
-            req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+            const req = indexedDB.open(IDB_NAME, 2); // version 2 adds fileHistory store
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(IDB_DIR_STORE)) db.createObjectStore(IDB_DIR_STORE);
+                if (!db.objectStoreNames.contains(IDB_HIST_STORE)) db.createObjectStore(IDB_HIST_STORE, { keyPath: 'name' });
+            };
             req.onsuccess = e => res(e.target.result);
             req.onerror = e => rej(e.target.error);
         });
@@ -441,8 +446,8 @@
     async function idbSaveHandle(handle) {
         try {
             const db = await idbOpen();
-            const tx = db.transaction(IDB_STORE, 'readwrite');
-            tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
+            const tx = db.transaction(IDB_DIR_STORE, 'readwrite');
+            tx.objectStore(IDB_DIR_STORE).put(handle, IDB_DIR_KEY);
         } catch (e) { console.warn('idb save failed', e); }
     }
 
@@ -450,11 +455,48 @@
         try {
             const db = await idbOpen();
             return await new Promise((res, rej) => {
-                const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
+                const req = db.transaction(IDB_DIR_STORE, 'readonly').objectStore(IDB_DIR_STORE).get(IDB_DIR_KEY);
                 req.onsuccess = e => res(e.target.result || null);
                 req.onerror = e => rej(e.target.error);
             });
         } catch (e) { return null; }
+    }
+
+    async function idbSaveFileHistory(name, handle) {
+        try {
+            const db = await idbOpen();
+            const tx = db.transaction(IDB_HIST_STORE, 'readwrite');
+            tx.objectStore(IDB_HIST_STORE).put({ name, handle, ts: Date.now() });
+            // Trim to MAX_FILE_HIST — get all, sort, delete oldest
+            const all = await new Promise((res, rej) => {
+                const req2 = db.transaction(IDB_HIST_STORE, 'readonly').objectStore(IDB_HIST_STORE).getAll();
+                req2.onsuccess = e => res(e.target.result);
+                req2.onerror = e => rej(e.target.error);
+            });
+            if (all.length > MAX_FILE_HIST) {
+                all.sort((a, b) => a.ts - b.ts);
+                const del = db.transaction(IDB_HIST_STORE, 'readwrite').objectStore(IDB_HIST_STORE);
+                all.slice(0, all.length - MAX_FILE_HIST).forEach(r => del.delete(r.name));
+            }
+        } catch (e) { console.warn('idb file history save failed', e); }
+    }
+
+    async function idbGetFileHistory() {
+        try {
+            const db = await idbOpen();
+            return await new Promise((res, rej) => {
+                const req = db.transaction(IDB_HIST_STORE, 'readonly').objectStore(IDB_HIST_STORE).getAll();
+                req.onsuccess = e => res((e.target.result || []).sort((a, b) => b.ts - a.ts));
+                req.onerror = e => rej(e.target.error);
+            });
+        } catch (e) { return []; }
+    }
+
+    async function idbDeleteFileHistory(name) {
+        try {
+            const db = await idbOpen();
+            db.transaction(IDB_HIST_STORE, 'readwrite').objectStore(IDB_HIST_STORE).delete(name);
+        } catch (e) { console.warn('idb file history delete failed', e); }
     }
 
     // ── Folder path display ────────────────────────────────────────────────────
@@ -638,6 +680,7 @@
             feState.loadedNames.add(fileNode.name);
             if (rowEl) { rowEl.classList.add('loaded'); rowEl.querySelector('.fe-file-icon').className = 'fa-solid fa-file-code fe-file-icon'; }
             render();
+            await idbSaveFileHistory(fileNode.name, fileNode.handle);
         } catch (e) { console.error('Failed to load', fileNode.name, e); }
     }
 
@@ -677,66 +720,53 @@
         renderFileTree();
     });
 
-    // ── Class history ──────────────────────────────────────────────────────────
-    const LS_HIST_KEY = 'apexflow-class-history';
-    const MAX_HIST = 50;
-
-    function getClassHistory() {
-        try { return JSON.parse(localStorage.getItem(LS_HIST_KEY) || '[]'); } catch { return []; }
-    }
-
-    function saveClassToHistory(name, content) {
-        const hist = getClassHistory().filter(h => h.name !== name);
-        hist.unshift({ name, content, ts: Date.now() });
-        if (hist.length > MAX_HIST) hist.length = MAX_HIST;
-        localStorage.setItem(LS_HIST_KEY, JSON.stringify(hist));
-    }
-
-    function deleteClassFromHistory(name) {
-        const hist = getClassHistory().filter(h => h.name !== name);
-        localStorage.setItem(LS_HIST_KEY, JSON.stringify(hist));
-        renderClassHistory();
-    }
-
-    function renderClassHistory() {
-        const list = document.getElementById('chp-list');
-        const hist = getClassHistory();
-        list.innerHTML = '';
-        if (!hist.length) {
-            list.innerHTML = '<div id="chp-empty">No class history yet</div>';
-            return;
-        }
-        hist.forEach(h => {
-            const item = document.createElement('div');
-            item.className = 'chp-item';
-            const alreadyLoaded = !!registry[h.name];
-            item.innerHTML = `
-                <i class="fa-solid ${alreadyLoaded ? 'fa-circle-check' : 'fa-file-code'}"></i>
-                <span class="chp-name" title="${h.name}">${h.name}</span>
-                <span class="chp-meta">${alreadyLoaded ? 'loaded' : timeAgo(h.ts)}</span>
-                <button class="chp-del" title="Remove from history">✕</button>`;
-            item.querySelector('.chp-del').addEventListener('click', e => {
-                e.stopPropagation();
-                deleteClassFromHistory(h.name);
-            });
-            item.addEventListener('click', () => {
-                parseApex(h.content);
-                render();
-                toggleClassHistory(false);
-                feState.loadedNames.add(h.name + '.cls');
-                feState.loadedNames.add(h.name + '.java');
-                renderFileTree();
-            });
-            list.appendChild(item);
-        });
-    }
-
+    // ── File history ───────────────────────────────────────────────────────────
     function timeAgo(ts) {
         const s = Math.floor((Date.now() - ts) / 1000);
         if (s < 60) return 'just now';
         if (s < 3600) return `${Math.floor(s/60)}m ago`;
         if (s < 86400) return `${Math.floor(s/3600)}h ago`;
         return `${Math.floor(s/86400)}d ago`;
+    }
+
+    async function renderClassHistory() {
+        const list = document.getElementById('chp-list');
+        list.innerHTML = '';
+        const hist = await idbGetFileHistory();
+        if (!hist.length) {
+            list.innerHTML = '<div id="chp-empty">No recently opened files</div>';
+            return;
+        }
+        hist.forEach(h => {
+            const item = document.createElement('div');
+            item.className = 'chp-item';
+            const alreadyLoaded = feState.loadedNames.has(h.name);
+            item.innerHTML = `
+                <i class="fa-solid ${alreadyLoaded ? 'fa-circle-check' : 'fa-file-code'}"></i>
+                <span class="chp-name" title="${h.name}">${h.name}</span>
+                <span class="chp-meta">${timeAgo(h.ts)}</span>
+                <button class="chp-del" title="Remove from history">✕</button>`;
+            item.querySelector('.chp-del').addEventListener('click', async e => {
+                e.stopPropagation();
+                await idbDeleteFileHistory(h.name);
+                renderClassHistory();
+            });
+            item.addEventListener('click', async () => {
+                try {
+                    const perm = await h.handle.requestPermission({ mode: 'read' });
+                    if (perm !== 'granted') return;
+                    const file = await h.handle.getFile();
+                    const text = await file.text();
+                    parseApex(text);
+                    feState.loadedNames.add(h.name);
+                    render();
+                    renderFileTree();
+                    toggleClassHistory(false);
+                    await idbSaveFileHistory(h.name, h.handle); // bump to top
+                } catch (e) { console.error('Failed to reload from history', h.name, e); }
+            });
+            list.appendChild(item);
+        });
     }
 
     function toggleClassHistory(forceOpen) {
@@ -837,7 +867,6 @@
             methods[mName] = nextMatch > -1 ? content.slice(start, start + nextMatch) : content.slice(start);
         }
         registry[className] = { varMap, methods, raw: content };
-        saveClassToHistory(className, content);
     }
 
     function cleanLabel(text) {
