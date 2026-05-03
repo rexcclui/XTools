@@ -1337,6 +1337,23 @@
                 if (!aggregated[resTarget].includes(method)) aggregated[resTarget].push(method);
             }
         }
+
+        // Scan for inner class type references: KnownClass.UpperCaseInnerType
+        // Catches usage like List<SMAC_Foo.Response>, return types, param types, new List<SMAC_Foo.Response>()
+        const innerTypeRegex = /\b([\w]+)\.([\w]+)\b/g;
+        let it;
+        while ((it = innerTypeRegex.exec(content)) !== null) {
+            const outer = it[1];
+            const inner = it[2];
+            if (!registry[outer] || outer === sourceName) continue;
+            if (!/^[A-Z]/.test(inner)) continue; // lowercase = method call, already handled above
+            if (content[it.index + it[0].length] === '(') continue; // constructor/method call, already handled
+            const base = outer.toLowerCase();
+            if (SYSTEM_TYPES.has(base)) continue;
+            if (!aggregated[outer]) aggregated[outer] = [];
+            if (!aggregated[outer].includes(inner)) aggregated[outer].push(inner);
+        }
+
         return aggregated;
     }
 
@@ -1474,6 +1491,20 @@
             if (registry[sourceName] && registry[sourceName].methods && registry[sourceName].methods[methodName]) {
                 addCall(sourceName, methodName, bm.index, { allowSelf: true });
             }
+        }
+
+        // Capture inner class type references: KnownClass.UpperCaseInnerType used as types
+        const innerTypeRegex2 = /\b([\w]+)\.([\w]+)\b/g;
+        let it2;
+        while ((it2 = innerTypeRegex2.exec(content)) !== null) {
+            const outer = it2[1];
+            const inner = it2[2];
+            if (!registry[outer] || outer === sourceName) continue;
+            if (!/^[A-Z]/.test(inner)) continue;
+            if (content[it2.index + it2[0].length] === '(') continue;
+            const base = outer.toLowerCase();
+            if (SYSTEM_TYPES.has(base)) continue;
+            addCall(outer, inner, it2.index);
         }
 
         // Capture fluent chains that start from a constructor: new ClassName().method1().method2()...
