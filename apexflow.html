@@ -297,7 +297,6 @@
 <div id="node-context-menu">
     <div class="ctx-item" id="ctx-toggle-nodes"><i class="fa-solid fa-eye-slash"></i><span id="ctx-toggle-label">Hide Nodes</span></div>
     <div class="ctx-item" id="ctx-hide-children" style="display:none"><i class="fa-solid fa-circle-nodes"></i><span id="ctx-hide-children-label">Hide Children</span></div>
-    <div class="ctx-item" id="ctx-drill-into" style="display:none"><i class="fa-solid fa-circle-arrow-right"></i><span id="ctx-drill-label">Drill Into</span></div>
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
@@ -397,7 +396,7 @@
     let expandedMethods = new Map();
     let activeMethods = new Set();
     let collapsedMethods = new Set(); // Active methods whose subnodes are hidden
-    let collapsedDepth1 = new Set();  // Depth-1 node ids whose depth-2 subnodes are hidden
+    let collapsedNodes = new Set();   // Node ids (any depth) whose children are collapsed
     let currentRenderedEdgeStyles = [];
     let tooltipDragState = { isDragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 };
     let tooltipResizeState = { isResizing: false, startX: 0, startY: 0, startWidth: 0, startHeight: 0 };
@@ -1061,12 +1060,11 @@
             document.getElementById('reset-btn').style.display = "inline-block";
             def = `graph LR\n`;
 
-            const firstLevelClasses = {};
-            const secondLevelClasses = {};
-            const entryEdges = [];
-            const downstreamEdges = [];
+            const depthNodeMap = {};  // { depth: { nodeId: entry } }
+            const allFlowEdges = [];
             const blockColors = new Map();
             let nextBlockColorIndex = 0;
+            const MAX_FLOW_DEPTH = 6;
 
             function getBlockColor(blockKey) {
                 if (!blockColors.has(blockKey)) {
@@ -1082,58 +1080,51 @@
                 return { id: `l${level}__${classId}__class`, label: registry[className] ? className : `? ${className}`, className, methodName: null };
             }
 
+            function collectFlowDepth(parentNodeId, calls, depth, edgeColor) {
+                if (depth > MAX_FLOW_DEPTH) return;
+                if (!depthNodeMap[depth]) depthNodeMap[depth] = {};
+                calls.forEach(call => {
+                    const targetClass = call.target;
+                    if (hiddenClasses.has(targetClass)) return;
+                    const node = buildNode(depth, targetClass, call.method);
+                    const nodeColor = getBlockColor(`depth${depth}:${targetClass}:${call.method}`);
+                    if (!depthNodeMap[depth][node.id]) {
+                        const isCollapsed = collapsedNodes.has(node.id);
+                        const subCalls = registry[targetClass]?.methods?.[call.method]
+                            ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
+                            : [];
+                        const hasChildren = subCalls.length > 0;
+                        depthNodeMap[depth][node.id] = {
+                            node: { ...node, displayLabel: `${cleanLabel(node.label)}${hasChildren ? (isCollapsed ? ' ⊕' : ' ⊖') : ''}` },
+                            color: nodeColor, seq: globalSeq++
+                        };
+                        if (!isCollapsed && subCalls.length > 0) {
+                            collectFlowDepth(node.id, subCalls, depth + 1, nodeColor);
+                        }
+                    }
+                    allFlowEdges.push({ from: parentNodeId, to: node.id, label: call.sequenceLabel, color: edgeColor, depth });
+                });
+            }
+
             const activeMethodList = [...activeMethods];
 
             if (activeMethodList.length === 0) {
                 def += `  empty["Select a method from the sidebar to view its call flow"]\n`;
                 def += `  style empty fill:#1e293b,stroke:#334155,color:#64748b\n`;
             } else {
+                let globalSeq = 0;
+
                 activeMethodList.forEach(entryMethod => {
                     const entryNodeId = `${safeId(focusedClass)}___${safeId(entryMethod)}`;
                     const isCollapsed = collapsedMethods.has(entryMethod);
                     const icon = isCollapsed ? '⊕' : '⊖';
                     def += `  ${entryNodeId}["${icon} ${entryMethod}()"]\n`;
                     def += `  style ${entryNodeId} fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f1f5f9\n`;
-                });
-
-                let globalSeq = 0;
-
-                activeMethodList.forEach(entryMethod => {
-                    if (collapsedMethods.has(entryMethod)) return;
-                    const entryBlockColor = getBlockColor(`entry:${entryMethod}`);
-                    const depth1Calls = collectOrderedCalls(registry[focusedClass].methods[entryMethod], registry[focusedClass].varMap, focusedClass);
-
-                    depth1Calls.forEach(call => {
-                        const targetClass = call.target;
-                        if (hiddenClasses.has(targetClass)) return;
-                        const targetNode = buildNode(1, targetClass, call.method);
-                        const firstLevelBlockColor = getBlockColor(`depth1:${targetClass}:${call.method}`);
-                        const isD1Collapsed = collapsedDepth1.has(targetNode.id);
-                        if (!firstLevelClasses[targetNode.id]) {
-                            const d2Calls = registry[targetClass]?.methods?.[call.method]
-                                ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
-                                : [];
-                            const hasChildren = d2Calls.length > 0;
-                            const d1Icon = hasChildren ? (isD1Collapsed ? ' ⊕' : ' ⊖') : '';
-                            firstLevelClasses[targetNode.id] = {
-                                node: { ...targetNode, displayLabel: `${cleanLabel(targetNode.label)}${d1Icon}` },
-                                color: firstLevelBlockColor, seq: globalSeq++
-                            };
-                        }
-                        entryEdges.push({ from: `${safeId(focusedClass)}___${safeId(entryMethod)}`, to: targetNode.id, label: call.sequenceLabel, color: entryBlockColor });
-
-                        if (!isD1Collapsed && registry[targetClass]?.methods?.[call.method]) {
-                            collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass).forEach(nestedCall => {
-                                const nextClass = nestedCall.target;
-                                if (hiddenClasses.has(nextClass)) return;
-                                const downstreamNode = buildNode(2, nextClass, nestedCall.method);
-                                if (!secondLevelClasses[downstreamNode.id]) {
-                                    secondLevelClasses[downstreamNode.id] = { node: downstreamNode, color: getBlockColor(`depth2:${nextClass}`), seq: globalSeq++ };
-                                }
-                                downstreamEdges.push({ from: targetNode.id, to: downstreamNode.id, label: nestedCall.sequenceLabel, color: firstLevelBlockColor });
-                            });
-                        }
-                    });
+                    if (!isCollapsed) {
+                        const entryBlockColor = getBlockColor(`entry:${entryMethod}`);
+                        const calls = collectOrderedCalls(registry[focusedClass].methods[entryMethod], registry[focusedClass].varMap, focusedClass);
+                        collectFlowDepth(entryNodeId, calls, 1, entryBlockColor);
+                    }
                 });
 
                 function renderClassSubgraphs(depthClasses, sgPrefix) {
@@ -1154,17 +1145,15 @@
                     });
                 }
 
-                renderClassSubgraphs(firstLevelClasses, 'sg1');
-                renderClassSubgraphs(secondLevelClasses, 'sg2');
-
-                entryEdges.forEach(edge => {
-                    def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
-                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:3px,fill:none`);
-                    linkCounter++;
+                Object.keys(depthNodeMap).sort((a, b) => +a - +b).forEach(depth => {
+                    renderClassSubgraphs(depthNodeMap[depth], `sg${depth}`);
                 });
-                downstreamEdges.forEach(edge => {
+
+                allFlowEdges.forEach(edge => {
                     def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
-                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:2px,fill:none,stroke-dasharray:6 3`);
+                    const sw = edge.depth === 1 ? '3px' : '2px';
+                    const dash = edge.depth > 1 ? ',stroke-dasharray:6 3' : '';
+                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:${sw},fill:none${dash}`);
                     linkCounter++;
                 });
             }
@@ -1713,12 +1702,12 @@
                         }
                     }
                 }
-                // Depth-1 node: l1__ClassName___methodName
-                const m2 = node.id.match(/flowchart-l1__([^-]+)___([^-]+)-/);
+                // Any depth node: lN__ClassName___methodName
+                const m2 = node.id.match(/flowchart-l(\d+)__([^-]+)___([^-]+)-/);
                 if (m2) {
-                    const nodeId = `l1__${m2[1]}___${m2[2]}`;
-                    if (collapsedDepth1.has(nodeId)) collapsedDepth1.delete(nodeId);
-                    else collapsedDepth1.add(nodeId);
+                    const nodeId = `l${m2[1]}__${m2[2]}___${m2[3]}`;
+                    if (collapsedNodes.has(nodeId)) collapsedNodes.delete(nodeId);
+                    else collapsedNodes.add(nodeId);
                     render();
                 }
             });
@@ -1848,13 +1837,13 @@
         let canToggle = false;
         if (focusedClass) {
             const m1 = node.id.match(/flowchart-([^-]+)___([^-]+)-/);
-            const isEntry = m1 && !m1[1].startsWith('l1__') && !m1[1].startsWith('l2__') && className === focusedClass && methodName && activeMethods.has(methodName);
-            const m2 = node.id.match(/flowchart-l1__([^-]+)___([^-]+)-/);
-            const nodeId = m2 ? `l1__${m2[1]}___${m2[2]}` : null;
-            const isD1 = !!nodeId;
-            if (isEntry || isD1) {
+            const isEntry = m1 && !m1[1].match(/^l\d+__/) && className === focusedClass && methodName && activeMethods.has(methodName);
+            const mDepth = node.id.match(/flowchart-l(\d+)__([^-]+)___([^-]+)-/);
+            const nodeId = mDepth ? `l${mDepth[1]}__${mDepth[2]}___${mDepth[3]}` : null;
+            const isDepthNode = !!nodeId;
+            if (isEntry || isDepthNode) {
                 canToggle = true;
-                const isCollapsed = isEntry ? collapsedMethods.has(methodName) : collapsedDepth1.has(nodeId);
+                const isCollapsed = isEntry ? collapsedMethods.has(methodName) : collapsedNodes.has(nodeId);
                 document.getElementById('ctx-toggle-label').textContent = isCollapsed ? 'Show Child Nodes' : 'Hide Child Nodes';
                 document.getElementById('ctx-toggle-nodes').style.display = 'flex';
                 document.getElementById('ctx-toggle-nodes').onclick = () => {
@@ -1863,8 +1852,8 @@
                         if (collapsedMethods.has(methodName)) collapsedMethods.delete(methodName);
                         else collapsedMethods.add(methodName);
                     } else {
-                        if (collapsedDepth1.has(nodeId)) collapsedDepth1.delete(nodeId);
-                        else collapsedDepth1.add(nodeId);
+                        if (collapsedNodes.has(nodeId)) collapsedNodes.delete(nodeId);
+                        else collapsedNodes.add(nodeId);
                     }
                     render();
                 };
@@ -1904,24 +1893,6 @@
             } else {
                 hideChildEl.style.display = 'none';
             }
-        }
-
-        // Drill Into — available in Analyze Flow on depth-1/2 nodes of loaded classes
-        const drillEl = document.getElementById('ctx-drill-into');
-        const isDrillable = focusedClass && className && className !== focusedClass && registry[className] && methodName;
-        drillEl.style.display = isDrillable ? 'flex' : 'none';
-        if (isDrillable) {
-            document.getElementById('ctx-drill-label').textContent = `Drill Into ${className}`;
-            drillEl.onclick = () => {
-                hideNodeContextMenu();
-                focusedClass = className;
-                selectedClassName = null;
-                activeMethods = new Set();
-                collapsedMethods = new Set();
-                collapsedDepth1 = new Set();
-                openMethodPicker(className, methodName);
-                render();
-            };
         }
 
         // Load Class option — only for ghost (unloaded) nodes
@@ -1966,7 +1937,7 @@
         selectedClassName = null;
         activeMethods = new Set();
         collapsedMethods = new Set();
-        collapsedDepth1 = new Set();
+        collapsedNodes = new Set();
         if (name) { openMethodPicker(name); } else { exitAnalyzeFlow(); }
     }
 
@@ -2012,7 +1983,7 @@
         focusedClass = null;
         activeMethods = new Set();
         collapsedMethods = new Set();
-        collapsedDepth1 = new Set();
+        collapsedNodes = new Set();
         document.getElementById('class-panel').style.display = '';
         document.getElementById('method-picker').classList.remove('visible');
         render();
