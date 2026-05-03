@@ -1048,10 +1048,7 @@
 
             function buildNode(level, className, methodName) {
                 const classId = safeId(className);
-                if (methodName) {
-                    const label = level > 0 ? `${className}.${methodName}()` : `${methodName}()`;
-                    return { id: `l${level}__${classId}___${safeId(methodName)}`, label, className, methodName };
-                }
+                if (methodName) return { id: `l${level}__${classId}___${safeId(methodName)}`, label: `${methodName}()`, className, methodName };
                 return { id: `l${level}__${classId}__class`, label: registry[className] ? className : `? ${className}`, className, methodName: null };
             }
 
@@ -1109,16 +1106,26 @@
                     });
                 });
 
-                function renderDepthBlocks(level, title, depthMethods) {
-                    const entries = Object.values(depthMethods).sort((a, b) => a.seq - b.seq);
-                    if (!entries.length) return;
-                    def += `  subgraph ${safeId(focusedClass)}___depth${level}["${title}"]\n    direction TB\n`;
-                    entries.forEach(e => { def += `    ${e.node.id}["${e.node.displayLabel || cleanLabel(e.node.label)}"]\n`; });
-                    def += `  end\n`;
+                function renderClassSubgraphs(depthClasses, sgPrefix) {
+                    const byClass = {};
+                    Object.values(depthClasses).sort((a, b) => a.seq - b.seq).forEach(e => {
+                        const cls = e.node.className;
+                        if (!byClass[cls]) byClass[cls] = [];
+                        byClass[cls].push(e);
+                    });
+                    Object.entries(byClass).forEach(([cls, clsEntries]) => {
+                        const sgId = `${sgPrefix}_${safeId(cls)}`;
+                        const sgLabel = registry[cls] ? cls : `? ${cls}`;
+                        def += `  subgraph ${sgId} ["${sgLabel}"]\n    direction TB\n`;
+                        clsEntries.forEach(e => {
+                            def += `    ${e.node.id}["${e.node.displayLabel || cleanLabel(e.node.label)}"]\n`;
+                        });
+                        def += `  end\n`;
+                    });
                 }
 
-                renderDepthBlocks(1, 'Direct Method Calls', firstLevelClasses);
-                renderDepthBlocks(2, 'Nested Method Calls', secondLevelClasses);
+                renderClassSubgraphs(firstLevelClasses, 'sg1');
+                renderClassSubgraphs(secondLevelClasses, 'sg2');
 
                 entryEdges.forEach(edge => {
                     def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
