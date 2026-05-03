@@ -1048,7 +1048,10 @@
 
             function buildNode(level, className, methodName) {
                 const classId = safeId(className);
-                if (methodName) return { id: `l${level}__${classId}___${safeId(methodName)}`, label: `${methodName}()`, className, methodName };
+                if (methodName) {
+                    const label = level > 0 ? `${className}.${methodName}()` : `${methodName}()`;
+                    return { id: `l${level}__${classId}___${safeId(methodName)}`, label, className, methodName };
+                }
                 return { id: `l${level}__${classId}__class`, label: registry[className] ? className : `? ${className}`, className, methodName: null };
             }
 
