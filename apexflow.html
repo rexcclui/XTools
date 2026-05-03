@@ -296,6 +296,7 @@
 <div id="node-context-menu">
     <div class="ctx-item" id="ctx-toggle-nodes"><i class="fa-solid fa-eye-slash"></i><span id="ctx-toggle-label">Hide Nodes</span></div>
     <div class="ctx-item" id="ctx-hide-children" style="display:none"><i class="fa-solid fa-circle-nodes"></i><span id="ctx-hide-children-label">Hide Children</span></div>
+    <div class="ctx-item" id="ctx-drill-into" style="display:none"><i class="fa-solid fa-circle-arrow-right"></i><span id="ctx-drill-label">Drill Into</span></div>
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
@@ -1876,6 +1877,24 @@
             }
         }
 
+        // Drill Into — available in Analyze Flow on depth-1/2 nodes of loaded classes
+        const drillEl = document.getElementById('ctx-drill-into');
+        const isDrillable = focusedClass && className && className !== focusedClass && registry[className] && methodName;
+        drillEl.style.display = isDrillable ? 'flex' : 'none';
+        if (isDrillable) {
+            document.getElementById('ctx-drill-label').textContent = `Drill Into ${className}`;
+            drillEl.onclick = () => {
+                hideNodeContextMenu();
+                focusedClass = className;
+                selectedClassName = null;
+                activeMethods = new Set();
+                collapsedMethods = new Set();
+                collapsedDepth1 = new Set();
+                openMethodPicker(className, methodName);
+                render();
+            };
+        }
+
         // Load Class option — only for ghost (unloaded) nodes
         const ghostName = ghostClassFromNode(node);
         const loadEl = document.getElementById('ctx-load-class');
@@ -1922,22 +1941,27 @@
         if (name) { openMethodPicker(name); } else { exitAnalyzeFlow(); }
     }
 
-    function openMethodPicker(className) {
+    function openMethodPicker(className, preSelectMethod) {
         document.getElementById('class-panel').style.display = 'none';
         document.getElementById('method-picker').classList.add('visible');
         document.getElementById('method-picker-classname').textContent = className;
         const listEl = document.getElementById('method-picker-list');
         listEl.innerHTML = '';
 
-        // Find method with most lines to auto-enable
         const methods = Object.keys(registry[className].methods);
-        let defaultMethod = methods[0];
-        let maxLines = 0;
-        methods.forEach(m => {
-            const lines = (registry[className].methods[m].match(/\n/g) || []).length;
-            if (lines > maxLines) { maxLines = lines; defaultMethod = m; }
-        });
-        if (defaultMethod) activeMethods.add(defaultMethod);
+        if (preSelectMethod && methods.includes(preSelectMethod)) {
+            // Drill-in: activate only the specific method, skip auto-default
+            activeMethods.add(preSelectMethod);
+        } else {
+            // Normal open: auto-enable the method with the most lines
+            let defaultMethod = methods[0];
+            let maxLines = 0;
+            methods.forEach(m => {
+                const lines = (registry[className].methods[m].match(/\n/g) || []).length;
+                if (lines > maxLines) { maxLines = lines; defaultMethod = m; }
+            });
+            if (defaultMethod) activeMethods.add(defaultMethod);
+        }
 
         methods.forEach(m => {
             const calls = collectOrderedCalls(registry[className].methods[m], registry[className].varMap, className);
