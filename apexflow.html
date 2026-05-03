@@ -191,9 +191,20 @@
             cursor: pointer; transition: 0.3s;
         }
         .btn-toggle:hover { background: var(--primary); color: white; }
+
+        #drop-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(16, 185, 129, 0.12);
+            border: 3px dashed var(--primary);
+            display: none; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 600; color: var(--primary);
+            pointer-events: none;
+        }
+        #drop-overlay.show { display: flex; }
     </style>
 </head>
 <body>
+<div id="drop-overlay">Drop .cls / .java files anywhere</div>
 
 <div id="code-tooltip">
     <div id="code-tooltip-header">
@@ -298,17 +309,25 @@
     const BANNED_METHODS = new Set(['add', 'get', 'put', 'putall', 'addall', 'size', 'contains', 'containskey', 'isempty', 'remove', 'clear', 'values', 'keyset', 'entryset', 'clone', 'sort', 'indexof', 'substring', 'length', 'tolowercase', 'touppercase', 'trim', 'strip', 'split', 'replace', 'replaceall', 'format', 'valueof', 'tostring', 'equals', 'hashcode', 'compareto', 'iterator', 'stream', 'foreach', 'println', 'print', 'printf', 'append', 'toarray', 'asList', 'aslist', 'ofnullable', 'isPresent', 'ispresent', 'orElse', 'orelse', 'getordefault']);
     const PATH_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e', '#14b8a6'];
 
-    const dropZone = document.getElementById('drop-zone');
-    dropZone.addEventListener('dragover', e => e.preventDefault());
-    dropZone.addEventListener('drop', async e => {
+    const dropOverlay = document.getElementById('drop-overlay');
+
+    document.addEventListener('dragover', e => {
         e.preventDefault();
+        dropOverlay.classList.add('show');
+    });
+    document.addEventListener('dragleave', e => {
+        if (!e.relatedTarget) dropOverlay.classList.remove('show');
+    });
+    document.addEventListener('drop', async e => {
+        e.preventDefault();
+        dropOverlay.classList.remove('show');
 
-        const clsFiles = Array.from(e.dataTransfer.files)
-            .filter(file => file.name.toLowerCase().endsWith('.cls') || file.name.toLowerCase().endsWith('.java'));
+        const files = Array.from(e.dataTransfer.files)
+            .filter(f => f.name.toLowerCase().endsWith('.cls') || f.name.toLowerCase().endsWith('.java'));
 
-        if (clsFiles.length === 0) return;
+        if (files.length === 0) return;
 
-        for (const file of clsFiles) {
+        for (const file of files) {
             const text = await file.text();
             parseApex(text);
         }
@@ -330,7 +349,7 @@
     }
 
     function parseApex(content) {
-        const classNameMatch = content.match(/class\s+(\w+)/i);
+        const classNameMatch = content.match(/(?:class|interface|enum|record)\s+(\w+)/i);
         if (!classNameMatch) return;
         const className = classNameMatch[1];
         const varMap = {}; 
