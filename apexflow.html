@@ -212,6 +212,22 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             min-width: 170px;
         }
+        #edge-context-menu {
+            position: fixed; display: none; z-index: 2000;
+            background: #1e293b; border: 1px solid #334155;
+            border-radius: 8px; overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            min-width: 180px; max-width: 280px;
+        }
+        #edge-ctx-header {
+            padding: 8px 12px 7px; font-size: 11px; color: #64748b;
+            border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+        }
+        #edge-ctx-header .edge-ctx-cls { color: #10b981; font-weight: 600; }
+        #edge-ctx-header i { color: #64748b; font-size: 9px; }
+        #edge-ctx-body { padding: 6px 14px 10px; }
+        #edge-ctx-body ul { margin: 0; padding: 0 0 0 14px; list-style: disc; }
+        #edge-ctx-body li { padding: 2px 0; font-size: 12px; line-height: 1.6; color: #e2e8f0; }
         .ctx-item {
             display: flex; align-items: center; gap: 10px;
             padding: 10px 14px; cursor: pointer; font-size: 13px;
@@ -283,6 +299,15 @@
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
+</div>
+
+<div id="edge-context-menu">
+    <div id="edge-ctx-header">
+        <span class="edge-ctx-cls" id="edge-ctx-source"></span>
+        <i class="fa-solid fa-arrow-right"></i>
+        <span class="edge-ctx-cls" id="edge-ctx-target"></span>
+    </div>
+    <div id="edge-ctx-body"><ul id="edge-ctx-list"></ul></div>
 </div>
 
 <div id="class-history-panel">
@@ -1148,6 +1173,7 @@
                     }
                 });
                 attachEvents();
+                attachEdgeEvents(svgEl);
                 if (selectedClassName) applyDiagramHighlight(selectedClassName);
             }
         } catch (err) { console.error(err); }
@@ -1338,13 +1364,15 @@
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { hideCodeTooltip(); hideNodeContextMenu(); }
+            if (e.key === 'Escape') { hideCodeTooltip(); hideNodeContextMenu(); hideEdgeContextMenu(); }
         });
         document.addEventListener('click', (e) => {
             const menu = document.getElementById('node-context-menu');
             if (!menu.contains(e.target)) hideNodeContextMenu();
+            const emenu = document.getElementById('edge-context-menu');
+            if (!emenu.contains(e.target)) hideEdgeContextMenu();
         }, true);
-        document.addEventListener('scroll', () => hideNodeContextMenu(), true);
+        document.addEventListener('scroll', () => { hideNodeContextMenu(); hideEdgeContextMenu(); }, true);
 
         tooltipGlobalHandlersBound = true;
     }
@@ -1664,6 +1692,56 @@
                 selectNodeText(node);
             });
         });
+    }
+
+    function attachEdgeEvents(svgEl) {
+        svgEl.querySelectorAll('.edgePath').forEach(edgeEl => {
+            const origPath = edgeEl.querySelector('path');
+            if (!origPath) return;
+
+            // Add a wide transparent overlay path for easier hit-testing
+            const hitPath = origPath.cloneNode(false);
+            hitPath.style.cssText = 'stroke:transparent;stroke-width:20px;fill:none;cursor:pointer;';
+            hitPath.classList.add('edge-hit-path');
+            edgeEl.appendChild(hitPath);
+
+            // Resolve source/target from Mermaid CSS classes (LS-safeId, LE-safeId)
+            const cls = Array.from(edgeEl.classList);
+            const lsCls = cls.find(c => c.startsWith('LS-'));
+            const leCls = cls.find(c => c.startsWith('LE-'));
+            if (!lsCls || !leCls) return;
+            const sourceId = lsCls.slice(3);
+            const targetId = leCls.slice(3);
+            const sourceName = Object.keys(registry).find(k => safeId(k) === sourceId);
+            const targetName = Object.keys(registry).find(k => safeId(k) === targetId);
+            if (!sourceName || !targetName) return;
+
+            [hitPath, origPath].forEach(el => {
+                el.addEventListener('contextmenu', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideNodeContextMenu();
+                    const flows = aggregateFlows(registry[sourceName].raw, registry[sourceName].varMap, sourceName);
+                    const items = flows[targetName] || [];
+                    showEdgeContextMenu(e, sourceName, targetName, items);
+                });
+            });
+        });
+    }
+
+    function showEdgeContextMenu(e, source, target, items) {
+        const menu = document.getElementById('edge-context-menu');
+        document.getElementById('edge-ctx-source').textContent = source;
+        document.getElementById('edge-ctx-target').textContent = target;
+        document.getElementById('edge-ctx-list').innerHTML = items.map(r => `<li>${r}</li>`).join('');
+        menu.style.display = 'block';
+        const mw = 280, mh = menu.offsetHeight || 120;
+        menu.style.left = Math.min(e.clientX, window.innerWidth - mw) + 'px';
+        menu.style.top = Math.min(e.clientY, window.innerHeight - mh) + 'px';
+    }
+
+    function hideEdgeContextMenu() {
+        document.getElementById('edge-context-menu').style.display = 'none';
     }
 
     function resolveNodeIdentity(node) {
