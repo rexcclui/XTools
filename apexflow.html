@@ -1066,6 +1066,8 @@
             let nextBlockColorIndex = 0;
             let globalSeq = 0;
             const MAX_FLOW_DEPTH = 6;
+            const canonicalNodes = {};   // 'className|||method' -> existing nodeId
+            const classFirstDepth = {}; // 'className' -> first depth it appeared at
 
             function getBlockColor(blockKey) {
                 if (!blockColors.has(blockKey)) {
@@ -1083,24 +1085,38 @@
 
             function collectFlowDepth(parentNodeId, calls, depth, edgeColor) {
                 if (depth > MAX_FLOW_DEPTH) return;
-                if (!depthNodeMap[depth]) depthNodeMap[depth] = {};
                 calls.forEach(call => {
                     const targetClass = call.target;
                     if (hiddenClasses.has(targetClass)) return;
-                    const node = buildNode(depth, targetClass, call.method);
-                    const nodeColor = getBlockColor(`depth${depth}:${targetClass}:${call.method}`);
-                    if (!depthNodeMap[depth][node.id]) {
+                    const canonKey = `${targetClass}|||${call.method}`;
+
+                    // Case 1: exact class+method already in chart — repoint edge to existing node
+                    if (canonicalNodes[canonKey]) {
+                        allFlowEdges.push({ from: parentNodeId, to: canonicalNodes[canonKey], label: call.sequenceLabel, color: edgeColor, depth });
+                        return;
+                    }
+
+                    // Case 2: class already in chart — add method to its existing group (same depth)
+                    const placeDepth = classFirstDepth[targetClass] !== undefined ? classFirstDepth[targetClass] : depth;
+                    if (!depthNodeMap[placeDepth]) depthNodeMap[placeDepth] = {};
+
+                    const node = buildNode(placeDepth, targetClass, call.method);
+                    canonicalNodes[canonKey] = node.id;
+                    if (classFirstDepth[targetClass] === undefined) classFirstDepth[targetClass] = placeDepth;
+
+                    if (!depthNodeMap[placeDepth][node.id]) {
                         const isCollapsed = collapsedNodes.has(node.id);
                         const subCalls = registry[targetClass]?.methods?.[call.method]
                             ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
                             : [];
                         const hasChildren = subCalls.length > 0;
-                        depthNodeMap[depth][node.id] = {
+                        const nodeColor = getBlockColor(`depth${placeDepth}:${targetClass}:${call.method}`);
+                        depthNodeMap[placeDepth][node.id] = {
                             node: { ...node, displayLabel: `${cleanLabel(node.label)}${hasChildren ? (isCollapsed ? ' ⊕' : ' ⊖') : ''}` },
                             color: nodeColor, seq: globalSeq++
                         };
                         if (!isCollapsed && subCalls.length > 0) {
-                            collectFlowDepth(node.id, subCalls, depth + 1, nodeColor);
+                            collectFlowDepth(node.id, subCalls, placeDepth + 1, nodeColor);
                         }
                     }
                     allFlowEdges.push({ from: parentNodeId, to: node.id, label: call.sequenceLabel, color: edgeColor, depth });
