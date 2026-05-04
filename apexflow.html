@@ -1686,30 +1686,6 @@
                 // Highlight cursor only — no auto-popup
                 node.style.cursor = 'pointer';
             });
-            node.addEventListener('click', () => {
-                if (!focusedClass) return;
-                // Entry node: ClassName___methodName
-                const m1 = node.id.match(/flowchart-([^-]+)___([^-]+)-/);
-                if (m1 && !m1[1].startsWith('l1__') && !m1[1].startsWith('l2__')) {
-                    const className = Object.keys(registry).find(k => safeId(k) === m1[1]);
-                    if (className === focusedClass) {
-                        const methodName = Object.keys(registry[className].methods).find(m => safeId(m) === m1[2]);
-                        if (methodName && activeMethods.has(methodName)) {
-                            if (collapsedMethods.has(methodName)) collapsedMethods.delete(methodName);
-                            else collapsedMethods.add(methodName);
-                            render(); return;
-                        }
-                    }
-                }
-                // Any depth node: lN__ClassName___methodName
-                const m2 = node.id.match(/flowchart-l(\d+)__([^-]+)___([^-]+)-/);
-                if (m2) {
-                    const nodeId = `l${m2[1]}__${m2[2]}___${m2[3]}`;
-                    if (collapsedNodes.has(nodeId)) collapsedNodes.delete(nodeId);
-                    else collapsedNodes.add(nodeId);
-                    render();
-                }
-            });
             node.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 hideCodeTooltip();
