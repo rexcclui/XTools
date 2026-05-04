@@ -55,8 +55,8 @@
         #fe-folder-path-label { font-size: 10px; color: #64748b; display: flex; align-items: center; gap: 5px; }
         #fe-folder-path-label i { color: #f59e0b; }
         #fe-folder-path-label span { flex: 1; }
-        #fe-reopen-btn { padding: 2px 7px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: #64748b; cursor: pointer; white-space: nowrap; }
-        #fe-reopen-btn:hover { border-color: var(--primary); color: var(--primary); }
+        #fe-reopen-btn, #history-btn { padding: 2px 7px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: #64748b; cursor: pointer; white-space: nowrap; }
+        #fe-reopen-btn:hover, #history-btn:hover { border-color: var(--primary); color: var(--primary); }
         #fe-folder-name { width: 100%; padding: 4px 7px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; color: #94a3b8; font-size: 11px; font-family: monospace; outline: none; }
         #fe-folder-name::placeholder { color: #475569; font-style: italic; }
         #fe-folder-name:focus { border-color: var(--primary); color: var(--text-main); }
@@ -336,6 +336,7 @@
                 <i class="fa-solid fa-folder"></i>
                 <span>Folder path</span>
                 <button id="fe-reopen-btn" title="Re-open this folder">↺ Reopen</button>
+                <button id="history-btn" title="File history"><i class="fa-solid fa-clock-rotate-left"></i></button>
             </div>
             <input id="fe-folder-name" type="text" spellcheck="false" placeholder="Paste full path here, e.g. /home/user/project/src" autocomplete="off">
         </div>
@@ -359,7 +360,6 @@
     <div class="toolbar">
         <h3 id="view-title" style="margin-left: 50px; font-size: 0.9rem; color: var(--text-dim);">Ready</h3>
         <div style="display: flex; gap: 10px;">
-            <button class="btn" id="history-btn" title="Class history"><i class="fa-solid fa-clock-rotate-left"></i></button>
             <button class="btn" id="copy-mermaid-btn" onclick="copyCurrentMermaid()" title="Copy Mermaid code">
                 <i class="fa-regular fa-copy"></i>
             </button>
