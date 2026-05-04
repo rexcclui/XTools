@@ -387,6 +387,7 @@
     });
     
     const registry = {};
+    const innerClassNames = new Set(); // inner class names found inside loaded files
     let focusedClass = null;
     let panZoomInstance = null;
     let selectedClassName = null;
@@ -871,7 +872,7 @@
         const text = (label?.textContent || '').trim();
         if (!text.startsWith('?')) return null;
         const name = text.replace(/^\?\s*/, '').trim();
-        return name && !registry[name] ? name : null;
+        return name && !registry[name] && !innerClassNames.has(name) ? name : null;
     }
 
     function findFileInTree(className) {
@@ -941,6 +942,14 @@
             methods[mName] = nextMatch > -1 ? content.slice(start, start + nextMatch) : content.slice(start);
         }
         registry[className] = { varMap, methods, raw: content };
+        // Collect inner class declarations — any additional class/interface/enum keywords after the first
+        const innerClassRegex = /\b(?:class|interface|enum)\s+(\w+)/g;
+        let icm;
+        let firstSkipped = false;
+        while ((icm = innerClassRegex.exec(content)) !== null) {
+            if (!firstSkipped) { firstSkipped = true; continue; } // skip the outer class itself
+            innerClassNames.add(icm[1]);
+        }
     }
 
     function cleanLabel(text) {
@@ -1062,7 +1071,7 @@
                     const label = cleanLabel(isTruncated ? items[0] + ', ' + items[1] + '…' : items.join(', '));
                     if (isTruncated) edgeLabelFull.push(items.join(', '));
                     def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
-                    if (!registry[target]) ghostNodes.add(target);
+                    if (!registry[target] && !innerClassNames.has(target)) ghostNodes.add(target);
                 });
                 def += `  ${safeId(cName)}["${cName}"]\n`;
             });
