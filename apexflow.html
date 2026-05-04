@@ -1543,6 +1543,27 @@
             }
         }
 
+        // Detect static factory chains: UpperClass.factory().chain1().chain2()...
+        // e.g. SMAC_ProjectTaskSelector2.newInstance().selectByProjectIds(...)
+        const staticFactoryFlowRegex = /\b([A-Z][\w]+)\.\w+\s*\([^)]*\)([\s\S]*?);/g;
+        let sf;
+        while ((sf = staticFactoryFlowRegex.exec(content)) !== null) {
+            const className = sf[1];
+            if (!className || className === sourceName) continue;
+            const base = className.toLowerCase();
+            if (SYSTEM_TYPES.has(base)) continue;
+            const chainBody = sf[2] || '';
+            if (!chainBody.trim()) continue;
+            const chainMethodRegex = /\.\s*(\w+)\s*\(/g;
+            let chainMatch;
+            while ((chainMatch = chainMethodRegex.exec(chainBody)) !== null) {
+                const method = chainMatch[1];
+                if (BANNED_METHODS.has(method.toLowerCase())) continue;
+                if (!aggregated[className]) aggregated[className] = [];
+                if (!aggregated[className].includes(method)) aggregated[className].push(method);
+            }
+        }
+
         return aggregated;
     }
 
@@ -1709,6 +1730,22 @@
             let chainMatch;
             while ((chainMatch = chainMethodRegex.exec(chainBody)) !== null) {
                 addCall(target, chainMatch[1], cc.index + chainMatch.index);
+            }
+        }
+
+        // Capture fluent chains from static factory calls: UpperClass.factory().chain1().chain2()...
+        // e.g. SMAC_ProjectTaskSelector2.newInstance().selectByProjectIds(...)
+        const staticFactoryChainRegex = /\b([A-Z][\w]+)\.\w+\s*\([^)]*\)([\s\S]*?);/g;
+        let sfc;
+        while ((sfc = staticFactoryChainRegex.exec(content)) !== null) {
+            const target = pickClassTarget(sfc[1]);
+            if (!target) continue;
+            const chainBody = sfc[2] || '';
+            if (!chainBody.trim()) continue;
+            const chainMethodRegex = /\.\s*(\w+)\s*\(/g;
+            let chainMatch;
+            while ((chainMatch = chainMethodRegex.exec(chainBody)) !== null) {
+                addCall(target, chainMatch[1], sfc.index + chainMatch.index);
             }
         }
 
