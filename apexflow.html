@@ -247,7 +247,7 @@
 
         /* CLASS HISTORY PANEL */
         #class-history-panel {
-            position: absolute; top: 68px; right: 12px; z-index: 500;
+            position: fixed; z-index: 500;
             width: 260px; background: var(--bg-sidebar); border: 1px solid var(--border);
             border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             display: none; flex-direction: column; overflow: hidden;
@@ -834,12 +834,23 @@
 
     function toggleClassHistory(forceOpen) {
         const panel = document.getElementById('class-history-panel');
+        const btn = document.getElementById('history-btn');
         const shouldOpen = forceOpen !== undefined ? forceOpen : !panel.classList.contains('open');
         panel.classList.toggle('open', shouldOpen);
-        if (shouldOpen) renderClassHistory();
+        if (shouldOpen) {
+            renderClassHistory();
+            // Position the panel below the button, aligned to its left edge
+            const rect = btn.getBoundingClientRect();
+            const panelW = 260;
+            let left = rect.left;
+            // Keep within viewport
+            if (left + panelW > window.innerWidth) left = window.innerWidth - panelW - 8;
+            panel.style.left = left + 'px';
+            panel.style.top = (rect.bottom + 4) + 'px';
+        }
     }
 
-    document.getElementById('history-btn').addEventListener('click', () => toggleClassHistory());
+    document.getElementById('history-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleClassHistory(); });
     document.getElementById('chp-close-btn').addEventListener('click', () => toggleClassHistory(false));
     document.addEventListener('click', e => {
         const panel = document.getElementById('class-history-panel');
@@ -1066,6 +1077,8 @@
             let nextBlockColorIndex = 0;
             let globalSeq = 0;
             const MAX_FLOW_DEPTH = 6;
+            const canonicalNodes = {};   // 'className|||method' -> existing nodeId
+            const classFirstDepth = {}; // 'className' -> first depth it appeared at
 
             function getBlockColor(blockKey) {
                 if (!blockColors.has(blockKey)) {
@@ -1083,24 +1096,38 @@
 
             function collectFlowDepth(parentNodeId, calls, depth, edgeColor) {
                 if (depth > MAX_FLOW_DEPTH) return;
-                if (!depthNodeMap[depth]) depthNodeMap[depth] = {};
                 calls.forEach(call => {
                     const targetClass = call.target;
                     if (hiddenClasses.has(targetClass)) return;
-                    const node = buildNode(depth, targetClass, call.method);
-                    const nodeColor = getBlockColor(`depth${depth}:${targetClass}:${call.method}`);
-                    if (!depthNodeMap[depth][node.id]) {
+                    const canonKey = `${targetClass}|||${call.method}`;
+
+                    // Case 1: exact class+method already in chart — repoint edge to existing node
+                    if (canonicalNodes[canonKey]) {
+                        allFlowEdges.push({ from: parentNodeId, to: canonicalNodes[canonKey], label: call.sequenceLabel, color: edgeColor, depth });
+                        return;
+                    }
+
+                    // Case 2: class already in chart — add method to its existing group (same depth)
+                    const placeDepth = classFirstDepth[targetClass] !== undefined ? classFirstDepth[targetClass] : depth;
+                    if (!depthNodeMap[placeDepth]) depthNodeMap[placeDepth] = {};
+
+                    const node = buildNode(placeDepth, targetClass, call.method);
+                    canonicalNodes[canonKey] = node.id;
+                    if (classFirstDepth[targetClass] === undefined) classFirstDepth[targetClass] = placeDepth;
+
+                    if (!depthNodeMap[placeDepth][node.id]) {
                         const isCollapsed = collapsedNodes.has(node.id);
                         const subCalls = registry[targetClass]?.methods?.[call.method]
                             ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
                             : [];
                         const hasChildren = subCalls.length > 0;
-                        depthNodeMap[depth][node.id] = {
+                        const nodeColor = getBlockColor(`depth${placeDepth}:${targetClass}:${call.method}`);
+                        depthNodeMap[placeDepth][node.id] = {
                             node: { ...node, displayLabel: `${cleanLabel(node.label)}${hasChildren ? (isCollapsed ? ' ⊕' : ' ⊖') : ''}` },
                             color: nodeColor, seq: globalSeq++
                         };
                         if (!isCollapsed && subCalls.length > 0) {
-                            collectFlowDepth(node.id, subCalls, depth + 1, nodeColor);
+                            collectFlowDepth(node.id, subCalls, placeDepth + 1, nodeColor);
                         }
                     }
                     allFlowEdges.push({ from: parentNodeId, to: node.id, label: call.sequenceLabel, color: edgeColor, depth });
