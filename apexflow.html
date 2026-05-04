@@ -1064,6 +1064,7 @@
             const allFlowEdges = [];
             const blockColors = new Map();
             let nextBlockColorIndex = 0;
+            let globalSeq = 0;
             const MAX_FLOW_DEPTH = 6;
 
             function getBlockColor(blockKey) {
@@ -1112,8 +1113,6 @@
                 def += `  empty["Select a method from the sidebar to view its call flow"]\n`;
                 def += `  style empty fill:#1e293b,stroke:#334155,color:#64748b\n`;
             } else {
-                let globalSeq = 0;
-
                 activeMethodList.forEach(entryMethod => {
                     const entryNodeId = `${safeId(focusedClass)}___${safeId(entryMethod)}`;
                     const isCollapsed = collapsedMethods.has(entryMethod);
