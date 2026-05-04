@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Apex Class Diagram</title>
+    <title>Apex / Java Class Diagram</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
@@ -43,6 +43,43 @@
         .class-card { background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
         .class-card.active { border-color: var(--highlight); background: rgba(251, 191, 36, 0.05); }
         .class-card.hidden { opacity: 0.6; }
+
+        /* FILE EXPLORER */
+        #file-explorer { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); flex-shrink: 0; max-height: 45%; min-height: 0; }
+        #file-explorer-header { padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        #file-explorer-header span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; flex: 1; }
+        #fe-open-btn { padding: 4px 10px; font-size: 11px; border-radius: 5px; border: 1px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; white-space: nowrap; }
+        #fe-open-btn:hover { background: var(--primary); color: #fff; }
+        #fe-fallback { display: none; }
+        #fe-folder-path { padding: 4px 10px 6px; display: none; flex-direction: column; gap: 3px; }
+        #fe-folder-path-label { font-size: 10px; color: #64748b; display: flex; align-items: center; gap: 5px; }
+        #fe-folder-path-label i { color: #f59e0b; }
+        #fe-folder-path-label span { flex: 1; }
+        #fe-reopen-btn, #history-btn { padding: 2px 7px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: #64748b; cursor: pointer; white-space: nowrap; }
+        #fe-reopen-btn:hover, #history-btn:hover { border-color: var(--primary); color: var(--primary); }
+        #fe-folder-name { width: 100%; padding: 4px 7px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; color: #94a3b8; font-size: 11px; font-family: monospace; outline: none; }
+        #fe-folder-name::placeholder { color: #475569; font-style: italic; }
+        #fe-folder-name:focus { border-color: var(--primary); color: var(--text-main); }
+        #edge-label-tooltip { position: fixed; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 11px; color: var(--text-main); max-width: 300px; pointer-events: none; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: none; }
+        #edge-label-tooltip ul { margin: 0; padding: 0 0 0 14px; list-style: disc; }
+        #edge-label-tooltip li { padding: 1px 0; line-height: 1.6; word-break: break-word; }
+        #fe-search { margin: 0 10px 8px; padding: 5px 9px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 5px; color: var(--text-main); font-size: 12px; outline: none; width: calc(100% - 20px); }
+        #fe-search:focus { border-color: var(--primary); }
+        .fe-file.keyboard-focus { background: #1e3a5f; outline: 1px solid var(--primary); }
+        #fe-tree { flex: 1; overflow-y: auto; padding: 0 6px 8px; min-height: 0; }
+        #fe-empty { padding: 16px; text-align: center; font-size: 12px; color: #64748b; }
+        .fe-dir { user-select: none; }
+        .fe-dir-row { display: flex; align-items: center; gap: 5px; padding: 3px 4px; border-radius: 4px; cursor: pointer; font-size: 12px; color: #94a3b8; }
+        .fe-dir-row:hover { background: rgba(255,255,255,0.04); }
+        .fe-dir-arrow { font-size: 9px; width: 10px; text-align: center; flex-shrink: 0; transition: transform 0.15s; }
+        .fe-dir-arrow.open { transform: rotate(90deg); }
+        .fe-dir-children { margin-left: 14px; border-left: 1px solid var(--border); padding-left: 4px; }
+        .fe-dir-children.hidden { display: none; }
+        .fe-file { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; color: #cbd5e1; transition: background 0.1s; user-select: none; }
+        .fe-file:hover { background: rgba(16,185,129,0.08); color: var(--primary); }
+        .fe-file.loaded { color: var(--primary); font-weight: 600; }
+        .fe-file-icon { font-size: 10px; color: #64748b; flex-shrink: 0; }
+        .fe-file.loaded .fe-file-icon { color: var(--primary); }
 
         /* METHOD PICKER PANEL */
         #method-picker { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
@@ -176,6 +213,22 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             min-width: 170px;
         }
+        #edge-context-menu {
+            position: fixed; display: none; z-index: 2000;
+            background: #1e293b; border: 1px solid #334155;
+            border-radius: 8px; overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            min-width: 180px; max-width: 280px;
+        }
+        #edge-ctx-header {
+            padding: 8px 12px 7px; font-size: 11px; color: #64748b;
+            border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+        }
+        #edge-ctx-header .edge-ctx-cls { color: #10b981; font-weight: 600; }
+        #edge-ctx-header i { color: #64748b; font-size: 9px; }
+        #edge-ctx-body { padding: 6px 14px 10px; }
+        #edge-ctx-body ul { margin: 0; padding: 0 0 0 14px; list-style: disc; }
+        #edge-ctx-body li { padding: 2px 0; font-size: 12px; line-height: 1.6; color: #e2e8f0; }
         .ctx-item {
             display: flex; align-items: center; gap: 10px;
             padding: 10px 14px; cursor: pointer; font-size: 13px;
@@ -191,9 +244,42 @@
             cursor: pointer; transition: 0.3s;
         }
         .btn-toggle:hover { background: var(--primary); color: white; }
+
+        /* CLASS HISTORY PANEL */
+        #class-history-panel {
+            position: absolute; top: 68px; right: 12px; z-index: 500;
+            width: 260px; background: var(--bg-sidebar); border: 1px solid var(--border);
+            border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            display: none; flex-direction: column; overflow: hidden;
+        }
+        #class-history-panel.open { display: flex; }
+        #chp-header { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; font-size: 12px; font-weight: 700; color: #94a3b8; }
+        #chp-header span { flex: 1; }
+        #chp-close-btn { background: none; border: none; color: #64748b; cursor: pointer; font-size: 13px; padding: 0 3px; }
+        #chp-close-btn:hover { color: var(--text-main); }
+        #chp-list { max-height: 320px; overflow-y: auto; padding: 6px; }
+        .chp-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: background 0.1s; }
+        .chp-item:hover { background: rgba(255,255,255,0.05); }
+        .chp-item i { font-size: 11px; color: var(--primary); flex-shrink: 0; }
+        .chp-name { flex: 1; font-size: 12px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chp-meta { font-size: 10px; color: #64748b; flex-shrink: 0; }
+        .chp-del { background: none; border: none; color: #475569; cursor: pointer; font-size: 11px; padding: 0 3px; flex-shrink: 0; }
+        .chp-del:hover { color: var(--danger); }
+        #chp-empty { padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
+
+        #drop-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(16, 185, 129, 0.12);
+            border: 3px dashed var(--primary);
+            display: none; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 600; color: var(--primary);
+            pointer-events: none;
+        }
+        #drop-overlay.show { display: flex; }
     </style>
 </head>
 <body>
+<div id="drop-overlay">Drop .cls / .java files anywhere</div>
 
 <div id="code-tooltip">
     <div id="code-tooltip-header">
@@ -210,15 +296,53 @@
 
 <div id="node-context-menu">
     <div class="ctx-item" id="ctx-toggle-nodes"><i class="fa-solid fa-eye-slash"></i><span id="ctx-toggle-label">Hide Nodes</span></div>
+    <div class="ctx-item" id="ctx-hide-children" style="display:none"><i class="fa-solid fa-circle-nodes"></i><span id="ctx-hide-children-label">Hide Children</span></div>
     <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
 </div>
+
+<div id="edge-context-menu">
+    <div id="edge-ctx-header">
+        <span class="edge-ctx-cls" id="edge-ctx-source"></span>
+        <i class="fa-solid fa-arrow-right"></i>
+        <span class="edge-ctx-cls" id="edge-ctx-target"></span>
+    </div>
+    <div id="edge-ctx-body"><ul id="edge-ctx-list"></ul></div>
+</div>
+
+<div id="class-history-panel">
+    <div id="chp-header">
+        <span>Class History</span>
+        <button id="chp-close-btn">✕</button>
+    </div>
+    <div id="chp-list"></div>
+</div>
+
+<input id="ctx-file-picker" type="file" accept=".cls,.java" style="display:none">
 
 <button class="btn-toggle" onclick="toggleSidebar()" title="Toggle Sidebar"><i class="fa-solid fa-bars"></i></button>
 
 <div id="sidebar">
-    <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex Class Diagram</h2></div>
-    <div id="drop-zone">Drag .cls Files Here</div>
+    <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex / Java Class Diagram</h2></div>
+    <div id="file-explorer">
+        <div id="file-explorer-header">
+            <span>File Explorer</span>
+            <button id="fe-open-btn"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
+            <input id="fe-fallback" type="file" accept=".cls,.java" webkitdirectory multiple>
+        </div>
+        <div id="fe-folder-path">
+            <div id="fe-folder-path-label">
+                <i class="fa-solid fa-folder"></i>
+                <span>Folder path</span>
+                <button id="fe-reopen-btn" title="Re-open this folder">↺ Reopen</button>
+                <button id="history-btn" title="File history"><i class="fa-solid fa-clock-rotate-left"></i></button>
+            </div>
+            <input id="fe-folder-name" type="text" spellcheck="false" placeholder="Paste full path here, e.g. /home/user/project/src" autocomplete="off">
+        </div>
+        <input id="fe-search" placeholder="Search files…" autocomplete="off">
+        <div id="fe-tree"><div id="fe-empty">Open a folder to browse source files</div></div>
+    </div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>
         <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()">Clear All</button></div>
@@ -272,33 +396,498 @@
     let expandedMethods = new Map();
     let activeMethods = new Set();
     let collapsedMethods = new Set(); // Active methods whose subnodes are hidden
-    let collapsedDepth1 = new Set();  // Depth-1 node ids whose depth-2 subnodes are hidden
+    let collapsedNodes = new Set();   // Node ids (any depth) whose children are collapsed
     let currentRenderedEdgeStyles = [];
     let tooltipDragState = { isDragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 };
     let tooltipResizeState = { isResizing: false, startX: 0, startY: 0, startWidth: 0, startHeight: 0 };
     let tooltipInteractionGuardUntil = 0;
 
-    const SYSTEM_TYPES = new Set(['list', 'set', 'map', 'string', 'integer', 'long', 'decimal', 'double', 'boolean', 'id', 'blob', 'date', 'datetime', 'time', 'object', 'database', 'schema', 'sobject', 'system', 'limits', 'userinfo', 'exception', 'selectoption', 'pagereference', 'json', 'pattern', 'matcher', 'crypto', 'http', 'httprequest', 'httpresponse']);
-    const BANNED_METHODS = new Set(['add', 'get', 'put', 'putall', 'addall', 'size', 'contains', 'containskey', 'isempty', 'remove', 'clear', 'values', 'keyset', 'clone', 'sort', 'indexof', 'substring', 'length', 'tolowercase', 'touppercase', 'trim', 'split', 'replace', 'format', 'valueof']);
+    const SYSTEM_TYPES = new Set([
+        // Apex
+        'list', 'set', 'map', 'string', 'integer', 'long', 'decimal', 'double', 'boolean',
+        'id', 'blob', 'date', 'datetime', 'time', 'object', 'database', 'schema', 'sobject',
+        'system', 'limits', 'userinfo', 'exception', 'selectoption', 'pagereference',
+        'json', 'pattern', 'matcher', 'crypto', 'http', 'httprequest', 'httpresponse',
+        // Java
+        'float', 'byte', 'short', 'char', 'void', 'number', 'math', 'runtime', 'thread',
+        'runnable', 'callable', 'runtimeexception', 'throwable', 'error', 'optional',
+        'stream', 'collectors', 'collections', 'arrays', 'objects', 'stringbuilder',
+        'stringbuffer', 'iterable', 'iterator', 'comparable', 'comparator', 'arraylist',
+        'linkedlist', 'hashmap', 'linkedhashmap', 'treemap', 'hashset', 'linkedhashset',
+        'treeset', 'queue', 'deque', 'stack', 'vector', 'properties', 'calendar',
+        'localdate', 'localdatetime', 'instant', 'duration', 'scanner', 'printstream',
+        'inputstream', 'outputstream', 'reader', 'writer', 'file', 'path', 'files',
+        'paths', 'logger', 'log'
+    ]);
+    const BANNED_METHODS = new Set(['add', 'get', 'put', 'putall', 'addall', 'size', 'contains', 'containskey', 'isempty', 'remove', 'clear', 'values', 'keyset', 'entryset', 'clone', 'sort', 'indexof', 'substring', 'length', 'tolowercase', 'touppercase', 'trim', 'strip', 'split', 'replace', 'replaceall', 'format', 'valueof', 'tostring', 'equals', 'hashcode', 'compareto', 'iterator', 'stream', 'foreach', 'println', 'print', 'printf', 'append', 'toarray', 'asList', 'aslist', 'ofnullable', 'isPresent', 'ispresent', 'orElse', 'orelse', 'getordefault']);
     const PATH_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e', '#14b8a6'];
 
-    const dropZone = document.getElementById('drop-zone');
-    dropZone.addEventListener('dragover', e => e.preventDefault());
-    dropZone.addEventListener('drop', async e => {
+    const dropOverlay = document.getElementById('drop-overlay');
+
+    document.addEventListener('dragover', e => {
         e.preventDefault();
+        if (!window._feDragNode) dropOverlay.classList.add('show');
+    });
+    document.addEventListener('dragleave', e => {
+        if (!e.relatedTarget) dropOverlay.classList.remove('show');
+    });
+    document.addEventListener('drop', async e => {
+        e.preventDefault();
+        dropOverlay.classList.remove('show');
 
-        const clsFiles = Array.from(e.dataTransfer.files)
-            .filter(file => file.name.toLowerCase().endsWith('.cls'));
+        // Drag from internal file explorer
+        if (window._feDragNode) {
+            await loadFileNode(window._feDragNode, null);
+            feState.loadedNames.add(window._feDragNode.name);
+            renderFileTree();
+            window._feDragNode = null;
+            return;
+        }
 
-        if (clsFiles.length === 0) return;
+        const files = Array.from(e.dataTransfer.files)
+            .filter(f => f.name.toLowerCase().endsWith('.cls') || f.name.toLowerCase().endsWith('.java'));
 
-        for (const file of clsFiles) {
+        if (files.length === 0) return;
+
+        for (const file of files) {
             const text = await file.text();
             parseApex(text);
         }
 
         render();
     });
+
+    // ── FILE EXPLORER ──────────────────────────────────────────────────────────
+    const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null };
+
+    // ── IndexedDB persistence for the directory handle ─────────────────────────
+    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory';
+    const MAX_FILE_HIST = 30;
+
+    function idbOpen() {
+        return new Promise((res, rej) => {
+            const req = indexedDB.open(IDB_NAME, 2); // version 2 adds fileHistory store
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(IDB_DIR_STORE)) db.createObjectStore(IDB_DIR_STORE);
+                if (!db.objectStoreNames.contains(IDB_HIST_STORE)) db.createObjectStore(IDB_HIST_STORE, { keyPath: 'name' });
+            };
+            req.onsuccess = e => res(e.target.result);
+            req.onerror = e => rej(e.target.error);
+        });
+    }
+
+    async function idbSaveHandle(handle) {
+        try {
+            const db = await idbOpen();
+            const tx = db.transaction(IDB_DIR_STORE, 'readwrite');
+            tx.objectStore(IDB_DIR_STORE).put(handle, IDB_DIR_KEY);
+        } catch (e) { console.warn('idb save failed', e); }
+    }
+
+    async function idbLoadHandle() {
+        try {
+            const db = await idbOpen();
+            return await new Promise((res, rej) => {
+                const req = db.transaction(IDB_DIR_STORE, 'readonly').objectStore(IDB_DIR_STORE).get(IDB_DIR_KEY);
+                req.onsuccess = e => res(e.target.result || null);
+                req.onerror = e => rej(e.target.error);
+            });
+        } catch (e) { return null; }
+    }
+
+    async function idbSaveFileHistory(name, handle) {
+        try {
+            const db = await idbOpen();
+            const tx = db.transaction(IDB_HIST_STORE, 'readwrite');
+            tx.objectStore(IDB_HIST_STORE).put({ name, handle, ts: Date.now() });
+            // Trim to MAX_FILE_HIST — get all, sort, delete oldest
+            const all = await new Promise((res, rej) => {
+                const req2 = db.transaction(IDB_HIST_STORE, 'readonly').objectStore(IDB_HIST_STORE).getAll();
+                req2.onsuccess = e => res(e.target.result);
+                req2.onerror = e => rej(e.target.error);
+            });
+            if (all.length > MAX_FILE_HIST) {
+                all.sort((a, b) => a.ts - b.ts);
+                const del = db.transaction(IDB_HIST_STORE, 'readwrite').objectStore(IDB_HIST_STORE);
+                all.slice(0, all.length - MAX_FILE_HIST).forEach(r => del.delete(r.name));
+            }
+        } catch (e) { console.warn('idb file history save failed', e); }
+    }
+
+    async function idbGetFileHistory() {
+        try {
+            const db = await idbOpen();
+            return await new Promise((res, rej) => {
+                const req = db.transaction(IDB_HIST_STORE, 'readonly').objectStore(IDB_HIST_STORE).getAll();
+                req.onsuccess = e => res((e.target.result || []).sort((a, b) => b.ts - a.ts));
+                req.onerror = e => rej(e.target.error);
+            });
+        } catch (e) { return []; }
+    }
+
+    async function idbDeleteFileHistory(name) {
+        try {
+            const db = await idbOpen();
+            db.transaction(IDB_HIST_STORE, 'readwrite').objectStore(IDB_HIST_STORE).delete(name);
+        } catch (e) { console.warn('idb file history delete failed', e); }
+    }
+
+    // ── Folder path display ────────────────────────────────────────────────────
+    const LS_PATH_KEY = 'apexflow-folder-path';
+
+    function showFolderPath(folderName, autoFocus = false) {
+        const bar = document.getElementById('fe-folder-path');
+        const nameEl = document.getElementById('fe-folder-name');
+        const stored = localStorage.getItem(LS_PATH_KEY);
+        nameEl.value = stored || folderName;
+        bar.style.display = 'flex';
+        if (autoFocus) {
+            // Select-all so user can immediately paste or type the full path
+            setTimeout(() => { nameEl.focus(); nameEl.select(); }, 80);
+        }
+    }
+
+    // Save path edits to localStorage on change
+    document.getElementById('fe-folder-name').addEventListener('change', e => {
+        const val = e.target.value.trim();
+        if (val) localStorage.setItem(LS_PATH_KEY, val);
+    });
+    document.getElementById('fe-folder-name').addEventListener('keydown', e => {
+        if (e.key === 'Enter') e.target.blur();
+        if (e.key === 'Escape') {
+            const stored = localStorage.getItem(LS_PATH_KEY);
+            e.target.value = stored || feState.dirHandle?.name || '';
+            e.target.blur();
+        }
+    });
+
+    // ── Open / reopen folder ───────────────────────────────────────────────────
+    function isSourceFile(name) {
+        const n = name.toLowerCase();
+        return n.endsWith('.cls') || n.endsWith('.java');
+    }
+
+    async function loadDirHandle(dirHandle, isReopen = false) {
+        feState.dirHandle = dirHandle;
+        feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
+        if (!isReopen) localStorage.removeItem(LS_PATH_KEY);
+        showFolderPath(dirHandle.name, !isReopen);
+        renderFileTree();
+        await idbSaveHandle(dirHandle);
+    }
+
+    async function openFolder() {
+        if (window.showDirectoryPicker) {
+            try {
+                const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+                await loadDirHandle(dirHandle);
+            } catch (e) {
+                if (e.name !== 'AbortError') console.error(e);
+            }
+        } else {
+            document.getElementById('fe-fallback').click();
+        }
+    }
+
+    async function reopenFolder() {
+        if (!feState.dirHandle) return;
+        try {
+            const perm = await feState.dirHandle.requestPermission({ mode: 'read' });
+            if (perm === 'granted') await loadDirHandle(feState.dirHandle, true);
+        } catch (e) { console.error(e); }
+    }
+
+    // On load: restore last handle if available
+    idbLoadHandle().then(async handle => {
+        if (!handle) return;
+        feState.dirHandle = handle;
+        showFolderPath(handle.name);
+        document.getElementById('fe-empty').textContent = `Click ↺ Reopen to reload "${handle.name}"`;
+    });
+
+    async function buildHandleTree(handle, name) {
+        if (handle.kind === 'file') {
+            return isSourceFile(name) ? { kind: 'file', name, handle } : null;
+        }
+        const children = [];
+        for await (const [childName, childHandle] of handle.entries()) {
+            const node = await buildHandleTree(childHandle, childName);
+            if (node) children.push(node);
+        }
+        if (!children.length) return null;
+        children.sort((a, b) => {
+            if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+        return { kind: 'dir', name, children };
+    }
+
+    function flatFiles(node, out = []) {
+        if (!node) return out;
+        if (node.kind === 'file') { out.push(node); return out; }
+        node.children.forEach(c => flatFiles(c, out));
+        return out;
+    }
+
+    function renderFileTree() {
+        const treeEl = document.getElementById('fe-tree');
+        const emptyEl = document.getElementById('fe-empty');
+        const q = feState.search.toLowerCase();
+
+        if (!feState.tree) {
+            treeEl.innerHTML = '';
+            treeEl.appendChild(emptyEl || Object.assign(document.createElement('div'), { id: 'fe-empty', textContent: 'Open a folder to browse source files' }));
+            return;
+        }
+
+        const allFiles = flatFiles(feState.tree);
+        const matched = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : null;
+
+        treeEl.innerHTML = '';
+
+        if (q) {
+            // Flat search results
+            if (!matched.length) {
+                treeEl.innerHTML = `<div style="padding:12px;text-align:center;font-size:12px;color:#64748b">No files match "${feState.search}"</div>`;
+                return;
+            }
+            matched.forEach(f => treeEl.appendChild(makeFileRow(f)));
+        } else {
+            treeEl.appendChild(makeDirNode(feState.tree, true));
+        }
+    }
+
+    function makeDirNode(node, expanded = false) {
+        if (node.kind === 'file') return makeFileRow(node);
+        const wrap = document.createElement('div');
+        wrap.className = 'fe-dir';
+        const row = document.createElement('div');
+        row.className = 'fe-dir-row';
+        const arrow = document.createElement('span');
+        arrow.className = 'fe-dir-arrow' + (expanded ? ' open' : '');
+        arrow.textContent = '▶';
+        const icon = document.createElement('i');
+        icon.className = expanded ? 'fa-solid fa-folder-open' : 'fa-solid fa-folder';
+        icon.style.cssText = 'font-size:11px;color:#f59e0b;flex-shrink:0';
+        const label = document.createElement('span');
+        label.textContent = node.name;
+        row.appendChild(arrow); row.appendChild(icon); row.appendChild(label);
+        const children = document.createElement('div');
+        children.className = 'fe-dir-children' + (expanded ? '' : ' hidden');
+        node.children.forEach(c => children.appendChild(makeDirNode(c)));
+        row.addEventListener('click', () => {
+            const open = !children.classList.contains('hidden');
+            children.classList.toggle('hidden', open);
+            arrow.classList.toggle('open', !open);
+            icon.className = open ? 'fa-solid fa-folder' : 'fa-solid fa-folder-open';
+            icon.style.cssText = 'font-size:11px;color:#f59e0b;flex-shrink:0';
+        });
+        wrap.appendChild(row); wrap.appendChild(children);
+        return wrap;
+    }
+
+    function makeFileRow(fileNode) {
+        const row = document.createElement('div');
+        row.className = 'fe-file' + (feState.loadedNames.has(fileNode.name) ? ' loaded' : '');
+        row.draggable = true;
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-file-code fe-file-icon';
+        const label = document.createElement('span');
+        label.textContent = fileNode.name;
+        row.appendChild(icon); row.appendChild(label);
+        row.addEventListener('click', () => loadFileNode(fileNode, row));
+        row.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/fe-filename', fileNode.name);
+            e.dataTransfer.effectAllowed = 'copy';
+            // Store reference so the document drop handler can retrieve it
+            window._feDragNode = fileNode;
+        });
+        row.addEventListener('dragend', () => { window._feDragNode = null; });
+        return row;
+    }
+
+    async function loadFileNode(fileNode, rowEl) {
+        try {
+            const file = await fileNode.handle.getFile();
+            const text = await file.text();
+            parseApex(text);
+            feState.loadedNames.add(fileNode.name);
+            if (rowEl) { rowEl.classList.add('loaded'); rowEl.querySelector('.fe-file-icon').className = 'fa-solid fa-file-code fe-file-icon'; }
+            render();
+            await idbSaveFileHistory(fileNode.name, fileNode.handle);
+        } catch (e) { console.error('Failed to load', fileNode.name, e); }
+    }
+
+    // Firefox fallback: webkitdirectory input
+    document.getElementById('fe-fallback').addEventListener('change', async e => {
+        const files = Array.from(e.target.files).filter(f => isSourceFile(f.name));
+        if (!files.length) return;
+        // Build a virtual tree from webkitRelativePath
+        const root = { kind: 'dir', name: files[0].webkitRelativePath.split('/')[0], children: [] };
+        const dirMap = { '': root };
+        files.forEach(f => {
+            const parts = f.webkitRelativePath.split('/');
+            const fileName = parts.pop();
+            const dirPath = parts.join('/');
+            if (!dirMap[dirPath]) {
+                let cur = root;
+                parts.slice(1).forEach((seg, i) => {
+                    const path = parts.slice(0, i + 2).join('/');
+                    if (!dirMap[path]) {
+                        const dir = { kind: 'dir', name: seg, children: [] };
+                        cur.children.push(dir);
+                        dirMap[path] = dir;
+                    }
+                    cur = dirMap[path];
+                });
+            }
+            dirMap[dirPath].children.push({ kind: 'file', name: fileName, handle: { getFile: async () => f } });
+        });
+        feState.tree = root;
+        renderFileTree();
+    });
+
+    document.getElementById('fe-open-btn').addEventListener('click', openFolder);
+    document.getElementById('fe-reopen-btn').addEventListener('click', reopenFolder);
+    let feSearchCursor = -1;
+
+    function feGetSearchRows() {
+        return Array.from(document.getElementById('fe-tree').querySelectorAll('.fe-file'));
+    }
+
+    function feMoveCursor(delta) {
+        const rows = feGetSearchRows();
+        if (!rows.length) return;
+        rows.forEach(r => r.classList.remove('keyboard-focus'));
+        feSearchCursor = Math.max(0, Math.min(rows.length - 1, feSearchCursor + delta));
+        const target = rows[feSearchCursor];
+        target.classList.add('keyboard-focus');
+        target.scrollIntoView({ block: 'nearest' });
+    }
+
+    document.getElementById('fe-search').addEventListener('input', e => {
+        feState.search = e.target.value;
+        feSearchCursor = -1;
+        renderFileTree();
+    });
+
+    document.getElementById('fe-search').addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); feMoveCursor(feSearchCursor < 0 ? 0 : 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); feMoveCursor(-1); }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            const rows = feGetSearchRows();
+            const idx = feSearchCursor >= 0 ? feSearchCursor : 0;
+            rows[idx]?.click();
+        }
+    });
+
+    // ── File history ───────────────────────────────────────────────────────────
+    function timeAgo(ts) {
+        const s = Math.floor((Date.now() - ts) / 1000);
+        if (s < 60) return 'just now';
+        if (s < 3600) return `${Math.floor(s/60)}m ago`;
+        if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+        return `${Math.floor(s/86400)}d ago`;
+    }
+
+    async function renderClassHistory() {
+        const list = document.getElementById('chp-list');
+        list.innerHTML = '';
+        const hist = await idbGetFileHistory();
+        if (!hist.length) {
+            list.innerHTML = '<div id="chp-empty">No recently opened files</div>';
+            return;
+        }
+        hist.forEach(h => {
+            const item = document.createElement('div');
+            item.className = 'chp-item';
+            const alreadyLoaded = feState.loadedNames.has(h.name);
+            item.innerHTML = `
+                <i class="fa-solid ${alreadyLoaded ? 'fa-circle-check' : 'fa-file-code'}"></i>
+                <span class="chp-name" title="${h.name}">${h.name}</span>
+                <span class="chp-meta">${timeAgo(h.ts)}</span>
+                <button class="chp-del" title="Remove from history">✕</button>`;
+            item.querySelector('.chp-del').addEventListener('click', async e => {
+                e.stopPropagation();
+                await idbDeleteFileHistory(h.name);
+                renderClassHistory();
+            });
+            item.addEventListener('click', async () => {
+                try {
+                    const perm = await h.handle.requestPermission({ mode: 'read' });
+                    if (perm !== 'granted') return;
+                    const file = await h.handle.getFile();
+                    const text = await file.text();
+                    parseApex(text);
+                    feState.loadedNames.add(h.name);
+                    render();
+                    renderFileTree();
+                    toggleClassHistory(false);
+                    await idbSaveFileHistory(h.name, h.handle); // bump to top
+                } catch (e) { console.error('Failed to reload from history', h.name, e); }
+            });
+            list.appendChild(item);
+        });
+    }
+
+    function toggleClassHistory(forceOpen) {
+        const panel = document.getElementById('class-history-panel');
+        const shouldOpen = forceOpen !== undefined ? forceOpen : !panel.classList.contains('open');
+        panel.classList.toggle('open', shouldOpen);
+        if (shouldOpen) renderClassHistory();
+    }
+
+    document.getElementById('history-btn').addEventListener('click', () => toggleClassHistory());
+    document.getElementById('chp-close-btn').addEventListener('click', () => toggleClassHistory(false));
+    document.addEventListener('click', e => {
+        const panel = document.getElementById('class-history-panel');
+        if (!panel.contains(e.target) && e.target.id !== 'history-btn') {
+            panel.classList.remove('open');
+        }
+    });
+
+    // ── Load class from ghost node ─────────────────────────────────────────────
+    function getLoadedChildren(className) {
+        if (!registry[className]) return [];
+        const flows = aggregateFlows(registry[className].raw, registry[className].varMap, className);
+        return Object.keys(flows).filter(t => registry[t] && t !== className);
+    }
+
+    function ghostClassFromNode(node) {
+        const label = node.querySelector('.nodeLabel') || node.querySelector('text');
+        const text = (label?.textContent || '').trim();
+        if (!text.startsWith('?')) return null;
+        const name = text.replace(/^\?\s*/, '').trim();
+        return name && !registry[name] ? name : null;
+    }
+
+    function findFileInTree(className) {
+        if (!feState.tree) return null;
+        const targets = [`${className}.cls`, `${className}.java`].map(s => s.toLowerCase());
+        return flatFiles(feState.tree).find(f => targets.includes(f.name.toLowerCase())) || null;
+    }
+
+    async function loadClassByName(className) {
+        // 1. Try file explorer tree
+        const fileNode = findFileInTree(className);
+        if (fileNode) {
+            await loadFileNode(fileNode, null);
+            return;
+        }
+        // 2. Fallback: single file picker
+        const picker = document.getElementById('ctx-file-picker');
+        picker.onchange = async () => {
+            const file = picker.files[0];
+            if (!file) return;
+            const text = await file.text();
+            parseApex(text);
+            render();
+            picker.value = '';
+        };
+        picker.click();
+    }
 
     function toggleSidebar() {
         const sb = document.getElementById('sidebar');
@@ -314,7 +903,7 @@
     }
 
     function parseApex(content) {
-        const classNameMatch = content.match(/class\s+(\w+)/i);
+        const classNameMatch = content.match(/(?:class|interface|enum|record)\s+(\w+)/i);
         if (!classNameMatch) return;
         const className = classNameMatch[1];
         const varMap = {}; 
@@ -331,7 +920,7 @@
             varMap[diMatch[1]] = diMatch[2]; // override with the real impl class
         }
         const methods = {};
-        const methodRegex = /\b(?:public|private|protected|global)\s+(?:(?:static|virtual|override|final|abstract|webservice|testmethod)\s+)*(?:[\w.\[\],<>\s]+?)\s+(\w+)\s*\(/g;
+        const methodRegex = /\b(?:public|private|protected|global)\s+(?:(?:static|final|abstract|virtual|override|synchronized|native|default|strictfp|webservice|testmethod)\s+)*(?:[\w.\[\],<>\s]+?)\s+(\w+)\s*\(/g;
         let mMatch;
         while ((mMatch = methodRegex.exec(content)) !== null) {
             const mName = mMatch[1];
@@ -346,6 +935,31 @@
     function cleanLabel(text) {
         if (!text) return "";
         return text.replace(/"/g, "'").replace(/[\[\]\(\)]/g, "").trim();
+    }
+
+    function attachEdgeLabelTooltips(svgEl, fullLabels) {
+        if (!fullLabels.length) return;
+        const tooltip = document.getElementById('edge-label-tooltip');
+        const truncatedEls = Array.from(svgEl.querySelectorAll('.edgeLabel'))
+            .filter(el => el.textContent.includes('…'));
+        truncatedEls.forEach((el, i) => {
+            if (!fullLabels[i]) return;
+            const full = fullLabels[i];
+            el.style.cursor = 'help';
+            el.addEventListener('mouseenter', e => {
+                tooltip.innerHTML = '<ul>' + full.split(', ').map(r => `<li>${r}</li>`).join('') + '</ul>';
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.clientX + 14) + 'px';
+                tooltip.style.top = (e.clientY - 10) + 'px';
+            });
+            el.addEventListener('mousemove', e => {
+                tooltip.style.left = (e.clientX + 14) + 'px';
+                tooltip.style.top = (e.clientY - 10) + 'px';
+            });
+            el.addEventListener('mouseleave', () => {
+                tooltip.style.display = 'none';
+            });
+        });
     }
 
     function normalizeEdgeKeyPart(value) {
@@ -421,6 +1035,7 @@
         let linkCounter = 0;
         let styleDirectives = [];
         currentRenderedEdgeStyles = [];
+        let edgeLabelFull = [];
 
         if (!focusedClass) {
             document.getElementById('view-title').innerText = "System Architecture Map";
@@ -431,7 +1046,10 @@
                 const flows = aggregateFlows(registry[cName].raw, registry[cName].varMap, cName);
                 Object.keys(flows).forEach(target => {
                     if (hiddenClasses.has(target)) return;
-                    const label = cleanLabel(flows[target].length > 1 ? flows[target][0] + "..." : flows[target][0]);
+                    const items = flows[target];
+                    const isTruncated = items.length > 2;
+                    const label = cleanLabel(isTruncated ? items[0] + ', ' + items[1] + '…' : items.join(', '));
+                    if (isTruncated) edgeLabelFull.push(items.join(', '));
                     def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
                     if (!registry[target]) ghostNodes.add(target);
                 });
@@ -442,12 +1060,12 @@
             document.getElementById('reset-btn').style.display = "inline-block";
             def = `graph LR\n`;
 
-            const firstLevelClasses = {};
-            const secondLevelClasses = {};
-            const entryEdges = [];
-            const downstreamEdges = [];
+            const depthNodeMap = {};  // { depth: { nodeId: entry } }
+            const allFlowEdges = [];
             const blockColors = new Map();
             let nextBlockColorIndex = 0;
+            let globalSeq = 0;
+            const MAX_FLOW_DEPTH = 6;
 
             function getBlockColor(blockKey) {
                 if (!blockColors.has(blockKey)) {
@@ -463,6 +1081,32 @@
                 return { id: `l${level}__${classId}__class`, label: registry[className] ? className : `? ${className}`, className, methodName: null };
             }
 
+            function collectFlowDepth(parentNodeId, calls, depth, edgeColor) {
+                if (depth > MAX_FLOW_DEPTH) return;
+                if (!depthNodeMap[depth]) depthNodeMap[depth] = {};
+                calls.forEach(call => {
+                    const targetClass = call.target;
+                    if (hiddenClasses.has(targetClass)) return;
+                    const node = buildNode(depth, targetClass, call.method);
+                    const nodeColor = getBlockColor(`depth${depth}:${targetClass}:${call.method}`);
+                    if (!depthNodeMap[depth][node.id]) {
+                        const isCollapsed = collapsedNodes.has(node.id);
+                        const subCalls = registry[targetClass]?.methods?.[call.method]
+                            ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
+                            : [];
+                        const hasChildren = subCalls.length > 0;
+                        depthNodeMap[depth][node.id] = {
+                            node: { ...node, displayLabel: `${cleanLabel(node.label)}${hasChildren ? (isCollapsed ? ' ⊕' : ' ⊖') : ''}` },
+                            color: nodeColor, seq: globalSeq++
+                        };
+                        if (!isCollapsed && subCalls.length > 0) {
+                            collectFlowDepth(node.id, subCalls, depth + 1, nodeColor);
+                        }
+                    }
+                    allFlowEdges.push({ from: parentNodeId, to: node.id, label: call.sequenceLabel, color: edgeColor, depth });
+                });
+            }
+
             const activeMethodList = [...activeMethods];
 
             if (activeMethodList.length === 0) {
@@ -475,67 +1119,40 @@
                     const icon = isCollapsed ? '⊕' : '⊖';
                     def += `  ${entryNodeId}["${icon} ${entryMethod}()"]\n`;
                     def += `  style ${entryNodeId} fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#f1f5f9\n`;
+                    if (!isCollapsed) {
+                        const entryBlockColor = getBlockColor(`entry:${entryMethod}`);
+                        const calls = collectOrderedCalls(registry[focusedClass].methods[entryMethod], registry[focusedClass].varMap, focusedClass);
+                        collectFlowDepth(entryNodeId, calls, 1, entryBlockColor);
+                    }
                 });
 
-                let globalSeq = 0;
-
-                activeMethodList.forEach(entryMethod => {
-                    if (collapsedMethods.has(entryMethod)) return;
-                    const entryBlockColor = getBlockColor(`entry:${entryMethod}`);
-                    const depth1Calls = collectOrderedCalls(registry[focusedClass].methods[entryMethod], registry[focusedClass].varMap, focusedClass);
-
-                    depth1Calls.forEach(call => {
-                        const targetClass = call.target;
-                        if (hiddenClasses.has(targetClass)) return;
-                        const targetNode = buildNode(1, targetClass, call.method);
-                        const firstLevelBlockColor = getBlockColor(`depth1:${targetClass}:${call.method}`);
-                        const isD1Collapsed = collapsedDepth1.has(targetNode.id);
-                        if (!firstLevelClasses[targetNode.id]) {
-                            const d2Calls = registry[targetClass]?.methods?.[call.method]
-                                ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
-                                : [];
-                            const hasChildren = d2Calls.length > 0;
-                            const d1Icon = hasChildren ? (isD1Collapsed ? ' ⊕' : ' ⊖') : '';
-                            firstLevelClasses[targetNode.id] = {
-                                node: { ...targetNode, displayLabel: `${cleanLabel(targetNode.label)}${d1Icon}` },
-                                color: firstLevelBlockColor, seq: globalSeq++
-                            };
-                        }
-                        entryEdges.push({ from: `${safeId(focusedClass)}___${safeId(entryMethod)}`, to: targetNode.id, label: call.sequenceLabel, color: entryBlockColor });
-
-                        if (!isD1Collapsed && registry[targetClass]?.methods?.[call.method]) {
-                            collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass).forEach(nestedCall => {
-                                const nextClass = nestedCall.target;
-                                if (hiddenClasses.has(nextClass)) return;
-                                const downstreamNode = buildNode(2, nextClass, nestedCall.method);
-                                if (!secondLevelClasses[downstreamNode.id]) {
-                                    secondLevelClasses[downstreamNode.id] = { node: downstreamNode, color: getBlockColor(`depth2:${nextClass}`), seq: globalSeq++ };
-                                }
-                                downstreamEdges.push({ from: targetNode.id, to: downstreamNode.id, label: nestedCall.sequenceLabel, color: firstLevelBlockColor });
-                            });
-                        }
+                function renderClassSubgraphs(depthClasses, sgPrefix) {
+                    const byClass = {};
+                    Object.values(depthClasses).sort((a, b) => a.seq - b.seq).forEach(e => {
+                        const cls = e.node.className;
+                        if (!byClass[cls]) byClass[cls] = [];
+                        byClass[cls].push(e);
                     });
-                });
-
-                function renderDepthBlocks(level, title, depthMethods) {
-                    const entries = Object.values(depthMethods).sort((a, b) => a.seq - b.seq);
-                    if (!entries.length) return;
-                    def += `  subgraph ${safeId(focusedClass)}___depth${level}["${title}"]\n    direction TB\n`;
-                    entries.forEach(e => { def += `    ${e.node.id}["${e.node.displayLabel || cleanLabel(e.node.label)}"]\n`; });
-                    def += `  end\n`;
+                    Object.entries(byClass).forEach(([cls, clsEntries]) => {
+                        const sgId = `${sgPrefix}_${safeId(cls)}`;
+                        const sgLabel = registry[cls] ? cls : `? ${cls}`;
+                        def += `  subgraph ${sgId} ["${sgLabel}"]\n    direction TB\n`;
+                        clsEntries.forEach(e => {
+                            def += `    ${e.node.id}["${e.node.displayLabel || cleanLabel(e.node.label)}"]\n`;
+                        });
+                        def += `  end\n`;
+                    });
                 }
 
-                renderDepthBlocks(1, 'Direct Method Calls', firstLevelClasses);
-                renderDepthBlocks(2, 'Nested Method Calls', secondLevelClasses);
-
-                entryEdges.forEach(edge => {
-                    def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
-                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:3px,fill:none`);
-                    linkCounter++;
+                Object.keys(depthNodeMap).sort((a, b) => +a - +b).forEach(depth => {
+                    renderClassSubgraphs(depthNodeMap[depth], `sg${depth}`);
                 });
-                downstreamEdges.forEach(edge => {
+
+                allFlowEdges.forEach(edge => {
                     def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
-                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:2px,fill:none,stroke-dasharray:6 3`);
+                    const sw = edge.depth === 1 ? '3px' : '2px';
+                    const dash = edge.depth > 1 ? ',stroke-dasharray:6 3' : '';
+                    styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:${sw},fill:none${dash}`);
                     linkCounter++;
                 });
             }
@@ -565,6 +1182,7 @@
                 svgEl.removeAttribute('height'); svgEl.removeAttribute('width');
                 svgEl.style.width = "100%"; svgEl.style.height = "100%";
                 applyRenderedEdgeStyles(svgEl);
+                attachEdgeLabelTooltips(svgEl, edgeLabelFull);
                 panZoomInstance = svgPanZoom(svgEl, {
                     zoomEnabled: true,
                     dblClickZoomEnabled: false,
@@ -583,6 +1201,8 @@
                     }
                 });
                 attachEvents();
+                attachEdgeEvents(svgEl);
+                attachClusterEvents(svgEl);
                 if (selectedClassName) applyDiagramHighlight(selectedClassName);
             }
         } catch (err) { console.error(err); }
@@ -773,13 +1393,15 @@
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { hideCodeTooltip(); hideNodeContextMenu(); }
+            if (e.key === 'Escape') { hideCodeTooltip(); hideNodeContextMenu(); hideEdgeContextMenu(); }
         });
         document.addEventListener('click', (e) => {
             const menu = document.getElementById('node-context-menu');
             if (!menu.contains(e.target)) hideNodeContextMenu();
+            const emenu = document.getElementById('edge-context-menu');
+            if (!emenu.contains(e.target)) hideEdgeContextMenu();
         }, true);
-        document.addEventListener('scroll', () => hideNodeContextMenu(), true);
+        document.addEventListener('scroll', () => { hideNodeContextMenu(); hideEdgeContextMenu(); }, true);
 
         tooltipGlobalHandlersBound = true;
     }
@@ -840,6 +1462,51 @@
                 if (!aggregated[resTarget].includes(method)) aggregated[resTarget].push(method);
             }
         }
+
+        // Scan for inner class type references: KnownClass.UpperCaseInnerType
+        // Catches usage like List<SMAC_Foo.Response>, return types, param types, new List<SMAC_Foo.Response>()
+        const innerTypeRegex = /\b([\w]+)\.([\w]+)\b/g;
+        let it;
+        while ((it = innerTypeRegex.exec(content)) !== null) {
+            const outer = it[1];
+            const inner = it[2];
+            if (!registry[outer] || outer === sourceName) continue;
+            if (!/^[A-Z]/.test(inner)) continue; // lowercase = method call, already handled above
+            if (content[it.index + it[0].length] === '(') continue; // constructor/method call, already handled
+            const base = outer.toLowerCase();
+            if (SYSTEM_TYPES.has(base)) continue;
+            if (!aggregated[outer]) aggregated[outer] = [];
+            if (!aggregated[outer].includes(inner)) aggregated[outer].unshift(inner); // inner types shown first
+        }
+
+        // Detect constructor instantiations and chained builder calls:
+        // new SomeClass(...).method1().method2()...;
+        const constructorFlowRegex = /\bnew\s+([\w]+)\s*\([^)]*\)([\s\S]*?);/g;
+        let cf;
+        while ((cf = constructorFlowRegex.exec(content)) !== null) {
+            const className = cf[1];
+            if (!className || !/^[A-Z]/.test(className)) continue;
+            const base = className.toLowerCase();
+            if (SYSTEM_TYPES.has(base) || className === sourceName) continue;
+            if (!aggregated[className]) aggregated[className] = [];
+            // Collect chained method names on the constructor result
+            const chainBody = cf[2] || '';
+            const chainMethodRegex = /\.\s*(\w+)\s*\(/g;
+            let chainMatch;
+            let addedAny = false;
+            while ((chainMatch = chainMethodRegex.exec(chainBody)) !== null) {
+                const method = chainMatch[1];
+                if (BANNED_METHODS.has(method.toLowerCase())) continue;
+                if (!aggregated[className].includes(method)) {
+                    aggregated[className].push(method);
+                    addedAny = true;
+                }
+            }
+            if (!addedAny && !aggregated[className].includes('new')) {
+                aggregated[className].push('new');
+            }
+        }
+
         return aggregated;
     }
 
@@ -979,6 +1646,20 @@
             }
         }
 
+        // Capture inner class type references: KnownClass.UpperCaseInnerType used as types
+        const innerTypeRegex2 = /\b([\w]+)\.([\w]+)\b/g;
+        let it2;
+        while ((it2 = innerTypeRegex2.exec(content)) !== null) {
+            const outer = it2[1];
+            const inner = it2[2];
+            if (!registry[outer] || outer === sourceName) continue;
+            if (!/^[A-Z]/.test(inner)) continue;
+            if (content[it2.index + it2[0].length] === '(') continue;
+            const base = outer.toLowerCase();
+            if (SYSTEM_TYPES.has(base)) continue;
+            addCall(outer, inner, it2.index);
+        }
+
         // Capture fluent chains that start from a constructor: new ClassName().method1().method2()...
         const constructorChainRegex = /new\s+(\w+)\s*\([^)]*\)([\s\S]*?);/g;
         let cc;
@@ -1005,30 +1686,6 @@
                 // Highlight cursor only — no auto-popup
                 node.style.cursor = 'pointer';
             });
-            node.addEventListener('click', () => {
-                if (!focusedClass) return;
-                // Entry node: ClassName___methodName
-                const m1 = node.id.match(/flowchart-([^-]+)___([^-]+)-/);
-                if (m1 && !m1[1].startsWith('l1__') && !m1[1].startsWith('l2__')) {
-                    const className = Object.keys(registry).find(k => safeId(k) === m1[1]);
-                    if (className === focusedClass) {
-                        const methodName = Object.keys(registry[className].methods).find(m => safeId(m) === m1[2]);
-                        if (methodName && activeMethods.has(methodName)) {
-                            if (collapsedMethods.has(methodName)) collapsedMethods.delete(methodName);
-                            else collapsedMethods.add(methodName);
-                            render(); return;
-                        }
-                    }
-                }
-                // Depth-1 node: l1__ClassName___methodName
-                const m2 = node.id.match(/flowchart-l1__([^-]+)___([^-]+)-/);
-                if (m2) {
-                    const nodeId = `l1__${m2[1]}___${m2[2]}`;
-                    if (collapsedDepth1.has(nodeId)) collapsedDepth1.delete(nodeId);
-                    else collapsedDepth1.add(nodeId);
-                    render();
-                }
-            });
             node.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 hideCodeTooltip();
@@ -1040,6 +1697,94 @@
                 selectNodeText(node);
             });
         });
+    }
+
+    function attachEdgeEvents(svgEl) {
+        svgEl.querySelectorAll('.edgePath').forEach(edgeEl => {
+            const origPath = edgeEl.querySelector('path');
+            if (!origPath) return;
+
+            // Add a wide transparent overlay path for easier hit-testing
+            const hitPath = origPath.cloneNode(false);
+            hitPath.style.cssText = 'stroke:transparent;stroke-width:20px;fill:none;cursor:pointer;';
+            hitPath.classList.add('edge-hit-path');
+            edgeEl.appendChild(hitPath);
+
+            // Resolve source/target from Mermaid CSS classes (LS-safeId, LE-safeId)
+            const cls = Array.from(edgeEl.classList);
+            const lsCls = cls.find(c => c.startsWith('LS-'));
+            const leCls = cls.find(c => c.startsWith('LE-'));
+            if (!lsCls || !leCls) return;
+            const sourceId = lsCls.slice(3);
+            const targetId = leCls.slice(3);
+            const sourceName = Object.keys(registry).find(k => safeId(k) === sourceId);
+            const targetName = Object.keys(registry).find(k => safeId(k) === targetId);
+            if (!sourceName || !targetName) return;
+
+            [hitPath, origPath].forEach(el => {
+                el.addEventListener('contextmenu', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideNodeContextMenu();
+                    const flows = aggregateFlows(registry[sourceName].raw, registry[sourceName].varMap, sourceName);
+                    const items = flows[targetName] || [];
+                    showEdgeContextMenu(e, sourceName, targetName, items);
+                });
+            });
+        });
+    }
+
+    function attachClusterEvents(svgEl) {
+        svgEl.querySelectorAll('g.cluster').forEach(cluster => {
+            // Resolve class name: prefer label text match against registry / known unloaded names
+            const labelEl = cluster.querySelector('.cluster-label text, .nodeLabel, foreignObject span, text');
+            const rawLabel = (labelEl?.textContent || '').trim();
+            const labelName = rawLabel.startsWith('? ') ? rawLabel.slice(2).trim() : rawLabel;
+
+            // Match against registry or safeId reverse-lookup
+            const known = Object.keys(registry).find(k => k === labelName || safeId(k) === safeId(labelName));
+
+            // Only attach to unloaded (ghost) class subgraphs — label starts with "? " or not in registry
+            const isGhost = rawLabel.startsWith('? ') || (labelName && !known);
+            if (!isGhost || !labelName) return;
+
+            cluster.style.cursor = 'context-menu';
+            const rect = cluster.querySelector('rect');
+            if (rect) rect.style.cursor = 'context-menu';
+
+            cluster.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                hideEdgeContextMenu();
+                const menu = document.getElementById('node-context-menu');
+                document.getElementById('ctx-toggle-nodes').style.display = 'none';
+                document.getElementById('ctx-hide-children').style.display = 'none';
+                document.getElementById('ctx-view-code').style.display = 'none';
+                const loadEl = document.getElementById('ctx-load-class');
+                loadEl.style.display = 'flex';
+                loadEl.querySelector('span').textContent = `Load "${labelName}"`;
+                loadEl.onclick = () => { hideNodeContextMenu(); loadClassByName(labelName); };
+                const mw = 200, mh = 50;
+                menu.style.left = Math.min(e.clientX, window.innerWidth - mw) + 'px';
+                menu.style.top = Math.min(e.clientY, window.innerHeight - mh) + 'px';
+                menu.style.display = 'block';
+            });
+        });
+    }
+
+    function showEdgeContextMenu(e, source, target, items) {
+        const menu = document.getElementById('edge-context-menu');
+        document.getElementById('edge-ctx-source').textContent = source;
+        document.getElementById('edge-ctx-target').textContent = target;
+        document.getElementById('edge-ctx-list').innerHTML = items.map(r => `<li>${r}</li>`).join('');
+        menu.style.display = 'block';
+        const mw = 280, mh = menu.offsetHeight || 120;
+        menu.style.left = Math.min(e.clientX, window.innerWidth - mw) + 'px';
+        menu.style.top = Math.min(e.clientY, window.innerHeight - mh) + 'px';
+    }
+
+    function hideEdgeContextMenu() {
+        document.getElementById('edge-context-menu').style.display = 'none';
     }
 
     function resolveNodeIdentity(node) {
@@ -1067,13 +1812,13 @@
         let canToggle = false;
         if (focusedClass) {
             const m1 = node.id.match(/flowchart-([^-]+)___([^-]+)-/);
-            const isEntry = m1 && !m1[1].startsWith('l1__') && !m1[1].startsWith('l2__') && className === focusedClass && methodName && activeMethods.has(methodName);
-            const m2 = node.id.match(/flowchart-l1__([^-]+)___([^-]+)-/);
-            const nodeId = m2 ? `l1__${m2[1]}___${m2[2]}` : null;
-            const isD1 = !!nodeId;
-            if (isEntry || isD1) {
+            const isEntry = m1 && !m1[1].match(/^l\d+__/) && className === focusedClass && methodName && activeMethods.has(methodName);
+            const mDepth = node.id.match(/flowchart-l(\d+)__([^-]+)___([^-]+)-/);
+            const nodeId = mDepth ? `l${mDepth[1]}__${mDepth[2]}___${mDepth[3]}` : null;
+            const isDepthNode = !!nodeId;
+            if (isEntry || isDepthNode) {
                 canToggle = true;
-                const isCollapsed = isEntry ? collapsedMethods.has(methodName) : collapsedDepth1.has(nodeId);
+                const isCollapsed = isEntry ? collapsedMethods.has(methodName) : collapsedNodes.has(nodeId);
                 document.getElementById('ctx-toggle-label').textContent = isCollapsed ? 'Show Child Nodes' : 'Hide Child Nodes';
                 document.getElementById('ctx-toggle-nodes').style.display = 'flex';
                 document.getElementById('ctx-toggle-nodes').onclick = () => {
@@ -1082,8 +1827,8 @@
                         if (collapsedMethods.has(methodName)) collapsedMethods.delete(methodName);
                         else collapsedMethods.add(methodName);
                     } else {
-                        if (collapsedDepth1.has(nodeId)) collapsedDepth1.delete(nodeId);
-                        else collapsedDepth1.add(nodeId);
+                        if (collapsedNodes.has(nodeId)) collapsedNodes.delete(nodeId);
+                        else collapsedNodes.add(nodeId);
                     }
                     render();
                 };
@@ -1100,6 +1845,40 @@
                 const cn = getClassNameFromNode(node);
                 if (cn) setView(cn);
             };
+
+            // Hide / Show Children — only for loaded classes in overview
+            const cn = getClassNameFromNode(node);
+            const hideChildEl = document.getElementById('ctx-hide-children');
+            if (cn && registry[cn]) {
+                const children = getLoadedChildren(cn);
+                if (children.length) {
+                    const anyVisible = children.some(c => !hiddenClasses.has(c));
+                    document.getElementById('ctx-hide-children-label').textContent = anyVisible ? 'Hide Children' : 'Show Children';
+                    hideChildEl.querySelector('i').className = anyVisible ? 'fa-solid fa-circle-nodes' : 'fa-solid fa-circle-nodes';
+                    hideChildEl.style.display = 'flex';
+                    hideChildEl.onclick = () => {
+                        hideNodeContextMenu();
+                        if (anyVisible) children.forEach(c => hiddenClasses.add(c));
+                        else children.forEach(c => hiddenClasses.delete(c));
+                        render();
+                    };
+                } else {
+                    hideChildEl.style.display = 'none';
+                }
+            } else {
+                hideChildEl.style.display = 'none';
+            }
+        }
+
+        // Load Class option — only for ghost (unloaded) nodes
+        const ghostName = ghostClassFromNode(node);
+        const loadEl = document.getElementById('ctx-load-class');
+        loadEl.style.display = ghostName ? 'flex' : 'none';
+        if (ghostName) {
+            const inTree = !!findFileInTree(ghostName);
+            loadEl.querySelector('span').textContent = inTree ? `Load "${ghostName}"` : `Load "${ghostName}"…`;
+            loadEl.querySelector('i').className = inTree ? 'fa-solid fa-file-import' : 'fa-solid fa-folder-open';
+            loadEl.onclick = () => { hideNodeContextMenu(); loadClassByName(ghostName); };
         }
 
         // View Code option — only if method body exists
@@ -1119,7 +1898,7 @@
 
         // Position and show
         menu.style.display = 'block';
-        const menuW = 180, menuH = 90;
+        const menuW = 200, menuH = 110;
         menu.style.left = Math.min(e.clientX, window.innerWidth - menuW) + 'px';
         menu.style.top = Math.min(e.clientY, window.innerHeight - menuH) + 'px';
     }
@@ -1133,26 +1912,31 @@
         selectedClassName = null;
         activeMethods = new Set();
         collapsedMethods = new Set();
-        collapsedDepth1 = new Set();
+        collapsedNodes = new Set();
         if (name) { openMethodPicker(name); } else { exitAnalyzeFlow(); }
     }
 
-    function openMethodPicker(className) {
+    function openMethodPicker(className, preSelectMethod) {
         document.getElementById('class-panel').style.display = 'none';
         document.getElementById('method-picker').classList.add('visible');
         document.getElementById('method-picker-classname').textContent = className;
         const listEl = document.getElementById('method-picker-list');
         listEl.innerHTML = '';
 
-        // Find method with most lines to auto-enable
         const methods = Object.keys(registry[className].methods);
-        let defaultMethod = methods[0];
-        let maxLines = 0;
-        methods.forEach(m => {
-            const lines = (registry[className].methods[m].match(/\n/g) || []).length;
-            if (lines > maxLines) { maxLines = lines; defaultMethod = m; }
-        });
-        if (defaultMethod) activeMethods.add(defaultMethod);
+        if (preSelectMethod && methods.includes(preSelectMethod)) {
+            // Drill-in: activate only the specific method, skip auto-default
+            activeMethods.add(preSelectMethod);
+        } else {
+            // Normal open: auto-enable the method with the most lines
+            let defaultMethod = methods[0];
+            let maxLines = 0;
+            methods.forEach(m => {
+                const lines = (registry[className].methods[m].match(/\n/g) || []).length;
+                if (lines > maxLines) { maxLines = lines; defaultMethod = m; }
+            });
+            if (defaultMethod) activeMethods.add(defaultMethod);
+        }
 
         methods.forEach(m => {
             const calls = collectOrderedCalls(registry[className].methods[m], registry[className].varMap, className);
@@ -1174,7 +1958,7 @@
         focusedClass = null;
         activeMethods = new Set();
         collapsedMethods = new Set();
-        collapsedDepth1 = new Set();
+        collapsedNodes = new Set();
         document.getElementById('class-panel').style.display = '';
         document.getElementById('method-picker').classList.remove('visible');
         render();
@@ -1215,5 +1999,6 @@
         }, 1000);
     }
 </script>
+<div id="edge-label-tooltip"></div>
 </body>
 </html>
