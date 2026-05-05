@@ -188,6 +188,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
   <button class="tbtn" onclick="adj('rows',1)">+</button>
   <input id="gs" placeholder="Global search…" oninput="gSearch(this.value)"/>
   <button id="btn-hide-src" class="tbtn" onclick="togAllSrc()" title="Hide/show all source panels">⊡ Hide Source</button>
+  <button id="btn-scroll-sync" class="tbtn accent" onclick="togScrollSync()" title="Scroll sync ON — when hovering one side, the other side auto-scrolls to show the highlighted element">⇳ Scroll Sync</button>
   <button class="tbtn" title="Click any two value cells in the grid to compare" onclick="showCmpHelp()" id="btn-cmp">⇄ Compare <span id="sel-count" class="sel-badge"></span></button>
   <button class="tbtn danger" style="margin-left:auto" onclick="clearAll()">✕ Clear Tab</button>
 </div>
@@ -206,7 +207,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 /* ══ STATE ══ */
 let App={activeTab:0,tabs:[]};
 let G;
-let _dat={},_exp={},_debounce={},_srcHidden=false;
+let _dat={},_exp={},_debounce={},_srcHidden=false,_scrollSync=true;
 let _sel=[];
 
 function initApp(){
@@ -293,6 +294,29 @@ function highlightPath(cellEl,path){
   const gp=cellEl.querySelector('.grid-panel'),sp=cellEl.querySelector('.src-pretty');
   if(gp)gp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('grid-hl'));
   if(sp)sp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('src-hl'));
+}
+function togScrollSync(){
+  _scrollSync=!_scrollSync;
+  const btn=document.getElementById('btn-scroll-sync');
+  if(btn){
+    btn.className='tbtn'+(_scrollSync?' accent':'');
+    btn.title=_scrollSync
+      ?'Scroll sync ON — when hovering one side, the other side auto-scrolls to show the highlighted element'
+      :'Scroll sync OFF — highlighted elements will not auto-scroll into view';
+  }
+}
+/* Scroll the first highlighted element into view only if it is outside the
+   visible area of its scrollable container. */
+function scrollHlIntoView(container,hlClass){
+  if(!_scrollSync)return;
+  if(!container)return;
+  const el=container.querySelector('.'+hlClass);
+  if(!el)return;
+  const cr=container.getBoundingClientRect();
+  const er=el.getBoundingClientRect();
+  if(er.bottom<cr.top||er.top>cr.bottom){
+    el.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
 }
 function clearHighlight(cellEl){
   cellEl.querySelectorAll('.grid-hl').forEach(el=>el.classList.remove('grid-hl'));
@@ -845,6 +869,8 @@ function setupSyncEvents(cellEl,id){
       if(!el)return;
       highlightPath(cellEl,el.dataset.p);
       showNodePopup(el.dataset.p,el.dataset.cid||cid,e.clientX,e.clientY);
+      // scroll the corresponding src-pretty highlight into view if off-screen
+      scrollHlIntoView(cellEl.querySelector('.src-pretty'),'src-hl');
     });
     gp.addEventListener('mousemove',e=>moveNodePopup(e.clientX,e.clientY));
     gp.addEventListener('mouseleave',()=>{clearHighlight(cellEl);hideNodePopup();});
@@ -854,11 +880,20 @@ function setupSyncEvents(cellEl,id){
       const el=e.target.closest('[data-p]');
       if(!el)return;
       highlightPath(cellEl,el.dataset.p);
+      // scroll the corresponding grid highlight into view if off-screen
+      scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
     });
     sp.addEventListener('mouseleave',()=>clearHighlight(cellEl));
   }
   if(ta){
-    const syncH=()=>{const path=pathAtPos(ta.value,ta.selectionStart,cid);if(path)highlightPath(cellEl,path);};
+    const syncH=()=>{
+      const path=pathAtPos(ta.value,ta.selectionStart,cid);
+      if(path){
+        highlightPath(cellEl,path);
+        // scroll the corresponding grid highlight into view if off-screen
+        scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
+      }
+    };
     ta.addEventListener('keyup',syncH);ta.addEventListener('click',syncH);
   }
 }
