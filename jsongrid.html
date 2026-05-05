@@ -151,6 +151,21 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 .row-chg .v-right{background:var(--add-bg);color:var(--add)}
 .row-same td{color:var(--tx3)}
 .cmp-same-note{padding:20px;text-align:center;color:var(--add);font-size:13px;font-weight:600}
+
+/* Paste JSON chooser */
+#json-pick-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.48);z-index:1100;align-items:center;justify-content:center;padding:24px}
+.json-pick-box{background:var(--bg);border-radius:12px;width:100%;max-width:860px;max-height:85vh;display:flex;flex-direction:column;border:1px solid var(--bd2);box-shadow:0 20px 50px rgba(0,0,0,0.3)}
+.json-pick-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bd2);background:var(--bg2)}
+.json-pick-hdr h3{font-size:13px;font-weight:600}
+.json-pick-meta{font-size:11px;color:var(--tx2)}
+.json-pick-list{padding:10px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.json-pick-item{border:1px solid var(--bd);border-radius:8px;padding:8px;background:var(--bg);cursor:pointer}
+.json-pick-item:hover{border-color:var(--accent-m);background:var(--accent-l)}
+.json-pick-item-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
+.json-pick-item-title{font-size:12px;font-weight:600;color:var(--tx)}
+.json-pick-item-pos{font-size:10px;color:var(--tx3)}
+.json-pick-item-pre{font-family:var(--mono);font-size:11px;color:var(--tx2);white-space:pre-wrap;word-break:break-word;line-height:1.35;max-height:92px;overflow:hidden}
+.json-pick-ftr{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--bd2);background:var(--bg2)}
 /* Drop overlay */
 .drop-ov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(230,241,251,0.94);border:2px dashed var(--accent-m);z-index:10;pointer-events:none;border-radius:10px}
 .drop-ov.on{display:flex}
@@ -184,6 +199,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 </div>
 <div id="node-popup"></div>
 <div id="cmp-modal"></div>
+<div id="json-pick-modal"></div>
 <div id="main"><div id="go"></div></div>
 
 <script>
@@ -620,34 +636,87 @@ function renderPretty(id){
 
 function tryAutoConvertPaste(id,text){
   const ta=document.getElementById('ta-'+id);if(!ta)return false;
-  const s=cs(id);
+  const matches=extractJSONMessages(String(text||''));
+  if(matches.length>1){
+    showJsonPickModal(id,matches);
+    return true;
+  }
+
   const candidates=[];
-  const extracted=extractJSON(text);
-  if(extracted!==null)candidates.push(extracted);
+  if(matches.length===1)candidates.push(matches[0].jsonText);
   if(text!=null)candidates.push(String(text));
   const current=ta.value;
   if(current!=null)candidates.push(String(current));
+
   for(let i=0;i<candidates.length;i++){
-    const candidate=candidates[i].trim();
+    const candidate=String(candidates[i]||'').trim();
     if(!candidate)continue;
-    try{
-      const fmt=JSON.stringify(JSON.parse(candidate),null,2);
-      ta.value=fmt;
-      s.text=fmt;
-      s.pretty=true;
-      clearTimeout(_debounce[id]);
-      const raw=document.getElementById('ta-'+id),sp=document.getElementById('sp-'+id),btn=document.getElementById('btn-pr-'+id);
-      if(raw)raw.className='src-raw hidden';
-      if(sp)sp.className='src-pretty on';
-      if(btn){btn.className='ib on';btn.title='Back to raw editor';}
-      renderPretty(id);
-      rebuildGP(id);
-      lsSave(id);
-      saveAppState();
-      return true;
-    }catch(err){}
+    if(applyFormattedJSONToCell(id,candidate))return true;
   }
   return false;
+}
+
+function applyFormattedJSONToCell(id,jsonText){
+  const ta=document.getElementById('ta-'+id);if(!ta)return false;
+  const s=cs(id);
+  try{
+    const fmt=JSON.stringify(JSON.parse(jsonText),null,2);
+    ta.value=fmt;
+    s.text=fmt;
+    s.pretty=true;
+    clearTimeout(_debounce[id]);
+    const raw=document.getElementById('ta-'+id),sp=document.getElementById('sp-'+id),btn=document.getElementById('btn-pr-'+id);
+    if(raw)raw.className='src-raw hidden';
+    if(sp)sp.className='src-pretty on';
+    if(btn){btn.className='ib on';btn.title='Back to raw editor';}
+    renderPretty(id);
+    rebuildGP(id);
+    lsSave(id);
+    saveAppState();
+    return true;
+  }catch(err){
+    return false;
+  }
+}
+
+function jsonPickLabel(v){
+  if(Array.isArray(v))return `Array (${v.length})`;
+  if(v&&typeof v==='object')return `Object (${Object.keys(v).length})`;
+  return typeof v;
+}
+
+function jsonPickPreview(jsonText){
+  const compact=String(jsonText||'').replace(/\s+/g,' ').trim();
+  return compact.length>260?compact.slice(0,260)+'...':compact;
+}
+
+function hideJsonPickModal(){
+  const modal=document.getElementById('json-pick-modal');
+  if(!modal)return;
+  modal.style.display='none';
+  modal.innerHTML='';
+}
+
+function showJsonPickModal(id,matches){
+  const modal=document.getElementById('json-pick-modal');
+  if(!modal)return;
+  const items=matches.map((m,idx)=>{
+    const pos=`chars ${m.start+1}-${m.end+1}`;
+    return `<div class="json-pick-item" onclick="choosePastedJSON('${escA(id)}',${idx})"><div class="json-pick-item-head"><span class="json-pick-item-title">Message ${idx+1} - ${escH(jsonPickLabel(m.value))}</span><span class="json-pick-item-pos">${pos}</span></div><div class="json-pick-item-pre">${escH(jsonPickPreview(m.jsonText))}</div></div>`;
+  }).join('');
+  const box=`<div class="json-pick-box"><div class="json-pick-hdr"><div><h3>Multiple JSON messages found</h3><div class="json-pick-meta">Select one message to load into the cell.</div></div><button class="tbtn" onclick="hideJsonPickModal()">Cancel</button></div><div class="json-pick-list">${items}</div><div class="json-pick-ftr"><button class="tbtn" onclick="hideJsonPickModal()">Keep raw paste</button></div></div>`;
+  modal.innerHTML=box;
+  modal.style.display='flex';
+  modal._pickTargetId=id;
+  modal._pickMatches=matches;
+}
+
+function choosePastedJSON(id,idx){
+  const modal=document.getElementById('json-pick-modal');
+  const picks=modal&&Array.isArray(modal._pickMatches)?modal._pickMatches:[];
+  if(!picks[idx]){hideJsonPickModal();return;}
+  applyFormattedJSONToCell(id,picks[idx].jsonText);
+  hideJsonPickModal();
 }
 
 function syncTA(id){
@@ -1039,6 +1108,8 @@ document.addEventListener('contextmenu',e=>{
 });
 document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu'))hideCtxMenu();});
 document.getElementById('cmp-modal').addEventListener('click',e=>{if(e.target===document.getElementById('cmp-modal')){document.getElementById('cmp-modal').style.display='none';clearSel();}});
+document.getElementById('json-pick-modal').addEventListener('click',e=>{if(e.target===document.getElementById('json-pick-modal'))hideJsonPickModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hideJsonPickModal();});
 
 /* ══ LOCALSTORAGE ══ */
 const LS_PRE='jgw::',LS_MAX=200;
@@ -1147,36 +1218,51 @@ function _outsideDD(e){const d=document.querySelector('.storage-drop');if(!d){do
 function hideStorageDrop(){document.querySelectorAll('.storage-drop').forEach(d=>d.remove());}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 
-/* Extract first valid JSON object or array from arbitrary text */
-function extractJSON(text){
-  // Find first [ or {
-  let start=-1,openChar='',closeChar='';
-  for(let i=0;i<text.length;i++){
-    if(text[i]==='['){start=i;openChar='[';closeChar=']';break;}
-    if(text[i]==='{'){start=i;openChar='{';closeChar='}';break;}
-  }
-  if(start===-1)return null;
-
-  // Walk from start, tracking depth and string literals properly
-  let depth=0,inStr=false,escape=false;
-  for(let i=start;i<text.length;i++){
+/* Extract all valid top-level JSON objects/arrays from arbitrary text */
+function findJsonEnd(text,start){
+  const first=text[start];
+  if(first!=='{'&&first!=='[')return-1;
+  const st=[first];
+  let inStr=false,esc=false;
+  for(let i=start+1;i<text.length;i++){
     const ch=text[i];
-    if(escape){escape=false;continue;}
-    if(ch==='\\' && inStr){escape=true;continue;}
+    if(esc){esc=false;continue;}
+    if(ch==='\\'&&inStr){esc=true;continue;}
     if(ch==='"'){inStr=!inStr;continue;}
     if(inStr)continue;
-    if(ch===openChar)depth++;
-    else if(ch===closeChar){
-      depth--;
-      if(depth===0){
-        // Found matching close — try to parse
-        const candidate=text.slice(start,i+1);
-        try{JSON.parse(candidate);return candidate;}
-        catch(e){return null;}
-      }
+    if(ch==='{'||ch==='['){st.push(ch);continue;}
+    if(ch==='}'||ch===']'){
+      const open=st.pop();
+      if((open==='{'&&ch!=='}')||(open==='['&&ch!==']'))return-1;
+      if(!st.length)return i;
     }
   }
-  return null; // No matching close found
+  return-1;
+}
+
+function extractJSONMessages(text,maxMatches=20){
+  const out=[];
+  let i=0;
+  while(i<text.length&&out.length<maxMatches){
+    const ch=text[i];
+    if(ch!=='{'&&ch!=='['){i++;continue;}
+    const end=findJsonEnd(text,i);
+    if(end===-1){i++;continue;}
+    const candidate=text.slice(i,end+1);
+    try{
+      const value=JSON.parse(candidate);
+      out.push({start:i,end,jsonText:candidate,value});
+      i=end+1;
+      continue;
+    }catch(e){}
+    i++;
+  }
+  return out;
+}
+
+function extractJSON(text){
+  const msgs=extractJSONMessages(String(text||''),1);
+  return msgs.length?msgs[0].jsonText:null;
 }
 
 const escH=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
