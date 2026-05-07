@@ -4,13 +4,17 @@ A collection of browser-based developer tools for working with JSON data, Salesf
 
 Zero dependencies. Single HTML files. Work offline.
 
-**Live demo: [jsongrid.rex-cclui.workers.dev](https://jsongrid.rex-cclui.workers.dev/)**
+| Tool | URL |
+|---|---|
+| JSON Grid | [jsongrid.trendx.uk](https://jsongrid.trendx.uk/) |
+| Apex Flow | [apexflow.trendx.uk](https://apexflow.trendx.uk/) |
+| SF Debug Viewer | [apexdebug.trendx.uk](https://apexdebug.trendx.uk/) |
 
 ---
 
 ## Tools
 
-### JSON Grid (`index.html`)
+### JSON Grid (`jsongrid.html`)
 
 An interactive workspace for viewing, editing, and comparing JSON data using a flexible grid layout.
 
@@ -128,12 +132,12 @@ A Salesforce debug log parser and visualizer. Paste a raw debug log to get a col
 
 ## Getting Started
 
-No installation required. Open any `.html` file in a modern browser.
+No installation required. Open any file in `public/` in a modern browser, or use the live URLs above.
 
 ```bash
-# Optionally serve via a local server
-python -m http.server 8000
-# Then open http://localhost:8000
+# Serve locally
+python -m http.server 8000 --directory public
+# Then open http://localhost:8000/jsongrid.html
 ```
 
 **Browser requirements:** Chrome, Firefox, Safari, or Edge with ES6+ and localStorage support.
@@ -142,10 +146,53 @@ python -m http.server 8000
 
 ```
 jsonGrid/
-├── index.html          # JSON Grid — multi-cell JSON viewer/editor/diff
-├── apexflow.html       # Apex / Java Class Diagram — call-flow visualizer for .cls and .java files
-└── sf-debug-viewer.html # SF Debug Viewer — Salesforce debug log parser and tree viewer
+├── public/
+│   ├── jsongrid.html          # JSON Grid — multi-cell JSON viewer/editor/diff
+│   ├── apexflow.html          # Apex Flow — call-flow visualizer for .cls and .java files
+│   └── sf-debug-viewer.html   # SF Debug Viewer — Salesforce debug log parser and tree viewer
+├── src/
+│   └── index.js               # Cloudflare Worker — routes each subdomain to the right HTML file
+├── wrangler.jsonc             # Deploy config: jsongrid.trendx.uk
+├── wrangler.apexflow.jsonc    # Deploy config: apexflow.trendx.uk
+└── wrangler.apexdebug.jsonc   # Deploy config: apexdebug.trendx.uk
 ```
+
+## Deployment
+
+The three tools are hosted as separate Cloudflare Workers sharing the same codebase. A Worker script (`src/index.js`) routes each subdomain to the correct HTML file — no file renaming needed.
+
+### First-time setup
+
+```bash
+npm install -g wrangler
+wrangler login
+```
+
+### Deploy all three sites
+
+```bash
+./deploy.sh
+```
+
+Or deploy individually:
+
+```bash
+npx wrangler deploy                                    # jsongrid.trendx.uk
+npx wrangler deploy --config wrangler.apexflow.jsonc   # apexflow.trendx.uk
+npx wrangler deploy --config wrangler.apexdebug.jsonc  # apexdebug.trendx.uk
+```
+
+### How routing works
+
+`src/index.js` reads the subdomain from the incoming hostname and maps it to the matching HTML file:
+
+| Subdomain | File served |
+|---|---|
+| `jsongrid.trendx.uk` | `jsongrid.html` |
+| `apexflow.trendx.uk` | `apexflow.html` |
+| `apexdebug.trendx.uk` | `sf-debug-viewer.html` |
+
+To add a new tool: add the HTML file, add a row to `SUBDOMAIN_MAP` in `src/index.js`, create a `wrangler.<name>.jsonc`, and deploy.
 
 ## License
 

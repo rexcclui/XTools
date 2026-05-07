@@ -1,6 +1,6 @@
 {
-  // https://jsongrid.trendx.uk
-  "name": "jsongrid",
+  // https://apexflow.trendx.uk
+  "name": "apexflow",
   "compatibility_date": "2026-04-30",
   "main": "src/index.js",
   "assets": {
