@@ -14,7 +14,7 @@ Zero dependencies. Single HTML files. Work offline.
 
 ## Tools
 
-### JSON Grid (`index.html`)
+### JSON Grid (`jsongrid.html`)
 
 An interactive workspace for viewing, editing, and comparing JSON data using a flexible grid layout.
 
@@ -132,12 +132,12 @@ A Salesforce debug log parser and visualizer. Paste a raw debug log to get a col
 
 ## Getting Started
 
-No installation required. Open any `.html` file in a modern browser.
+No installation required. Open any file in `public/` in a modern browser, or use the live URLs above.
 
 ```bash
-# Optionally serve via a local server
-python -m http.server 8000
-# Then open http://localhost:8000
+# Serve locally
+python -m http.server 8000 --directory public
+# Then open http://localhost:8000/jsongrid.html
 ```
 
 **Browser requirements:** Chrome, Firefox, Safari, or Edge with ES6+ and localStorage support.
@@ -168,17 +168,18 @@ npm install -g wrangler
 wrangler login
 ```
 
-### Deploy each site
+### Deploy all three sites
 
 ```bash
-# https://jsongrid.trendx.uk
-npx wrangler deploy
+./deploy.sh
+```
 
-# https://apexflow.trendx.uk
-npx wrangler deploy --config wrangler.apexflow.jsonc
+Or deploy individually:
 
-# https://apexdebug.trendx.uk  (serves sf-debug-viewer.html)
-npx wrangler deploy --config wrangler.apexdebug.jsonc
+```bash
+npx wrangler deploy                                    # jsongrid.trendx.uk
+npx wrangler deploy --config wrangler.apexflow.jsonc   # apexflow.trendx.uk
+npx wrangler deploy --config wrangler.apexdebug.jsonc  # apexdebug.trendx.uk
 ```
 
 ### How routing works
