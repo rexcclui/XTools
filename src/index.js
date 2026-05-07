@@ -16,9 +16,7 @@ export default {
       const subdomain = url.hostname.split('.')[0];
       const filename = SUBDOMAIN_MAP[subdomain];
       if (filename) {
-        const target = new URL(`/${filename}`, url);
-        const res = await env.ASSETS.fetch(new Request(target.toString(), request));
-        if (res.ok) return res;
+        return Response.redirect(new URL(`/${filename}`, url).toString(), 302);
       }
     }
 
