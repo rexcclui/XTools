@@ -146,9 +146,10 @@ python -m http.server 8000
 
 ```
 jsonGrid/
-├── jsongrid.html              # JSON Grid — multi-cell JSON viewer/editor/diff
-├── apexflow.html              # Apex Flow — call-flow visualizer for .cls and .java files
-├── sf-debug-viewer.html       # SF Debug Viewer — Salesforce debug log parser and tree viewer
+├── public/
+│   ├── jsongrid.html          # JSON Grid — multi-cell JSON viewer/editor/diff
+│   ├── apexflow.html          # Apex Flow — call-flow visualizer for .cls and .java files
+│   └── sf-debug-viewer.html   # SF Debug Viewer — Salesforce debug log parser and tree viewer
 ├── src/
 │   └── index.js               # Cloudflare Worker — routes each subdomain to the right HTML file
 ├── wrangler.jsonc             # Deploy config: jsongrid.trendx.uk

@@ -4,7 +4,7 @@
   "compatibility_date": "2026-04-30",
   "main": "src/index.js",
   "assets": {
-    "directory": ".",
+    "directory": "public",
     "binding": "ASSETS"
   }
 }
