@@ -411,6 +411,9 @@ function initAnalyzer(rootEl, fetchSource) {
   };
   let tabSeq = 0;
 
+  function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
+  let _activeLogLine=null,_activeTreeNode=null;
+
   // ── Highlight helpers ──────────────────────────────────────────────────────
   function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
   function getActiveHls(){return S.highlights.filter(h=>h.query.trim())}
@@ -478,12 +481,12 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   function syncLogToTree(tab,ns,lineEl){
-    $$('.ll.active').forEach(e=>e.classList.remove('active'));
-    $$('.nrow.active').forEach(e=>e.classList.remove('active'));
-    if (lineEl) lineEl.classList.add('active');
+    if (_activeLogLine){_activeLogLine.classList.remove('active');_activeLogLine=null}
+    if (_activeTreeNode){_activeTreeNode.classList.remove('active');_activeTreeNode=null}
+    if (lineEl){lineEl.classList.add('active');_activeLogLine=lineEl}
     const nodeEl=C.querySelector(`.nrow[data-ns="${ns}"]`);
     if (nodeEl){
-      nodeEl.classList.add('active');
+      nodeEl.classList.add('active');_activeTreeNode=nodeEl;
       let p=nodeEl.parentElement;
       while (p&&!p.classList.contains('tree-content')){
         if (p.classList.contains('nchildren')) p.style.display='block';
@@ -494,11 +497,11 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   function syncTreeToLog(tab,ns){
-    $$('.ll.active').forEach(e=>e.classList.remove('active'));
+    if (_activeLogLine){_activeLogLine.classList.remove('active');_activeLogLine=null}
     const logEl=$('logRendered_'+tab.id);
     if (!logEl) return;
     const lineEl=logEl.querySelector(`.ll[data-ns="${ns}"]`);
-    if (lineEl){lineEl.classList.add('active');lineEl.scrollIntoView({block:'nearest',behavior:'smooth'})}
+    if (lineEl){_activeLogLine=lineEl;lineEl.classList.add('active');lineEl.scrollIntoView({block:'nearest',behavior:'smooth'})}
   }
 
   // ── Tree renderer ──────────────────────────────────────────────────────────
@@ -519,11 +522,14 @@ function initAnalyzer(rootEl, fetchSource) {
     return S.nsFilter.has(m?m[1]:'(none)');
   }
   function nodeText(node){return`${node.cls} ${node.meth} ${node.params} ${node.sig}`.toLowerCase()}
+  let _searchCache=new Map();
   function subtreeHasSearchMatch(node){
     if (!S.treeSearch) return true;
+    if (_searchCache.has(node.id)) return _searchCache.get(node.id);
     const q=S.treeSearch.toLowerCase();
-    if (nodeText(node).includes(q)) return true;
-    return node.children.some(c=>subtreeHasSearchMatch(c));
+    const v=nodeText(node).includes(q)||node.children.some(c=>subtreeHasSearchMatch(c));
+    _searchCache.set(node.id,v);
+    return v;
   }
   function subtreeHasMatch(node){
     if (!nodeVisible(node)) return false;
@@ -624,15 +630,15 @@ function initAnalyzer(rootEl, fetchSource) {
         tog.textContent=open?'▶':'▼';
         node.expanded=!open;
         syncTreeToLog(tab,node.ns);
-        $$('.nrow.active').forEach(el=>el.classList.remove('active'));
-        row.classList.add('active');
+        if (_activeTreeNode) _activeTreeNode.classList.remove('active');
+        _activeTreeNode=row;row.classList.add('active');
       });
     } else {
       row.addEventListener('click',e=>{
         e.stopPropagation();
         syncTreeToLog(tab,node.ns);
-        $$('.nrow.active').forEach(el=>el.classList.remove('active'));
-        row.classList.add('active');
+        if (_activeTreeNode) _activeTreeNode.classList.remove('active');
+        _activeTreeNode=row;row.classList.add('active');
       });
     }
     return wrap;
@@ -732,6 +738,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   function renderLogPane(tab){
+    _activeLogLine=null;
     const logPane=$('logPane');
     const toolbar=document.createElement('div');toolbar.className='log-toolbar';
     const info=document.createElement('span');info.style.cssText='font-size:11px;color:var(--dm)';
@@ -750,6 +757,8 @@ function initAnalyzer(rootEl, fetchSource) {
   function renderTreePane(tab){
     const content=$('treeContent');
     if (!content) return;
+    _searchCache=new Map();
+    _activeTreeNode=null;
     content.innerHTML='';
     const hls=getActiveHls();
     if (!tab.tree||!tab.tree.children.length){
@@ -867,7 +876,7 @@ function initAnalyzer(rootEl, fetchSource) {
     rerender();
   }
   function toggleOpt(key,btn){S[key]=!S[key];btn.classList.toggle('on',S[key]);rerender()}
-  function rerender(){const tab=S.tabs.find(t=>t.id===S.activeId);if(tab&&tab.parsed)renderTreePane(tab)}
+  const rerender=debounce(()=>{const tab=S.tabs.find(t=>t.id===S.activeId);if(tab&&tab.parsed)renderTreePane(tab)},60);
 
   // ── Namespace filter ───────────────────────────────────────────────────────
   function renderNsPopup(tab){
@@ -1139,7 +1148,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   // ── Event wiring ───────────────────────────────────────────────────────────
-  $('globalSearch').addEventListener('input', onGlobalSearch);
+  $('globalSearch').addEventListener('input', debounce(onGlobalSearch, 150));
   $('hideInput').addEventListener('keydown', e=>{if(e.key==='Enter')addHideKeyword()});
   $('btn-addHide').addEventListener('click', addHideKeyword);
   $('btn-history').addEventListener('click', toggleHistory);
