@@ -1,0 +1,9 @@
+{
+  "name": "sf-debug-viewer",
+  "compatibility_date": "2026-04-30",
+  "main": "src/index.js",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS"
+  }
+}
