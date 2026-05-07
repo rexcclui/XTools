@@ -4,7 +4,11 @@ A collection of browser-based developer tools for working with JSON data, Salesf
 
 Zero dependencies. Single HTML files. Work offline.
 
-**Live demo: [jsongrid.rex-cclui.workers.dev](https://jsongrid.rex-cclui.workers.dev/)**
+| Tool | URL |
+|---|---|
+| JSON Grid | [jsongrid.trendx.uk](https://jsongrid.trendx.uk/) |
+| Apex Flow | [apexflow.trendx.uk](https://apexflow.trendx.uk/) |
+| SF Debug Viewer | [apexdebug.trendx.uk](https://apexdebug.trendx.uk/) |
 
 ---
 
@@ -142,10 +146,51 @@ python -m http.server 8000
 
 ```
 jsonGrid/
-├── index.html          # JSON Grid — multi-cell JSON viewer/editor/diff
-├── apexflow.html       # Apex / Java Class Diagram — call-flow visualizer for .cls and .java files
-└── sf-debug-viewer.html # SF Debug Viewer — Salesforce debug log parser and tree viewer
+├── jsongrid.html              # JSON Grid — multi-cell JSON viewer/editor/diff
+├── apexflow.html              # Apex Flow — call-flow visualizer for .cls and .java files
+├── sf-debug-viewer.html       # SF Debug Viewer — Salesforce debug log parser and tree viewer
+├── src/
+│   └── index.js               # Cloudflare Worker — routes each subdomain to the right HTML file
+├── wrangler.jsonc             # Deploy config: jsongrid.trendx.uk
+├── wrangler.apexflow.jsonc    # Deploy config: apexflow.trendx.uk
+└── wrangler.apexdebug.jsonc   # Deploy config: apexdebug.trendx.uk
 ```
+
+## Deployment
+
+The three tools are hosted as separate Cloudflare Workers sharing the same codebase. A Worker script (`src/index.js`) routes each subdomain to the correct HTML file — no file renaming needed.
+
+### First-time setup
+
+```bash
+npm install -g wrangler
+wrangler login
+```
+
+### Deploy each site
+
+```bash
+# https://jsongrid.trendx.uk
+npx wrangler deploy
+
+# https://apexflow.trendx.uk
+npx wrangler deploy --config wrangler.apexflow.jsonc
+
+# https://apexdebug.trendx.uk  (serves sf-debug-viewer.html)
+npx wrangler deploy --config wrangler.apexdebug.jsonc
+```
+
+### How routing works
+
+`src/index.js` reads the subdomain from the incoming hostname and maps it to the matching HTML file:
+
+| Subdomain | File served |
+|---|---|
+| `jsongrid.trendx.uk` | `jsongrid.html` |
+| `apexflow.trendx.uk` | `apexflow.html` |
+| `apexdebug.trendx.uk` | `sf-debug-viewer.html` |
+
+To add a new tool: add the HTML file, add a row to `SUBDOMAIN_MAP` in `src/index.js`, create a `wrangler.<name>.jsonc`, and deploy.
 
 ## License
 

@@ -1,4 +1,5 @@
 {
+  // https://apexdebug.trendx.uk
   "name": "apexdebug",
   "compatibility_date": "2026-04-30",
   "main": "src/index.js",
