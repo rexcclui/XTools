@@ -57,7 +57,8 @@ const CSS = `
 .btn-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .btn-primary{background:#238636;border-color:#2ea043;color:#fff}
 .btn-primary:hover{background:#2ea043}
-.log-rendered{flex:1;overflow:auto;font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5;position:relative}
+.log-rendered{flex:1;overflow:auto;font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5;position:relative;outline:none}
+.log-rendered:focus{box-shadow:inset 0 0 0 1px var(--ac)}
 .log-toolbar{padding:4px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:6px;align-items:center;flex-shrink:0}
 .ll{display:flex;align-items:center;gap:6px;padding:0 8px;border-left:2px solid transparent;cursor:pointer;height:18px;overflow:hidden;white-space:nowrap;box-sizing:border-box}
 .ll:hover{background:rgba(255,255,255,.03)}
@@ -462,11 +463,11 @@ function initAnalyzer(rootEl, fetchSource) {
     });
   }
 
-  function buildLogRow(ll,tab,hls){
-    const isActive=tab._activeLogNs!==undefined&&tab._activeLogNs===ll.ns;
+  function buildLogRow(ll,tab,hls,visIdx){
+    const isActive=tab._cursorVisIdx===visIdx;
     const div=document.createElement('div');
     div.className=`ll ev-${ll.ev}${isActive?' active':''}`;
-    div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;
+    div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;div.dataset.visidx=visIdx;
     const num=document.createElement('span');num.className='ll-num';num.textContent=ll.idx+1;
     div.appendChild(num);
     if (ll.ev){
@@ -478,12 +479,16 @@ function initAnalyzer(rootEl, fetchSource) {
       const raw=document.createElement('span');raw.className='ll-rest';raw.innerHTML=applyHl(ll.raw,hls);
       div.appendChild(raw);
     }
-    div.addEventListener('click',()=>syncLogToTree(tab,ll.ns,div));
+    div.addEventListener('click',()=>{
+      tab._cursorVisIdx=visIdx;
+      syncLogToTree(tab,ll.ns,div);
+    });
     return div;
   }
 
   function makeLogScroller(container,tab){
     let visLines=computeVisibleLines(tab);
+    tab._visLines=visLines;
     let rendered={start:-1,end:-1};
     const spacer=document.createElement('div');spacer.style.cssText='position:relative;';
     const rowsEl=document.createElement('div');rowsEl.style.cssText='position:absolute;top:0;left:0;right:0;will-change:transform;';
@@ -501,35 +506,85 @@ function initAnalyzer(rootEl, fetchSource) {
       rowsEl.style.transform=`translateY(${start*LOG_ROW_H}px)`;
       const hls=getActiveHls();
       const frag=document.createDocumentFragment();
-      for (let i=start;i<end;i++) frag.appendChild(buildLogRow(visLines[i],tab,hls));
+      for (let i=start;i<end;i++) frag.appendChild(buildLogRow(visLines[i],tab,hls,i));
       rowsEl.innerHTML='';rowsEl.appendChild(frag);
+    }
+
+    function scrollToVisIdx(idx,center){
+      const rowTop=idx*LOG_ROW_H;
+      const rowBot=rowTop+LOG_ROW_H;
+      const viewTop=container.scrollTop;
+      const viewBot=viewTop+container.clientHeight;
+      if (center||rowTop<viewTop) container.scrollTop=Math.max(0,rowTop-(container.clientHeight/2));
+      else if (rowBot>viewBot) container.scrollTop=rowBot-container.clientHeight;
+      rendered={start:-1,end:-1};render();
     }
 
     container.addEventListener('scroll',()=>render(),{passive:true});
 
     return {
-      refresh(newVis){visLines=newVis??computeVisibleLines(tab);rendered={start:-1,end:-1};render()},
+      refresh(newVis){visLines=newVis??computeVisibleLines(tab);tab._visLines=visLines;rendered={start:-1,end:-1};render()},
       scrollToNs(ns){
         const idx=visLines.findIndex(ll=>ll.ns===ns);
         if (idx<0) return null;
-        container.scrollTop=Math.max(0,idx*LOG_ROW_H-container.clientHeight/2);
-        rendered={start:-1,end:-1};render();
+        scrollToVisIdx(idx,true);
         return rowsEl.querySelector(`.ll[data-ns="${ns}"]`);
       },
+      scrollToVisIdx,
       scrollToFirst(pred){
         const idx=visLines.findIndex(pred);
-        if (idx<0) return;
-        container.scrollTop=Math.max(0,idx*LOG_ROW_H-container.clientHeight/2);
-        rendered={start:-1,end:-1};render();
+        if (idx>=0) scrollToVisIdx(idx,true);
       },
       forceRender:render,
+      pageSize(){return Math.max(1,Math.floor(container.clientHeight/LOG_ROW_H)-1)},
     };
   }
 
+  function moveLogCursor(tab,newIdx){
+    const vis=tab._visLines||[];
+    if (!vis.length) return;
+    newIdx=Math.max(0,Math.min(vis.length-1,newIdx));
+    tab._cursorVisIdx=newIdx;
+    const ll=vis[newIdx];
+    tab._activeLogNs=ll.ns;
+    tab._logScroller?.scrollToVisIdx(newIdx,false);
+    // update tree selection
+    $$('.nrow.active').forEach(e=>e.classList.remove('active'));
+    const nodeEl=C.querySelector(`.nrow[data-ns="${ll.ns}"]`);
+    if (nodeEl){
+      nodeEl.classList.add('active');
+      let p=nodeEl.parentElement;
+      while (p&&!p.classList.contains('tree-content')){
+        if (p.classList.contains('nchildren')) p.style.display='block';
+        p=p.parentElement;
+      }
+      nodeEl.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  }
+
   function renderLogView(tab){
+    tab._cursorVisIdx=-1;
     const wrap=document.createElement('div');
     wrap.className='log-rendered';
     wrap.id='logRendered_'+tab.id;
+    wrap.tabIndex=0;
+    wrap.setAttribute('aria-label','Log lines — use arrow keys to navigate');
+
+    wrap.addEventListener('keydown',e=>{
+      const vis=tab._visLines||[];
+      if (!vis.length) return;
+      const cur=tab._cursorVisIdx<0?0:tab._cursorVisIdx;
+      const ps=tab._logScroller?.pageSize()??20;
+      let next=-1;
+      if (e.key==='ArrowDown')  {next=cur+1;e.preventDefault()}
+      else if (e.key==='ArrowUp')    {next=cur-1;e.preventDefault()}
+      else if (e.key==='PageDown')   {next=cur+ps;e.preventDefault()}
+      else if (e.key==='PageUp')     {next=cur-ps;e.preventDefault()}
+      else if (e.key==='Home')       {next=0;e.preventDefault()}
+      else if (e.key==='End')        {next=vis.length-1;e.preventDefault()}
+      if (next>=0) moveLogCursor(tab,next);
+    });
+
     // Scroller needs actual layout — init after element is in DOM
     setTimeout(()=>{
       tab._logScroller=makeLogScroller(wrap,tab);
@@ -546,7 +601,12 @@ function initAnalyzer(rootEl, fetchSource) {
     $$('.ll.active').forEach(e=>e.classList.remove('active'));
     $$('.nrow.active').forEach(e=>e.classList.remove('active'));
     tab._activeLogNs=ns;
-    if (lineEl) lineEl.classList.add('active');
+    if (lineEl){
+      lineEl.classList.add('active');
+      // keep _cursorVisIdx in sync when row is clicked directly
+      const vi=lineEl.dataset.visidx;
+      if (vi!=null) tab._cursorVisIdx=parseInt(vi);
+    }
     const nodeEl=C.querySelector(`.nrow[data-ns="${ns}"]`);
     if (nodeEl){
       nodeEl.classList.add('active');
@@ -564,7 +624,11 @@ function initAnalyzer(rootEl, fetchSource) {
     $$('.ll.active').forEach(e=>e.classList.remove('active'));
     if (!tab._logScroller) return;
     const rowEl=tab._logScroller.scrollToNs(ns);
-    if (rowEl) rowEl.classList.add('active');
+    if (rowEl){
+      rowEl.classList.add('active');
+      const vi=rowEl.dataset.visidx;
+      if (vi!=null) tab._cursorVisIdx=parseInt(vi);
+    }
   }
 
   // ── Tree renderer ──────────────────────────────────────────────────────────
