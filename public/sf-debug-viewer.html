@@ -64,6 +64,7 @@ const CSS = `
 .ll:hover{background:rgba(255,255,255,.03)}
 .ll.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
 .ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
+.ll-ind{flex-shrink:0;color:#2d333b;font-family:'SF Mono','Fira Code',monospace;letter-spacing:-.1px;user-select:none}
 .ll-ts{color:var(--vd);flex-shrink:0}
 .ll-ev{flex-shrink:0;font-weight:600}
 .ll-rest{color:var(--dm);word-break:break-all}
@@ -155,12 +156,13 @@ const CSS = `
 .ll.ll-block{background:rgba(227,179,65,.08)}
 .ll.ll-block:not(.active){border-left-color:#e3b34188}
 .ll.active.ll-block{background:rgba(56,139,253,.15)}
-.log-ctx-menu{position:fixed;z-index:9999;background:var(--b2);border:1px solid var(--bd);border-radius:6px;box-shadow:0 4px 16px #0009;min-width:170px;padding:4px 0;font-size:12px}
-.log-ctx-item{padding:6px 14px;color:var(--tx);cursor:pointer;display:flex;align-items:center;gap:8px}
-.log-ctx-item:hover{background:var(--b3)}
-.log-ctx-item.danger{color:#f85149}
-.log-ctx-sep{height:1px;background:var(--bd);margin:3px 0}
-.log-ctx-label{padding:3px 14px 2px;font-size:10px;color:var(--vd);text-transform:uppercase;letter-spacing:.6px}
+.log-ctx-menu{position:fixed;z-index:9999;background:#1c2128;border:1px solid #444c56;border-radius:7px;box-shadow:0 6px 24px #000c;min-width:180px;padding:4px 0;font-size:12px}
+.log-ctx-item{padding:7px 16px;color:#e6edf3;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
+.log-ctx-item:hover{background:#2d333b;color:#fff}
+.log-ctx-item.danger{color:#f47067}
+.log-ctx-item.danger:hover{background:#2d1117;color:#ff7b72}
+.log-ctx-sep{height:1px;background:#30363d;margin:3px 0}
+.log-ctx-label{padding:5px 16px 2px;font-size:10px;color:#768390;text-transform:uppercase;letter-spacing:.7px;user-select:none}
 .parse-progress-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dm);font-size:12px}
 .parse-progress-bar{width:220px;height:4px;background:var(--b3);border-radius:2px;overflow:hidden}
 .parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
@@ -363,9 +365,13 @@ async function parseLogAsync(text, onProgress) {
     const raw=rawLines[i].trim();
     if (!raw) continue;
     const pl=parseLine(raw);
-    if (!pl){logLines.push({idx:i,ns:0,ts:'',ev:'',rest:raw,raw});continue}
+    if (!pl){logLines.push({idx:i,ns:0,ts:'',ev:'',rest:raw,raw,depth:Math.max(0,stack.length-1)});continue}
     const {ts,ns,ev,rest}=pl;
-    logLines.push({idx:i,ns,ts,ev,rest,raw});
+    // depth: exit lines match their entry level; push lines are at current depth before push
+    const depth=EXIT_MAP[ev]&&ev!=='EXECUTION_FINISHED'
+      ? Math.max(0,stack.length-2)
+      : Math.max(0,stack.length-1);
+    logLines.push({idx:i,ns,ts,ev,rest,raw,depth});
     if (ev) eventTypeCounts.set(ev,(eventTypeCounts.get(ev)||0)+1);
     if (ev==='EXECUTION_STARTED'){root.ts=ts;root.ns=ns;continue}
     if (ev==='EXECUTION_FINISHED'){root.endNs=ns;root.dur=ns-root.ns;continue}
@@ -460,7 +466,7 @@ function initAnalyzer(rootEl, fetchSource) {
   const S = {
     tabs:[],activeId:null,
     highlights:HL_COLORS.map((c,i)=>({id:i+1,query:'',bg:c.bg,fg:c.fg,border:c.border})),
-    typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,
+    typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,showLogIndent:false,
     nsFilter:null,hideKeywords:[],hiddenEventTypes:new Set(['HEAP_ALLOCATE','STATEMENT_EXECUTE']),treeSearch:'',
   };
   let tabSeq = 0;
@@ -516,6 +522,12 @@ function initAnalyzer(rootEl, fetchSource) {
     div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;div.dataset.visidx=visIdx;
     const num=document.createElement('span');num.className='ll-num';num.textContent=ll.idx+1;
     div.appendChild(num);
+    if (S.showLogIndent&&ll.depth>0){
+      const ind=document.createElement('span');ind.className='ll-ind';
+      // two non-breaking spaces per depth level, with subtle pipe guides
+      ind.textContent=('\xa0\xa0│').repeat(ll.depth-1)+'\xa0\xa0┤';
+      div.appendChild(ind);
+    }
     if (ll.ev){
       const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
       const ev=document.createElement('span');ev.className='ll-ev';ev.innerHTML=applyHl(ll.ev,hls);
@@ -1008,9 +1020,17 @@ function initAnalyzer(rootEl, fetchSource) {
     showTreeBtn.id='btn-showTree';showTreeBtn.textContent='◀ Stack';
     showTreeBtn.style.display=$('splitWrap').classList.contains('tree-hidden')?'':'none';
     showTreeBtn.addEventListener('click',showTreePane);
+    const indentBtn=document.createElement('button');
+    indentBtn.className='btn btn-sm'+(S.showLogIndent?' toggle-btn on':'');
+    indentBtn.id='btn-logIndent';indentBtn.title='Toggle call-depth indentation';indentBtn.textContent='⇥ Indent';
+    indentBtn.addEventListener('click',()=>{
+      S.showLogIndent=!S.showLogIndent;
+      indentBtn.className='btn btn-sm'+(S.showLogIndent?' toggle-btn on':'');
+      tab._logScroller?.refresh();
+    });
     const editBtn=document.createElement('button');editBtn.className='btn btn-sm';
     editBtn.textContent='✎ Edit';editBtn.addEventListener('click',()=>editTab(tab.id));
-    toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(editBtn);
+    toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(indentBtn);toolbar.appendChild(editBtn);
     const {el}=renderLogView(tab);
     logPane.innerHTML='';logPane.appendChild(toolbar);logPane.appendChild(el);
   }
