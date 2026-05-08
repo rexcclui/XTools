@@ -1069,21 +1069,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const wrap=document.createElement('div');wrap.className='log-input-wrap';
     const ta=document.createElement('textarea');ta.className='log-textarea';
     ta.id='logTA_'+tab.id;ta.placeholder='Paste Salesforce debug log here…';
-    // Only populate textarea if raw content is small — reinserting large text freezes the DOM
-    const RAW_INLINE_LIMIT=200000;
-    if (tab.raw && tab.raw.length<=RAW_INLINE_LIMIT) ta.value=tab.raw;
-    // After paste lands in the textarea, drain large content into tab.raw and clear the textarea
-    // so subsequent tab switches don't re-insert the huge string into the DOM.
-    ta.addEventListener('paste',()=>{
-      setTimeout(()=>{
-        if (ta.value.length>RAW_INLINE_LIMIT){
-          tab.raw=ta.value;
-          ta.value='';
-          const st=wrap.querySelector('#parseStatus');
-          if (st) st.textContent=`${(tab.raw.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
-        }
-      },0);
-    });
+    ta.value=tab.raw||'';
     wrap.appendChild(ta);
     const btnRow=document.createElement('div');btnRow.className='btn-row';
     const parseBtn=document.createElement('button');parseBtn.className='btn btn-primary';
@@ -1105,9 +1091,8 @@ function initAnalyzer(rootEl, fetchSource) {
     const tab=S.tabs.find(t=>t.id===S.activeId);
     if (!tab) return;
     const ta=$('logTA_'+tab.id);
-    // Only read textarea if it has content (large pastes are intercepted — tab.raw set directly)
-    if (ta&&ta.value.length>0) tab.raw=ta.value;
-    if (!tab.raw||!tab.raw.trim()){const ps=$('parseStatus');if(ps)ps.textContent='Paste a log first.';return}
+    if (ta) tab.raw=ta.value;
+    if (!tab.raw.trim()){const ps=$('parseStatus');if(ps)ps.textContent='Paste a log first.';return}
     await parseTab(tab);
     saveToHistory(tab);
   }
