@@ -437,7 +437,7 @@ async function parseLogAsync(text, onProgress) {
       if (nt==='method'||nt==='constructor') stats.methods++;
       if (nt==='soql') stats.soql++;
       if (nt==='dml') stats.dml++;
-      if (m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes('.')?m.cls.match(/^([A-Z][a-zA-Z0-9]*)\./):null);if(nsm)namespaces.add(nsm[1])}
+      if (m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes('.')?m.cls.match(/^([a-z][a-zA-Z0-9]*)\./):null);if(nsm)namespaces.add(nsm[1])}
       cur().children.push(node);
       stack.push(node);
     }
@@ -511,7 +511,7 @@ function buildWorkerSrc(){
     '      if(nt==="method"||nt==="constructor")stats.methods++;\n'+
     '      if(nt==="soql")stats.soql++;\n'+
     '      if(nt==="dml")stats.dml++;\n'+
-    '      if(m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes(".")?m.cls.match(/^([A-Z][a-zA-Z0-9]*)\\./) :null);if(nsm)nsArr.push(nsm[1])}\n'+
+    '      if(m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes(".")?m.cls.match(/^([a-z][a-zA-Z0-9]*)\\./) :null);if(nsm)nsArr.push(nsm[1])}\n'+
     '      cur().children.push(nd);stk.push(nd);\n'+
     '    }\n'+
     '  }\n'+
@@ -923,7 +923,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
   function nsMatchesFilter(cls){
     if (!S.nsFilter||!S.nsFilter.size) return true;
-    const m=cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(cls.includes('.')?cls.match(/^([A-Z][a-zA-Z0-9]*)\./):null);
+    const m=cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(cls.includes('.')?cls.match(/^([a-z][a-zA-Z0-9]*)\./):null);
     return S.nsFilter.has(m?m[1]:'(none)');
   }
   function nodeText(node){return`${node.cls} ${node.meth} ${node.params} ${node.sig}`.toLowerCase()}
