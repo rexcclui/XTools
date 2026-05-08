@@ -172,7 +172,7 @@ const HTML = `
 <div class="drop-overlay" id="dropOverlay">Drop log file(s) to open</div>
 <div class="hdr">
   <span class="hdr-title">SF Debug Viewer</span>
-  <span style="font-size:10px;color:var(--vd);white-space:nowrap" title="Last deploy">⬡ 2026-05-07 17:55 UTC</span>
+  <span style="font-size:10px;color:var(--vd);white-space:nowrap" title="Last deploy">⬡ 2026-05-08 07:00 UTC</span>
   <div class="gs-wrap" style="flex:1;min-width:140px;max-width:280px">
     <input class="g-search" id="globalSearch" placeholder="Search all logs…" autocomplete="off">
     <div class="gs-results" id="gsResults" style="display:none"></div>
@@ -444,41 +444,104 @@ function initAnalyzer(rootEl, fetchSource) {
     return null;
   }
 
-  // ── Log renderer ───────────────────────────────────────────────────────────
-  function renderLogView(tab){
-    const hls=getActiveHls();
-    const frag=document.createDocumentFragment();
-    let firstHlIdx=-1;
-    for (const ll of tab.logLines){
-      const div=document.createElement('div');
-      div.className=`ll ev-${ll.ev}`;
-      div.dataset.ns=ll.ns;
-      div.dataset.idx=ll.idx;
-      div.dataset.ev=ll.ev;
-      const num=document.createElement('span');
-      num.className='ll-num';num.textContent=ll.idx+1;
-      div.appendChild(num);
-      if (ll.ev){
-        const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
-        const ev=document.createElement('span');ev.className='ll-ev';ev.dataset.raw=ll.ev;
-        ev.innerHTML=applyHl(ll.ev,hls);
-        const rest=document.createElement('span');rest.className='ll-rest';rest.dataset.raw=ll.rest;
-        rest.innerHTML=applyHl(ll.rest,hls);
-        div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
-      } else {
-        const raw=document.createElement('span');raw.className='ll-rest';raw.dataset.raw=ll.raw;
-        raw.innerHTML=applyHl(ll.raw,hls);
-        div.appendChild(raw);
-      }
-      if (hls.length&&hlMatchesBg(ll.raw,hls)){if(firstHlIdx<0)firstHlIdx=ll.idx}
-      div.addEventListener('click',()=>syncLogToTree(tab,ll.ns,div));
-      frag.appendChild(div);
+  // ── Log renderer (virtual scroll) ─────────────────────────────────────────
+  const LOG_ROW_H=20,LOG_BUF=200;
+
+  function buildLogLine(ll,hls){
+    const div=document.createElement('div');
+    div.className=`ll ev-${ll.ev}`;
+    div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;
+    div.style.cssText=`height:${LOG_ROW_H}px;overflow:hidden;white-space:nowrap;flex-shrink:0`;
+    const num=document.createElement('span');num.className='ll-num';num.textContent=ll.idx+1;
+    div.appendChild(num);
+    if(ll.ev){
+      const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
+      const ev=document.createElement('span');ev.className='ll-ev';ev.dataset.raw=ll.ev;ev.innerHTML=applyHl(ll.ev,hls);
+      const rest=document.createElement('span');rest.className='ll-rest';rest.dataset.raw=ll.rest;rest.innerHTML=applyHl(ll.rest,hls);
+      div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
+    } else {
+      const raw=document.createElement('span');raw.className='ll-rest';raw.dataset.raw=ll.raw;raw.innerHTML=applyHl(ll.raw,hls);
+      div.appendChild(raw);
     }
-    const wrap=document.createElement('div');
-    wrap.className='log-rendered';
-    wrap.id='logRendered_'+tab.id;
-    wrap.appendChild(frag);
-    return {el:wrap,firstHlIdx};
+    return div;
+  }
+
+  function makeVirtualLog(tab){
+    const outer=document.createElement('div');
+    outer.className='log-rendered';outer.id='logRendered_'+tab.id;
+    const inner=document.createElement('div');inner.style.position='relative';
+    outer.appendChild(inner);
+    let visLines=[];
+    const pool=new Map(); // visIdx → el
+
+    function computeVis(){
+      const kws=S.hideKeywords,hEvs=S.hiddenEventTypes;
+      if(!kws.length&&!hEvs.size)return tab.logLines;
+      return tab.logLines.filter(ll=>{
+        if(hEvs.size&&hEvs.has(ll.ev))return false;
+        if(kws.length&&kws.some(k=>ll.raw.toLowerCase().includes(k)))return false;
+        return true;
+      });
+    }
+    function calcRange(){
+      const st=outer.scrollTop,h=outer.clientHeight||500;
+      return{start:Math.max(0,Math.floor(st/LOG_ROW_H)-LOG_BUF),end:Math.min(visLines.length,Math.ceil((st+h)/LOG_ROW_H)+LOG_BUF)};
+    }
+    function renderRange(start,end){
+      const hls=getActiveHls();
+      for(const[i,el]of pool)if(i<start||i>=end){el.remove();pool.delete(i)}
+      for(let i=start;i<end;i++){
+        if(pool.has(i))continue;
+        const ll=visLines[i];
+        const el=buildLogLine(ll,hls);
+        el.style.position='absolute';el.style.top=i*LOG_ROW_H+'px';el.style.left='0';el.style.right='0';
+        el.addEventListener('click',()=>syncLogToTree(tab,ll.ns,el));
+        inner.appendChild(el);pool.set(i,el);
+      }
+    }
+    outer.addEventListener('scroll',()=>{const{start,end}=calcRange();renderRange(start,end)},{passive:true});
+    visLines=computeVis();
+    requestAnimationFrame(()=>{
+      inner.style.height=visLines.length*LOG_ROW_H+'px';
+      const{start,end}=calcRange();renderRange(start,end);
+    });
+    return{
+      el:outer,
+      refresh(){
+        if(_activeLogLine){_activeLogLine.classList.remove('active');_activeLogLine=null}
+        const anchor=pool.size?visLines[Math.min(...pool.keys())]:null;
+        visLines=computeVis();
+        pool.forEach(el=>el.remove());pool.clear();
+        inner.style.height=visLines.length*LOG_ROW_H+'px';
+        if(anchor){const ni=visLines.findIndex(l=>l.idx>=anchor.idx);if(ni>=0)outer.scrollTop=ni*LOG_ROW_H}
+        const{start,end}=calcRange();renderRange(start,end);
+      },
+      rerenderVisible(){
+        const hls=getActiveHls();
+        for(const[,el]of pool)el.querySelectorAll('[data-raw]').forEach(span=>{
+          const raw=span.dataset.raw;
+          span.innerHTML=span.className==='nparams'?'('+applyHl(raw,hls)+')':applyHl(raw,hls);
+        });
+      },
+      scrollToNs(ns){
+        const visIdx=visLines.findIndex(l=>l.ns===ns);
+        if(visIdx<0)return null;
+        outer.scrollTop=Math.max(0,visIdx*LOG_ROW_H-(outer.clientHeight||500)/2);
+        const{start,end}=calcRange();renderRange(start,end);
+        return pool.get(visIdx)||null;
+      },
+      scrollToLogIdx(logIdx){
+        const visIdx=visLines.findIndex(l=>l.idx===logIdx);
+        if(visIdx<0)return;
+        outer.scrollTop=Math.max(0,visIdx*LOG_ROW_H-(outer.clientHeight||500)/2);
+        const{start,end}=calcRange();renderRange(start,end);
+      },
+      getFirstHlIdx(){
+        const hls=getActiveHls();if(!hls.length)return -1;
+        for(const ll of visLines)if(hls.some(h=>h.query&&ll.raw.toLowerCase().includes(h.query.toLowerCase())))return ll.idx;
+        return -1;
+      }
+    };
   }
 
   function syncLogToTree(tab,ns,lineEl){
@@ -499,10 +562,9 @@ function initAnalyzer(rootEl, fetchSource) {
 
   function syncTreeToLog(tab,ns){
     if (_activeLogLine){_activeLogLine.classList.remove('active');_activeLogLine=null}
-    const logEl=$('logRendered_'+tab.id);
-    if (!logEl) return;
-    const lineEl=logEl.querySelector(`.ll[data-ns="${ns}"]`);
-    if (lineEl){_activeLogLine=lineEl;lineEl.classList.add('active');lineEl.scrollIntoView({block:'nearest',behavior:'smooth'})}
+    if (!tab._vlog) return;
+    const el=tab._vlog.scrollToNs(ns);
+    if (el){_activeLogLine=el;el.classList.add('active')}
   }
 
   // ── Tree renderer ──────────────────────────────────────────────────────────
@@ -588,13 +650,17 @@ function initAnalyzer(rootEl, fetchSource) {
       const gap=(S.showTiming&&next&&c.endNs>0&&next.ns>c.endNs)?fmtDur(next.ns-c.endNs):'';
       return{c,gap};
     });
+    // Only build children DOM when expanded; lazy-build on first expand for collapsed nodes
+    const hasKids=node.children.length>0;
     const visibleKids=[];
-    for (const {c,gap} of childMeta){const el=buildNode(c,tab,hls,gap);if(el)visibleKids.push(el)}
+    if(node.expanded&&hasKids){
+      for(const{c,gap}of childMeta){const el=buildNode(c,tab,hls,gap);if(el)visibleKids.push(el)}
+    }
     const wrap=document.createElement('div');wrap.className=`tree-node t-${node.type}`;
     const row=document.createElement('div');row.className='nrow';row.dataset.ns=node.ns;row.dataset.id=node.id;
     const tog=document.createElement('span');
-    tog.className=`ntog ${visibleKids.length?(node.expanded?'open':''):''}`;
-    tog.textContent=visibleKids.length?(node.expanded?'▼':'▶'):'·';
+    tog.className=`ntog ${node.expanded&&hasKids?'open':''}`;
+    tog.textContent=hasKids?(node.expanded?'▼':'▶'):'·';
     row.appendChild(tog);
     const ic=document.createElement('span');ic.className='nic';ic.textContent=cfg.ic;row.appendChild(ic);
     if (cfg.badge){const bd=document.createElement('span');bd.className=`nbadge ${cfg.bc}`;bd.textContent=cfg.badge;row.appendChild(bd)}
@@ -619,14 +685,21 @@ function initAnalyzer(rootEl, fetchSource) {
       row.title='Right-click for source snippet';
     }
     wrap.appendChild(row);
-    if (visibleKids.length){
+    if (hasKids){
       const kids=document.createElement('div');kids.className='nchildren';
       kids.style.display=node.expanded?'block':'none';
-      groupVarKids(visibleKids).forEach(k=>kids.appendChild(k));
+      if(visibleKids.length)groupVarKids(visibleKids).forEach(k=>kids.appendChild(k));
       wrap.appendChild(kids);
       row.addEventListener('click',e=>{
         e.stopPropagation();
         const open=kids.style.display!=='none';
+        if(!open&&!kids.children.length){
+          // Lazy-build children on first expand
+          const lazyKids=[];
+          for(const{c,gap}of childMeta){const el=buildNode(c,tab,getActiveHls(),gap);if(el)lazyKids.push(el)}
+          groupVarKids(lazyKids).forEach(k=>kids.appendChild(k));
+          if(!kids.children.length)return; // all filtered, stay collapsed
+        }
         kids.style.display=open?'none':'block';
         tog.textContent=open?'▶':'▼';
         node.expanded=!open;
@@ -735,7 +808,6 @@ function initAnalyzer(rootEl, fetchSource) {
     $('treeControls').style.display='flex';
     $('statsBar').style.display='flex';
     const tsb=$('treeSearchBox');if(tsb)tsb.value=S.treeSearch;
-    setTimeout(()=>applyHideToLog(tab),0);
   }
 
   function renderLogPane(tab){
@@ -747,12 +819,9 @@ function initAnalyzer(rootEl, fetchSource) {
     const editBtn=document.createElement('button');editBtn.className='btn btn-sm';
     editBtn.textContent='✎ Edit';editBtn.addEventListener('click',()=>editTab(tab.id));
     toolbar.appendChild(info);toolbar.appendChild(editBtn);
-    const {el,firstHlIdx}=renderLogView(tab);
-    logPane.innerHTML='';logPane.appendChild(toolbar);logPane.appendChild(el);
-    if (firstHlIdx>=0){
-      const target=el.querySelector(`.ll[data-idx="${firstHlIdx}"]`);
-      if (target) setTimeout(()=>target.scrollIntoView({block:'center'}),50);
-    }
+    const vlog=makeVirtualLog(tab);tab._vlog=vlog;
+    logPane.innerHTML='';logPane.appendChild(toolbar);logPane.appendChild(vlog.el);
+    requestAnimationFrame(()=>{const fi=vlog.getFirstHlIdx();if(fi>=0)vlog.scrollToLogIdx(fi)});
   }
 
   function renderTreePane(tab){
@@ -814,29 +883,18 @@ function initAnalyzer(rootEl, fetchSource) {
     const tab=S.tabs.find(t=>t.id===S.activeId);
     if (!tab||!tab.parsed) return;
     const hls=getActiveHls();
-    $$('.ll [data-raw], .nrow [data-raw]').forEach(span=>{
+    if(tab._vlog)tab._vlog.rerenderVisible();
+    $$('.nrow [data-raw]').forEach(span=>{
       const raw=span.dataset.raw;
-      if (span.className==='nparams') span.innerHTML='('+applyHl(raw,hls)+')';
-      else span.innerHTML=applyHl(raw,hls);
+      span.innerHTML=span.className==='nparams'?'('+applyHl(raw,hls)+')':applyHl(raw,hls);
     });
-    applyHideToLog(tab);
     const firstMark=C.querySelector('.log-rendered mark');
-    if (firstMark) firstMark.closest('.ll').scrollIntoView({block:'center',behavior:'smooth'});
+    if (firstMark) firstMark.closest('.ll')?.scrollIntoView({block:'center',behavior:'smooth'});
   }
 
   function applyHideToLog(tab){
     const t=tab||getActiveTab();
-    const logEl=C.querySelector('#logRendered_'+t?.id);
-    if (!logEl) return;
-    const kws=S.hideKeywords,hEvs=S.hiddenEventTypes,noFilter=!kws.length&&!hEvs.size;
-    logEl.querySelectorAll('.ll').forEach(ll=>{
-      if (noFilter){ll.classList.remove('ll-hidden');return}
-      const ev=ll.dataset.ev||'';
-      const evHidden=hEvs.size&&hEvs.has(ev);
-      const idx=parseInt(ll.dataset.idx);
-      const raw=evHidden?'':(t?.logLines[idx]?.raw||'');
-      ll.classList.toggle('ll-hidden',evHidden||(kws.length&&kws.some(k=>raw.toLowerCase().includes(k))));
-    });
+    if(t?._vlog)t._vlog.refresh();
   }
 
   function getActiveTab(){return S.tabs.find(t=>t.id===S.activeId)}
