@@ -168,7 +168,13 @@ const CSS = `
 .log-ctx-item.danger:hover{background:#2d1117;color:#ff7b72}
 .log-ctx-sep{height:1px;background:#30363d;margin:3px 0}
 .log-ctx-label{padding:5px 16px 2px;font-size:10px;color:#768390;text-transform:uppercase;letter-spacing:.7px;user-select:none}
-.parse-progress-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dm);font-size:12px}
+.log-ctx-info{padding:6px 14px 5px;background:#0d1117;border-bottom:1px solid #30363d;margin-bottom:2px}
+.log-ctx-info-name{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#79c0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.log-ctx-info-meta{font-size:10px;color:#768390;margin-top:2px}
+.log-tags-bar{padding:3px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:3px;align-items:center;flex-wrap:wrap;flex-shrink:0;max-height:52px;overflow-y:auto}
+.log-tag-chip{padding:1px 6px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--dm);font-size:10px;cursor:pointer;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace;transition:all .1s}
+.log-tag-chip:hover{border-color:var(--dm);color:var(--tx)}
+.log-tag-chip.tag-hidden{opacity:.35;text-decoration:line-through;color:var(--vd)}
 .parse-progress-bar{width:220px;height:4px;background:var(--b3);border-radius:2px;overflow:hidden}
 .parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
 .parse-progress-pct{font-size:10px;color:var(--vd)}
@@ -629,24 +635,50 @@ function initAnalyzer(rootEl, fetchSource) {
     return true;
   }
 
+  function jumpToNs(tab,targetNs){
+    const vis=tab._visLines||[];
+    const idx=vis.findIndex(ll=>ll.ns===targetNs);
+    if (idx>=0){moveLogCursor(tab,idx);return true}
+    return false;
+  }
+
+  function sep(menu){const d=document.createElement('div');d.className='log-ctx-sep';menu.appendChild(d)}
+
   function showLogContextMenu(e,tab,ns,sel=''){
     closeLogContextMenu();
     const menu=document.createElement('div');menu.className='log-ctx-menu';_ctxMenu=menu;
     const vis=tab._visLines||[];
     const ll=vis.find(l=>l.ns===ns)||(tab.logLines||[]).find(l=>l.ns===ns);
 
-    if (ll?.ev){
-      const lbl=document.createElement('div');lbl.className='log-ctx-label';lbl.textContent=ll.ev;
-      menu.appendChild(lbl);
-    }
-
     function item(text,cls,fn){
       const d=document.createElement('div');d.className='log-ctx-item'+(cls?' '+cls:'');d.textContent=text;
       d.addEventListener('click',()=>{closeLogContextMenu();fn()});
       menu.appendChild(d);
     }
+    function lbl(text){
+      const d=document.createElement('div');d.className='log-ctx-label';d.textContent=text;menu.appendChild(d);
+    }
 
-    // highlight selection — only when text is selected and a slot is free
+    // ── block info + jump ──────────────────────────────────────────────────
+    const block=tab.tree&&ns>0?findBlockAtNs(tab.tree,ns):null;
+    if (block&&block.type!=='execution'){
+      const info=document.createElement('div');info.className='log-ctx-info';
+      const cls=(block.cls?block.cls+'.':'')+block.meth;
+      const lineCount=(tab.logLines||[]).filter(ll=>ll.ns>=block.ns&&ll.ns<=block.endNs).length;
+      const dur=block.dur>0?fmtDur(block.dur):'—';
+      const name=document.createElement('div');name.className='log-ctx-info-name';
+      name.title=cls;name.textContent=cls;
+      const meta=document.createElement('div');meta.className='log-ctx-info-meta';
+      meta.textContent=`${lineCount} lines · ${dur}`;
+      info.appendChild(name);info.appendChild(meta);menu.appendChild(info);
+      item('↑ Jump to entry','',()=>jumpToNs(tab,block.ns));
+      if (block.endNs>0) item('↓ Jump to exit','',()=>jumpToNs(tab,block.endNs));
+      sep(menu);
+    } else if (ll?.ev){
+      lbl(ll.ev);
+    }
+
+    // ── highlight selection ───────────────────────────────────────────────
     if (sel){
       const freeSlot=S.highlights.find(h=>!h.query.trim());
       const label=sel.length>32?sel.slice(0,32)+'…':sel;
@@ -654,27 +686,26 @@ function initAnalyzer(rootEl, fetchSource) {
         item(`Highlight "${label}" → H${freeSlot.id}`,'',()=>applyHighlight(sel));
       } else {
         const d=document.createElement('div');d.className='log-ctx-item';
-        d.style.opacity='.45';d.style.cursor='default';
+        d.style.cssText='opacity:.45;cursor:default';
         d.textContent='No free highlight slot (H1–H4 all used)';
         menu.appendChild(d);
       }
-      const sep=document.createElement('div');sep.className='log-ctx-sep';menu.appendChild(sep);
+      sep(menu);
     }
 
+    // ── block highlight ───────────────────────────────────────────────────
     item('Show current block','',()=>highlightBlock(tab,ns));
-
     if (tab._blockRange){
-      const sep=document.createElement('div');sep.className='log-ctx-sep';menu.appendChild(sep);
-      const lbl2=document.createElement('div');lbl2.className='log-ctx-label';
-      lbl2.textContent='Block: '+tab._blockRange.label.slice(0,28);
-      menu.appendChild(lbl2);
+      sep(menu);
+      lbl('Block: '+tab._blockRange.label.slice(0,28));
       item('Clear block highlight','danger',()=>clearBlock(tab));
     }
 
     document.body.appendChild(menu);
-    const mw=176,mh=menu.childElementCount*28+8;
+    const mw=248;
+    menu.style.minWidth=mw+'px';
     menu.style.left=Math.min(e.clientX,window.innerWidth-mw-4)+'px';
-    menu.style.top=Math.min(e.clientY,window.innerHeight-mh-4)+'px';
+    menu.style.top=Math.min(e.clientY,window.innerHeight-menu.offsetHeight-4)+'px';
   }
 
   document.addEventListener('click',e=>{if(_ctxMenu&&!_ctxMenu.contains(e.target))closeLogContextMenu()},true);
@@ -1042,6 +1073,25 @@ function initAnalyzer(rootEl, fetchSource) {
     const tsb=$('treeSearchBox');if(tsb)tsb.value=S.treeSearch;
   }
 
+  function renderLogTagsBar(tab){
+    if (!tab?.eventTypes?.size) return null;
+    const bar=document.createElement('div');bar.className='log-tags-bar';
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>b[1]-a[1]);
+    sorted.forEach(([ev,count])=>{
+      const chip=document.createElement('button');
+      chip.className='log-tag-chip'+(S.hiddenEventTypes.has(ev)?' tag-hidden':'');
+      chip.textContent=ev;chip.title=`${ev} — ${count} occurrences. Click to hide/show`;
+      chip.addEventListener('click',()=>{
+        const nowHidden=!S.hiddenEventTypes.has(ev);
+        if (nowHidden) S.hiddenEventTypes.add(ev); else S.hiddenEventTypes.delete(ev);
+        chip.classList.toggle('tag-hidden',nowHidden);
+        applyHideToLog(tab);updateAllHlCounts();
+      });
+      bar.appendChild(chip);
+    });
+    return bar;
+  }
+
   function renderLogPane(tab){
     const logPane=$('logPane');
     const toolbar=document.createElement('div');toolbar.className='log-toolbar';
@@ -1062,8 +1112,12 @@ function initAnalyzer(rootEl, fetchSource) {
     const editBtn=document.createElement('button');editBtn.className='btn btn-sm';
     editBtn.textContent='✎ Edit';editBtn.addEventListener('click',()=>editTab(tab.id));
     toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(indentBtn);toolbar.appendChild(editBtn);
+    const tagsBar=renderLogTagsBar(tab);
     const {el}=renderLogView(tab);
-    logPane.innerHTML='';logPane.appendChild(toolbar);logPane.appendChild(el);
+    logPane.innerHTML='';
+    logPane.appendChild(toolbar);
+    if (tagsBar) logPane.appendChild(tagsBar);
+    logPane.appendChild(el);
   }
 
   function renderTreePane(tab){
