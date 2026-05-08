@@ -330,7 +330,7 @@ function evMeta(ev, rest) {
   const p = rest.split('|');
   if (ev==='METHOD_ENTRY'||ev==='CONSTRUCTOR_ENTRY'||ev==='SYSTEM_METHOD_ENTRY') {
     const lr=p[0]||'';
-    const hasCid=p.length>=3&&SID_RE.test(p[1]);
+    const hasCid=p.length>=3&&(SID_RE.test(p[1])||p[1]==='');
     const sig=hasCid?p.slice(2).join('|'):p.slice(1).join('|');
     const pL=sig.indexOf('('),pR=sig.lastIndexOf(')');
     const namePart=pL>=0?sig.slice(0,pL):sig;
@@ -1204,6 +1204,8 @@ function initAnalyzer(rootEl, fetchSource) {
     tab.logLines=result.logLines;tab.tree=result.tree;tab.stats=result.stats;
     tab.namespaces=result.namespaces;tab.eventTypes=result.eventTypes;tab.parsed=true;
     tagLineNamespaces(tab.logLines);
+    // collect any namespaces the parser missed (e.g. || empty-field format)
+    tab.logLines.forEach(ll=>{if(ll.nsTag)tab.namespaces.add(ll.nsTag);});
     renderParsedTab(tab);
   }
 
