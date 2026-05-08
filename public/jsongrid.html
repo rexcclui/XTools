@@ -296,17 +296,19 @@ function highlightPath(cellEl,path){
   if(gp)gp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('grid-hl'));
   if(sp)sp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('src-hl'));
 }
-/* Scroll the first highlighted element into view only if it is outside the
-   visible area of its scrollable container. */
+/* Scroll the highlighted element into the center of its container.
+   Uses direct scrollTop manipulation so only the specific panel scrolls. */
 function scrollHlIntoView(container,hlClass){
   if(!container)return;
   const el=container.querySelector('.'+hlClass);
   if(!el)return;
   const cr=container.getBoundingClientRect();
   const er=el.getBoundingClientRect();
-  if(er.bottom<cr.top||er.top>cr.bottom){
-    el.scrollIntoView({block:'nearest',behavior:'smooth'});
-  }
+  // skip if already fully visible within the container
+  if(er.top>=cr.top&&er.bottom<=cr.bottom)return;
+  // position element relative to container scroll origin, then center it
+  const relTop=er.top-cr.top+container.scrollTop;
+  container.scrollTo({top:relTop-container.clientHeight/2+el.offsetHeight/2,behavior:'smooth'});
 }
 function clearHighlight(cellEl){
   cellEl.querySelectorAll('.grid-hl').forEach(el=>el.classList.remove('grid-hl'));
