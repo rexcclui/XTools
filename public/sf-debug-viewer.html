@@ -615,7 +615,16 @@ function initAnalyzer(rootEl, fetchSource) {
   let _ctxMenu=null;
   function closeLogContextMenu(){if(_ctxMenu){_ctxMenu.remove();_ctxMenu=null}}
 
-  function showLogContextMenu(e,tab,ns){
+  function applyHighlight(query){
+    const slot=S.highlights.find(h=>!h.query.trim());
+    if (!slot) return false;
+    slot.query=query;
+    renderHlSlots();
+    rerenderHighlights();
+    return true;
+  }
+
+  function showLogContextMenu(e,tab,ns,sel=''){
     closeLogContextMenu();
     const menu=document.createElement('div');menu.className='log-ctx-menu';_ctxMenu=menu;
     const vis=tab._visLines||[];
@@ -630,6 +639,21 @@ function initAnalyzer(rootEl, fetchSource) {
       const d=document.createElement('div');d.className='log-ctx-item'+(cls?' '+cls:'');d.textContent=text;
       d.addEventListener('click',()=>{closeLogContextMenu();fn()});
       menu.appendChild(d);
+    }
+
+    // highlight selection — only when text is selected and a slot is free
+    if (sel){
+      const freeSlot=S.highlights.find(h=>!h.query.trim());
+      const label=sel.length>32?sel.slice(0,32)+'…':sel;
+      if (freeSlot){
+        item(`Highlight "${label}" → H${freeSlot.id}`,'',()=>applyHighlight(sel));
+      } else {
+        const d=document.createElement('div');d.className='log-ctx-item';
+        d.style.opacity='.45';d.style.cursor='default';
+        d.textContent='No free highlight slot (H1–H4 all used)';
+        menu.appendChild(d);
+      }
+      const sep=document.createElement('div');sep.className='log-ctx-sep';menu.appendChild(sep);
     }
 
     item('Show current block','',()=>highlightBlock(tab,ns));
@@ -686,7 +710,9 @@ function initAnalyzer(rootEl, fetchSource) {
       const rowEl=e.target.closest('.ll');
       if (!rowEl) return;
       const ns=parseInt(rowEl.dataset.ns);
-      showLogContextMenu(e,tab,ns);
+      // capture selection before the menu causes it to collapse
+      const sel=window.getSelection()?.toString().trim()||'';
+      showLogContextMenu(e,tab,ns,sel);
     });
 
     wrap.addEventListener('keydown',e=>{
