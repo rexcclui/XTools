@@ -1589,7 +1589,8 @@ function initAnalyzer(rootEl, fetchSource) {
     const allCb=document.createElement('input');allCb.type='checkbox';
     allCb.checked=S.hiddenNsLines.size===0;
     allCb.addEventListener('change',()=>{
-      S.hiddenNsLines.clear();
+      if(allCb.checked){ S.hiddenNsLines.clear(); }
+      else { nsArr.forEach(ns=>S.hiddenNsLines.add(ns)); }
       renderNsLogPopup(tab,pop,anchorBtn);
       applyHideToLog(tab);updateAllHlCounts();
     });
