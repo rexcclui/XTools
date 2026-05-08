@@ -195,7 +195,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
   <button class="tbtn" onclick="adj('rows',1)">+</button>
   <input id="gs" placeholder="Global search…" oninput="gSearch(this.value)"/>
   <button id="btn-hide-src" class="tbtn" onclick="togAllSrc()" title="Hide/show all source panels">⊡ Hide Source</button>
-  <button class="tbtn" title="Click any two value cells in the grid to compare" onclick="showCmpHelp()" id="btn-cmp">⇄ Compare <span id="sel-count" class="sel-badge"></span></button>
+  <button class="tbtn" title="Select two cells then right-click to compare" onclick="showCmpHelp()" id="btn-cmp">⇄ Compare <span id="sel-count" class="sel-badge"></span></button>
   <button class="tbtn danger" style="margin-left:auto" onclick="clearAll()">✕ Clear Tab</button>
 </div>
 <div id="tab-bar"></div>
@@ -963,7 +963,6 @@ function toggleSel(el,cid,path){
   if(idx>-1){_sel[idx].el.classList.remove('sel-node');_sel.splice(idx,1);}
   else{if(_sel.length>=2){const o=_sel.shift();if(o.el)o.el.classList.remove('sel-node');}el.classList.add('sel-node');_sel.push({cid,path,key:k,el});}
   updSelBadge();
-  if(_sel.length===2)openCompare();
 }
 function updSelBadge(){
   const badge=document.getElementById('sel-count');
@@ -971,7 +970,7 @@ function updSelBadge(){
 }
 function showCmpHelp(){
   if(_sel.length===2){openCompare();return;}
-  alert('Click any value cell in the grid table to select it (turns orange). Click a second value to automatically open the compare view. Click a selected cell again to deselect it.');
+  alert('Click any value cell in the grid table to select it (turns orange). Select two cells, then right-click and choose "Compare selected nodes". Click a selected cell again to deselect it.');
 }
 
 function openCompare(){
