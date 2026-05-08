@@ -606,26 +606,29 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   // Tag each log line with its namespace using a call-stack approach so that
+  // Tag each log line with its namespace using a call-stack approach so that
   // VARIABLE_ASSIGNMENT / USER_DEBUG / etc. inside a namespace method also get
   // tagged, not just the METHOD_ENTRY line itself.
   function tagLineNamespaces(logLines){
     if(!logLines.length||logLines[0].nsTag!==undefined) return;
-    // Extract namespace from a line's rest field (METHOD_ENTRY / CONSTRUCTOR_ENTRY etc.)
     const NS_RE=/\|([a-zA-Z][a-zA-Z0-9]*)(?:\.|__)/;
     function restNs(rest){if(!rest)return'';const m=rest.match(NS_RE);return m?m[1]:'';}
-    const nsStack=['']; // current enclosing namespace; '' = no namespace
+    const nsStack=[''];
     for(let i=0;i<logLines.length;i++){
       const ll=logLines[i];
       const curNs=nsStack[nsStack.length-1];
       if(PUSH_EVS.has(ll.ev)){
-        const myNs=restNs(ll.rest); // own namespace (may be '')
-        ll.nsTag=myNs||curNs;       // entry line tagged with its method's ns; inherit if none
+        // SYSTEM_METHOD_ENTRY always runs on behalf of the caller — don't extract
+        // its own "System" namespace, just inherit the enclosing namespace so that
+        // hiding e.g. fferpcore also hides System.debug calls made inside it.
+        const myNs=ll.ev==='SYSTEM_METHOD_ENTRY'?'':restNs(ll.rest);
+        ll.nsTag=myNs||curNs;
         nsStack.push(ll.nsTag);
       } else if(EXIT_MAP[ll.ev]&&ll.ev!=='EXECUTION_FINISHED'){
-        ll.nsTag=curNs;             // exit line same namespace as its entry
+        ll.nsTag=curNs;
         if(nsStack.length>1) nsStack.pop();
       } else {
-        ll.nsTag=curNs;             // all other lines inherit enclosing method's ns
+        ll.nsTag=curNs;
       }
     }
   }
