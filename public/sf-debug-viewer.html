@@ -1496,15 +1496,27 @@ function initAnalyzer(rootEl, fetchSource) {
 
   // ── Drag & drop ────────────────────────────────────────────────────────────
   const dropOverlay=$('dropOverlay');
-  document.addEventListener('dragover',e=>{e.preventDefault();dropOverlay.classList.add('show')});
+  document.addEventListener('dragover',e=>{
+    e.preventDefault();
+    const hasText=e.dataTransfer.types&&(e.dataTransfer.types.includes('text/plain')||e.dataTransfer.types.includes('Text'));
+    dropOverlay.textContent=hasText?'Drop to open as log':'Drop log file(s) to open';
+    dropOverlay.classList.add('show');
+  });
   document.addEventListener('dragleave',e=>{if(!e.relatedTarget)dropOverlay.classList.remove('show')});
   document.addEventListener('drop',e=>{
     e.preventDefault();dropOverlay.classList.remove('show');
-    [...e.dataTransfer.files].forEach(f=>{
-      const reader=new FileReader();
-      reader.onload=ev=>addTab(null,f.name,ev.target.result);
-      reader.readAsText(f);
-    });
+    const files=[...e.dataTransfer.files];
+    if (files.length){
+      files.forEach(f=>{
+        const reader=new FileReader();
+        reader.onload=ev=>addTab(null,f.name,ev.target.result);
+        reader.readAsText(f);
+      });
+      return;
+    }
+    // plain-text drag from other apps (selected text, terminal output, etc.)
+    const text=e.dataTransfer.getData('text/plain')||e.dataTransfer.getData('Text');
+    if (text&&text.trim()) addTab(null,'Dropped log',text.trim());
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
