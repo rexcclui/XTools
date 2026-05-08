@@ -1069,7 +1069,22 @@ function initAnalyzer(rootEl, fetchSource) {
     const wrap=document.createElement('div');wrap.className='log-input-wrap';
     const ta=document.createElement('textarea');ta.className='log-textarea';
     ta.id='logTA_'+tab.id;ta.placeholder='Paste Salesforce debug log here…';
-    ta.textContent=tab.raw||'';
+    // Only populate textarea if raw content is small — large text freezes the DOM
+    const RAW_INLINE_LIMIT=200000;
+    if (tab.raw && tab.raw.length<=RAW_INLINE_LIMIT) ta.value=tab.raw;
+    // Intercept paste: capture text directly, skip the slow textarea DOM insert
+    ta.addEventListener('paste',e=>{
+      const text=e.clipboardData&&e.clipboardData.getData('text/plain');
+      if (!text) return;
+      if (text.length>RAW_INLINE_LIMIT){
+        e.preventDefault();
+        tab.raw=text;
+        ta.value='';
+        const st=wrap.querySelector('#parseStatus');
+        if (st) st.textContent=`${(text.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
+      }
+      // small pastes go through normally; tab.raw read in parseActiveTab
+    });
     wrap.appendChild(ta);
     const btnRow=document.createElement('div');btnRow.className='btn-row';
     const parseBtn=document.createElement('button');parseBtn.className='btn btn-primary';
@@ -1078,6 +1093,7 @@ function initAnalyzer(rootEl, fetchSource) {
     sampleBtn.textContent='Sample';sampleBtn.addEventListener('click',loadSample);
     const status=document.createElement('span');status.id='parseStatus';
     status.style.cssText='font-size:11px;color:var(--dm)';
+    if (tab.raw&&tab.raw.length>RAW_INLINE_LIMIT) status.textContent=`${(tab.raw.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
     btnRow.appendChild(parseBtn);btnRow.appendChild(sampleBtn);btnRow.appendChild(status);
     wrap.appendChild(btnRow);logPane.appendChild(wrap);
     $('treePaneHdr').style.display='none';
@@ -1090,8 +1106,9 @@ function initAnalyzer(rootEl, fetchSource) {
     const tab=S.tabs.find(t=>t.id===S.activeId);
     if (!tab) return;
     const ta=$('logTA_'+tab.id);
-    if (ta) tab.raw=ta.value;
-    if (!tab.raw.trim()){const ps=$('parseStatus');if(ps)ps.textContent='Paste a log first.';return}
+    // Only read textarea if it has content (large pastes are intercepted — tab.raw set directly)
+    if (ta&&ta.value.length>0) tab.raw=ta.value;
+    if (!tab.raw||!tab.raw.trim()){const ps=$('parseStatus');if(ps)ps.textContent='Paste a log first.';return}
     await parseTab(tab);
     saveToHistory(tab);
   }
@@ -1180,7 +1197,7 @@ function initAnalyzer(rootEl, fetchSource) {
   function renderLogTagsBar(tab){
     if (!tab?.eventTypes?.size) return null;
     const bar=document.createElement('div');bar.className='log-tags-bar';
-    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>b[1]-a[1]);
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
     sorted.forEach(([ev,count])=>{
       const chip=document.createElement('button');
       chip.className='log-tag-chip'+(S.hiddenEventTypes.has(ev)?' tag-hidden':'');
@@ -1448,7 +1465,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const hideAll=document.createElement('button');hideAll.className='btn btn-sm';hideAll.textContent='Hide all';
     hideAll.addEventListener('click',()=>{tab.eventTypes.forEach((_,ev)=>S.hiddenEventTypes.add(ev));renderLogTagsPopup(tab);applyHideToLog(tab)});
     ctrl.appendChild(showAll);ctrl.appendChild(hideAll);pop.appendChild(ctrl);
-    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>b[1]-a[1]);
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
     sorted.forEach(([ev,count])=>{
       const item=document.createElement('div');item.className='ns-item';
       const cb=document.createElement('input');cb.type='checkbox';cb.checked=!S.hiddenEventTypes.has(ev);
