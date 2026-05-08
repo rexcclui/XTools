@@ -32,6 +32,8 @@ const CSS = `
 .hl-nav{display:none;background:none;border:none;color:var(--vd);font-size:9px;line-height:1;padding:0 1px;cursor:pointer}
 .hl-nav:hover{color:var(--tx)}
 .hl-slot.active-slot .hl-nav{display:inline}
+.hl-count{display:none;font-size:10px;color:var(--vd);min-width:18px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
+.hl-slot.active-slot .hl-count{display:inline}
 .btn{padding:4px 10px;border-radius:5px;border:1px solid var(--bd);background:transparent;color:var(--dm);transition:all .15s}
 .btn:hover{background:var(--b3);color:var(--tx)}
 .btn-sm{padding:2px 7px;font-size:11px}
@@ -1136,8 +1138,12 @@ function initAnalyzer(rootEl, fetchSource) {
     if (idx>=0) moveLogCursor(tab,idx);
   }
 
+  let _hlCountRefreshers=[];
+  function updateAllHlCounts(){_hlCountRefreshers.forEach(fn=>fn())}
+
   function renderHlSlots(){
     const wrap=$('hlSlots');wrap.innerHTML='';
+    _hlCountRefreshers=[];
     S.highlights.forEach(h=>{
       const slot=document.createElement('div');slot.className='hl-slot';
       slot.style.borderColor=h.query?h.border:'var(--bd)';
@@ -1148,6 +1154,16 @@ function initAnalyzer(rootEl, fetchSource) {
       dot.addEventListener('click',()=>{});
       const inp=document.createElement('input');inp.className='hl-input';
       inp.value=h.query;inp.placeholder=`H${h.id}`;
+      const cnt=document.createElement('span');cnt.className='hl-count';
+      function refreshCount(){
+        if (!h.query.trim()){cnt.textContent='';return}
+        const tab=S.tabs.find(t=>t.id===S.activeId);
+        const vis=tab?._visLines||(tab?.logLines)||[];
+        const q=h.query.toLowerCase();
+        cnt.textContent=vis.filter(ll=>ll.raw.toLowerCase().includes(q)).length;
+      }
+      _hlCountRefreshers.push(refreshCount);
+      refreshCount();
       const applyHlInput=()=>{
         h.query=inp.value;
         slot.style.borderColor=h.query?h.border:'var(--bd)';
@@ -1164,8 +1180,8 @@ function initAnalyzer(rootEl, fetchSource) {
       navDn.title=`Next H${h.id} match`;
       navDn.addEventListener('click',()=>navigateHighlight(h,'down'));
       const clr=document.createElement('button');clr.className='hl-clr';clr.textContent='×';
-      clr.addEventListener('click',()=>{h.query='';inp.value='';slot.style.borderColor='var(--bd)';dot.style.background='var(--b3)';slot.classList.remove('active-slot');rerenderHighlights()});
-      slot.appendChild(dot);slot.appendChild(inp);slot.appendChild(navUp);slot.appendChild(navDn);slot.appendChild(clr);wrap.appendChild(slot);
+      clr.addEventListener('click',()=>{h.query='';inp.value='';slot.style.borderColor='var(--bd)';dot.style.background='var(--b3)';slot.classList.remove('active-slot');refreshCount();rerenderHighlights()});
+      slot.appendChild(dot);slot.appendChild(inp);slot.appendChild(cnt);slot.appendChild(navUp);slot.appendChild(navDn);slot.appendChild(clr);wrap.appendChild(slot);
     });
   }
 
@@ -1181,6 +1197,7 @@ function initAnalyzer(rootEl, fetchSource) {
       if (span.className==='nparams') span.innerHTML='('+applyHl(raw,hls)+')';
       else span.innerHTML=applyHl(raw,hls);
     });
+    updateAllHlCounts();
   }
 
   function applyHideToLog(tab){
