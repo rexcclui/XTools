@@ -437,7 +437,7 @@ async function parseLogAsync(text, onProgress) {
       if (nt==='method'||nt==='constructor') stats.methods++;
       if (nt==='soql') stats.soql++;
       if (nt==='dml') stats.dml++;
-      if (m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes('.')?m.cls.match(/^([a-z][a-zA-Z0-9]*)\./):null);if(nsm)namespaces.add(nsm[1])}
+      if (m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes('.')?m.cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\./):null);if(nsm)namespaces.add(nsm[1])}
       cur().children.push(node);
       stack.push(node);
     }
@@ -511,7 +511,7 @@ function buildWorkerSrc(){
     '      if(nt==="method"||nt==="constructor")stats.methods++;\n'+
     '      if(nt==="soql")stats.soql++;\n'+
     '      if(nt==="dml")stats.dml++;\n'+
-    '      if(m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes(".")?m.cls.match(/^([a-z][a-zA-Z0-9]*)\\./) :null);if(nsm)nsArr.push(nsm[1])}\n'+
+    '      if(m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes(".")?m.cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\\./) :null);if(nsm)nsArr.push(nsm[1])}\n'+
     '      cur().children.push(nd);stk.push(nd);\n'+
     '    }\n'+
     '  }\n'+
@@ -605,14 +605,28 @@ function initAnalyzer(rootEl, fetchSource) {
     });
   }
 
-  // Tag each log line with its namespace (one-time pass after parse)
+  // Tag each log line with its namespace using a call-stack approach so that
+  // VARIABLE_ASSIGNMENT / USER_DEBUG / etc. inside a namespace method also get
+  // tagged, not just the METHOD_ENTRY line itself.
   function tagLineNamespaces(logLines){
-    const NS_RE=/\|([a-z][a-zA-Z0-9]+)(?:\.|__)/;
+    if(!logLines.length||logLines[0].nsTag!==undefined) return;
+    // Extract namespace from a line's rest field (METHOD_ENTRY / CONSTRUCTOR_ENTRY etc.)
+    const NS_RE=/\|([a-zA-Z][a-zA-Z0-9]*)(?:\.|__)/;
+    function restNs(rest){if(!rest)return'';const m=rest.match(NS_RE);return m?m[1]:'';}
+    const nsStack=['']; // current enclosing namespace; '' = no namespace
     for(let i=0;i<logLines.length;i++){
       const ll=logLines[i];
-      if(ll.nsTag!==undefined) break; // already tagged
-      if(ll.rest){const m=ll.rest.match(NS_RE);ll.nsTag=m?m[1]:'';}
-      else ll.nsTag='';
+      const curNs=nsStack[nsStack.length-1];
+      if(PUSH_EVS.has(ll.ev)){
+        const myNs=restNs(ll.rest); // own namespace (may be '')
+        ll.nsTag=myNs||curNs;       // entry line tagged with its method's ns; inherit if none
+        nsStack.push(ll.nsTag);
+      } else if(EXIT_MAP[ll.ev]&&ll.ev!=='EXECUTION_FINISHED'){
+        ll.nsTag=curNs;             // exit line same namespace as its entry
+        if(nsStack.length>1) nsStack.pop();
+      } else {
+        ll.nsTag=curNs;             // all other lines inherit enclosing method's ns
+      }
     }
   }
 
@@ -923,7 +937,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
   function nsMatchesFilter(cls){
     if (!S.nsFilter||!S.nsFilter.size) return true;
-    const m=cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(cls.includes('.')?cls.match(/^([a-z][a-zA-Z0-9]*)\./):null);
+    const m=cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(cls.includes('.')?cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\./):null);
     return S.nsFilter.has(m?m[1]:'(none)');
   }
   function nodeText(node){return`${node.cls} ${node.meth} ${node.params} ${node.sig}`.toLowerCase()}
