@@ -1232,20 +1232,28 @@ function ctxLocateOtherSide(){
   const {el,path,inGrid,inSrc}=_ctxTarget;
   const cellEl=el.closest('[id^="cell-"]');
   if(!cellEl||!path)return;
+  const id=cellEl.id.replace('cell-','');
+  // Expand ancestors so the target element is rendered in the destination panel
+  expandAncestors(path);
   if(inGrid){
-    // clicked in grid → locate in src-pretty (switch to pretty mode if not already on)
-    const cellId=cellEl.id.replace('cell-','');
+    // clicked in grid → locate in src-pretty
     const sp=cellEl.querySelector('.src-pretty');
-    const doScroll=()=>{
+    if(!sp||!sp.classList.contains('on')){
+      togPretty(id); // switches to pretty mode and re-renders with updated _exp
+    } else {
+      renderPretty(id); // re-render with updated _exp so expanded ancestors appear
+    }
+    setTimeout(()=>{
       highlightPath(cellEl,path);
-      setTimeout(()=>scrollHlIntoView(cellEl.querySelector('.src-pretty'),'src-hl'),30);
-    };
-    if(!sp||!sp.classList.contains('on')){togPretty(cellId);setTimeout(doScroll,80);}
-    else doScroll();
+      scrollHlIntoView(cellEl.querySelector('.src-pretty'),'src-hl');
+    },30);
   } else if(inSrc){
-    // clicked in src-pretty → scroll the grid panel to the matching node
-    highlightPath(cellEl,path);
-    scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
+    // clicked in src-pretty → locate in grid
+    rebuildGP(id); // rebuilds grid DOM with expanded ancestors
+    setTimeout(()=>{
+      highlightPath(cellEl,path);
+      scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
+    },30);
   }
 }
 document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu'))hideCtxMenu();});
