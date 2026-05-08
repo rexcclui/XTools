@@ -1069,21 +1069,20 @@ function initAnalyzer(rootEl, fetchSource) {
     const wrap=document.createElement('div');wrap.className='log-input-wrap';
     const ta=document.createElement('textarea');ta.className='log-textarea';
     ta.id='logTA_'+tab.id;ta.placeholder='Paste Salesforce debug log here…';
-    // Only populate textarea if raw content is small — large text freezes the DOM
+    // Only populate textarea if raw content is small — reinserting large text freezes the DOM
     const RAW_INLINE_LIMIT=200000;
     if (tab.raw && tab.raw.length<=RAW_INLINE_LIMIT) ta.value=tab.raw;
-    // Intercept paste: capture text directly, skip the slow textarea DOM insert
-    ta.addEventListener('paste',e=>{
-      const text=e.clipboardData&&e.clipboardData.getData('text/plain');
-      if (!text) return;
-      if (text.length>RAW_INLINE_LIMIT){
-        e.preventDefault();
-        tab.raw=text;
-        ta.value='';
-        const st=wrap.querySelector('#parseStatus');
-        if (st) st.textContent=`${(text.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
-      }
-      // small pastes go through normally; tab.raw read in parseActiveTab
+    // After paste lands in the textarea, drain large content into tab.raw and clear the textarea
+    // so subsequent tab switches don't re-insert the huge string into the DOM.
+    ta.addEventListener('paste',()=>{
+      setTimeout(()=>{
+        if (ta.value.length>RAW_INLINE_LIMIT){
+          tab.raw=ta.value;
+          ta.value='';
+          const st=wrap.querySelector('#parseStatus');
+          if (st) st.textContent=`${(tab.raw.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
+        }
+      },0);
     });
     wrap.appendChild(ta);
     const btnRow=document.createElement('div');btnRow.className='btn-row';
