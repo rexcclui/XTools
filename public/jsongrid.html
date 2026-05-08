@@ -189,12 +189,12 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
   <button class="tbtn" onclick="adj('rows',1)">+</button>
   <input id="gs" placeholder="Global search…" oninput="gSearch(this.value)"/>
   <button id="btn-hide-src" class="tbtn" onclick="togAllSrc()" title="Hide/show all source panels">⊡ Hide Source</button>
-  <button id="btn-scroll-sync" class="tbtn accent" onclick="togScrollSync()" title="Scroll sync ON — when hovering one side, the other side auto-scrolls to show the highlighted element">⇳ Scroll Sync</button>
   <button class="tbtn" title="Click any two value cells in the grid to compare" onclick="showCmpHelp()" id="btn-cmp">⇄ Compare <span id="sel-count" class="sel-badge"></span></button>
   <button class="tbtn danger" style="margin-left:auto" onclick="clearAll()">✕ Clear Tab</button>
 </div>
 <div id="tab-bar"></div>
 <div id="ctx-menu">
+  <div id="ctx-locate-other" class="ctx-item" onclick="ctxLocateOtherSide()" style="display:none"><span>⇆</span> Locate on other side</div>
   <div id="ctx-copy-json" class="ctx-item" onclick="ctxCopyJSON()"><span>⎘</span> Copy node JSON</div>
   <div id="ctx-parse-json" class="ctx-item" onclick="ctxParseJSON()"><span>⊞</span> Convert string to JSON table</div>
   <div id="ctx-compare" class="ctx-item" onclick="openCompare()"><span>⇄</span> Compare selected nodes</div>
@@ -208,7 +208,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 /* ══ STATE ══ */
 let App={activeTab:0,tabs:[]};
 let G;
-let _dat={},_exp={},_debounce={},_srcHidden=false,_scrollSync=true;
+let _dat={},_exp={},_debounce={},_srcHidden=false;
 let _sel=[];
 
 function initApp(){
@@ -296,20 +296,9 @@ function highlightPath(cellEl,path){
   if(gp)gp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('grid-hl'));
   if(sp)sp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('src-hl'));
 }
-function togScrollSync(){
-  _scrollSync=!_scrollSync;
-  const btn=document.getElementById('btn-scroll-sync');
-  if(btn){
-    btn.className='tbtn'+(_scrollSync?' accent':'');
-    btn.title=_scrollSync
-      ?'Scroll sync ON — when hovering one side, the other side auto-scrolls to show the highlighted element'
-      :'Scroll sync OFF — highlighted elements will not auto-scroll into view';
-  }
-}
 /* Scroll the first highlighted element into view only if it is outside the
    visible area of its scrollable container. */
 function scrollHlIntoView(container,hlClass){
-  if(!_scrollSync)return;
   if(!container)return;
   const el=container.querySelector('.'+hlClass);
   if(!el)return;
@@ -870,8 +859,6 @@ function setupSyncEvents(cellEl,id){
       if(!el)return;
       highlightPath(cellEl,el.dataset.p);
       showNodePopup(el.dataset.p,el.dataset.cid||cid,e.clientX,e.clientY);
-      // scroll the corresponding src-pretty highlight into view if off-screen
-      scrollHlIntoView(cellEl.querySelector('.src-pretty'),'src-hl');
     });
     gp.addEventListener('mousemove',e=>moveNodePopup(e.clientX,e.clientY));
     gp.addEventListener('mouseleave',()=>{clearHighlight(cellEl);hideNodePopup();});
@@ -881,19 +868,13 @@ function setupSyncEvents(cellEl,id){
       const el=e.target.closest('[data-p]');
       if(!el)return;
       highlightPath(cellEl,el.dataset.p);
-      // scroll the corresponding grid highlight into view if off-screen
-      scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
     });
     sp.addEventListener('mouseleave',()=>clearHighlight(cellEl));
   }
   if(ta){
     const syncH=()=>{
       const path=pathAtPos(ta.value,ta.selectionStart,cid);
-      if(path){
-        highlightPath(cellEl,path);
-        // scroll the corresponding grid highlight into view if off-screen
-        scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
-      }
+      if(path) highlightPath(cellEl,path);
     };
     ta.addEventListener('keyup',syncH);ta.addEventListener('click',syncH);
   }
@@ -1125,23 +1106,50 @@ document.addEventListener('click',e=>{
 },true);
 
 document.addEventListener('contextmenu',e=>{
-  // Walk up to find any element with data-p and data-cid
-  const el=e.target.closest('[data-p][data-cid],.jv');
-  if(!el||!el.dataset.p||!el.dataset.cid){hideCtxMenu();return;}
+  const elCid=e.target.closest('[data-p][data-cid],.jv');
+  const elP=e.target.closest('[data-p]');
+  if(!elP&&!elCid){hideCtxMenu();return;}
   e.preventDefault();
-  _ctxTarget={el,path:el.dataset.p,cid:el.dataset.cid};
+  const useEl=elCid||elP;
+  // derive cid from element or from parent cell
+  let cid=useEl.dataset.cid;
+  if(!cid){
+    const cellEl=useEl.closest('[id^="cell-"]');
+    if(cellEl) cid='t'+G.id+'_'+cellEl.id.replace('cell-','');
+  }
+  const inGrid=!!useEl.closest('.grid-panel,.jg-wrap');
+  const inSrc=!!useEl.closest('.src-pretty');
+  _ctxTarget={el:useEl,path:useEl.dataset.p,cid,inGrid,inSrc};
   const m=document.getElementById('ctx-menu');
-  const v=getAt(_ctxTarget.cid,_ctxTarget.path);
+  const v=cid?getAt(cid,useEl.dataset.p):undefined;
   const isJsonStr=typeof v==='string'&&(v.trim().startsWith('{')||v.trim().startsWith('['));
+  const canLocate=inGrid||inSrc;
+  document.getElementById('ctx-locate-other').style.display=canLocate?'flex':'none';
   document.getElementById('ctx-copy-json').style.display=v!==undefined?'flex':'none';
   document.getElementById('ctx-parse-json').style.display=isJsonStr?'flex':'none';
   document.getElementById('ctx-compare').style.display=_sel.length===2?'flex':'none';
-  if(v===undefined&&!isJsonStr&&_sel.length!==2){hideCtxMenu();return;}
+  if(!canLocate&&v===undefined&&!isJsonStr&&_sel.length!==2){hideCtxMenu();return;}
   const vw=window.innerWidth,vh=window.innerHeight;
   m.style.display='block';
   m.style.left=(e.clientX+220>vw?e.clientX-220:e.clientX)+'px';
   m.style.top=(e.clientY+120>vh?e.clientY-120:e.clientY)+'px';
 });
+
+function ctxLocateOtherSide(){
+  hideCtxMenu();
+  if(!_ctxTarget)return;
+  const {el,path,inGrid,inSrc}=_ctxTarget;
+  const cellEl=el.closest('[id^="cell-"]');
+  if(!cellEl||!path)return;
+  highlightPath(cellEl,path);
+  if(inGrid){
+    // clicked in grid → scroll src-pretty to show corresponding line
+    scrollHlIntoView(cellEl.querySelector('.src-pretty'),'src-hl');
+  } else if(inSrc){
+    // clicked in src-pretty → scroll grid to show corresponding node
+    scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
+  }
+}
 document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu'))hideCtxMenu();});
 document.getElementById('cmp-modal').addEventListener('click',e=>{if(e.target===document.getElementById('cmp-modal')){document.getElementById('cmp-modal').style.display='none';clearSel();}});
 document.getElementById('json-pick-modal').addEventListener('click',e=>{if(e.target===document.getElementById('json-pick-modal'))hideJsonPickModal();});
