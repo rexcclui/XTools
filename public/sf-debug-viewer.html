@@ -175,6 +175,23 @@ const CSS = `
 .log-tag-chip{padding:1px 6px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--dm);font-size:10px;cursor:pointer;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace;transition:all .1s}
 .log-tag-chip:hover{border-color:var(--dm);color:var(--tx)}
 .log-tag-chip.tag-hidden{opacity:.35;text-decoration:line-through;color:var(--vd)}
+.filter-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
+.filter-modal{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:440px;max-height:72vh;display:flex;flex-direction:column;box-shadow:0 16px 48px #000d}
+.filter-modal-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.filter-modal-title{font-weight:600;font-size:13px;flex:1}
+.filter-modal-search{background:var(--b3);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:3px 8px;font-size:12px;width:130px;outline:none}
+.filter-modal-search:focus{border-color:var(--ac)}
+.filter-modal-body{overflow-y:auto;padding:4px 2px;flex:1}
+.filter-modal-item{display:flex;align-items:center;gap:8px;padding:4px 12px;border-radius:5px;cursor:pointer;user-select:none}
+.filter-modal-item:hover{background:var(--b3)}
+.filter-modal-item label{flex:1;font-family:'SF Mono','Fira Code',monospace;font-size:11px;cursor:pointer;color:var(--tx)}
+.filter-modal-item .fmi-cnt{font-size:10px;color:var(--vd)}
+.filter-modal-footer{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--bd);flex-shrink:0}
+.ns-log-popup{position:fixed;z-index:8000;background:var(--b2);border:1px solid var(--bd);border-radius:7px;box-shadow:0 8px 28px #000b;padding:4px 0;min-width:190px;max-height:300px;overflow-y:auto;display:none}
+.ns-log-popup.open{display:block}
+.ns-log-item{display:flex;align-items:center;gap:8px;padding:4px 12px;cursor:pointer;user-select:none}
+.ns-log-item:hover{background:var(--b3)}
+.ns-log-item label{font-family:monospace;font-size:11px;flex:1;cursor:pointer;color:var(--tx)}
 .parse-progress-bar{width:220px;height:4px;background:var(--b3);border-radius:2px;overflow:hidden}
 .parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
 .parse-progress-pct{font-size:10px;color:var(--vd)}
@@ -540,7 +557,7 @@ function initAnalyzer(rootEl, fetchSource) {
     tabs:[],activeId:null,
     highlights:HL_COLORS.map((c,i)=>({id:i+1,query:'',bg:c.bg,fg:c.fg,border:c.border})),
     typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,showLogIndent:false,
-    nsFilter:null,hideKeywords:[],hiddenEventTypes:new Set(['HEAP_ALLOCATE','STATEMENT_EXECUTE']),treeSearch:'',
+    nsFilter:null,hiddenNsLines:new Set(),hideKeywords:[],hiddenEventTypes:new Set(['HEAP_ALLOCATE','STATEMENT_EXECUTE']),treeSearch:'',
   };
   let tabSeq = 0;
 
@@ -578,13 +595,25 @@ function initAnalyzer(rootEl, fetchSource) {
   const LOG_OVERSCAN = 50;
 
   function computeVisibleLines(tab){
-    const kws=S.hideKeywords,hEvs=S.hiddenEventTypes;
-    if (!kws.length&&!hEvs.size) return tab.logLines;
+    const kws=S.hideKeywords,hEvs=S.hiddenEventTypes,hNs=S.hiddenNsLines;
+    if (!kws.length&&!hEvs.size&&!hNs.size) return tab.logLines;
     return tab.logLines.filter(ll=>{
       if (ll.ev&&hEvs.has(ll.ev)) return false;
+      if (hNs.size&&ll.nsTag&&hNs.has(ll.nsTag)) return false;
       if (kws.length&&kws.some(k=>ll.raw.toLowerCase().includes(k))) return false;
       return true;
     });
+  }
+
+  // Tag each log line with its namespace (one-time pass after parse)
+  function tagLineNamespaces(logLines){
+    const NS_RE=/\|([a-z][a-zA-Z0-9]+)(?:\.|__)/;
+    for(let i=0;i<logLines.length;i++){
+      const ll=logLines[i];
+      if(ll.nsTag!==undefined) break; // already tagged
+      if(ll.rest){const m=ll.rest.match(NS_RE);ll.nsTag=m?m[1]:'';}
+      else ll.nsTag='';
+    }
   }
 
   function buildLogRow(ll,tab,hls,visIdx){
@@ -777,7 +806,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   document.addEventListener('click',e=>{if(_ctxMenu&&!_ctxMenu.contains(e.target))closeLogContextMenu()},true);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLogContextMenu()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();}});
 
   function moveLogCursor(tab,newIdx){
     const vis=tab._visLines||[];
@@ -1160,6 +1189,7 @@ function initAnalyzer(rootEl, fetchSource) {
     }
     tab.logLines=result.logLines;tab.tree=result.tree;tab.stats=result.stats;
     tab.namespaces=result.namespaces;tab.eventTypes=result.eventTypes;tab.parsed=true;
+    tagLineNamespaces(tab.logLines);
     renderParsedTab(tab);
   }
 
@@ -1216,12 +1246,20 @@ function initAnalyzer(rootEl, fetchSource) {
     });
     const editBtn=document.createElement('button');editBtn.className='btn btn-sm';
     editBtn.textContent='✎ Edit';editBtn.addEventListener('click',()=>editTab(tab.id));
+    const logTagsModalBtn=document.createElement('button');logTagsModalBtn.className='btn btn-sm';
+    logTagsModalBtn.textContent='Log Tags';
+    logTagsModalBtn.addEventListener('click',()=>openLogTagsModal(tab));
+    const nsLogWrap=document.createElement('div');nsLogWrap.style.cssText='position:relative;display:inline-block';
+    const nsLogBtn=document.createElement('button');nsLogBtn.className='btn btn-sm';
+    nsLogBtn.textContent='NS ▾';nsLogBtn.title='Hide namespaces from log';
+    const nsLogPop=document.createElement('div');nsLogPop.className='ns-log-popup';
+    nsLogWrap.appendChild(nsLogBtn);nsLogWrap.appendChild(nsLogPop);
+    nsLogBtn.addEventListener('click',e=>{e.stopPropagation();nsLogPop.classList.toggle('open');if(nsLogPop.classList.contains('open')){renderNsLogPopup(tab,nsLogPop,nsLogBtn)}});
     toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(indentBtn);toolbar.appendChild(editBtn);
-    const tagsBar=renderLogTagsBar(tab);
+    toolbar.appendChild(logTagsModalBtn);toolbar.appendChild(nsLogWrap);
     const {el}=renderLogView(tab);
     logPane.innerHTML='';
     logPane.appendChild(toolbar);
-    if (tagsBar) logPane.appendChild(tagsBar);
     logPane.appendChild(el);
   }
 
@@ -1460,6 +1498,99 @@ function initAnalyzer(rootEl, fetchSource) {
       const label=document.createElement('span');label.style.cssText='flex:1;font-family:monospace;font-size:10px';label.textContent=ev;
       const cnt=document.createElement('span');cnt.style.cssText='color:var(--vd);font-size:10px;margin-left:auto';cnt.textContent=count;
       item.appendChild(cb);item.appendChild(label);item.appendChild(cnt);pop.appendChild(item);
+    });
+  }
+
+  // ── Log Tags modal ─────────────────────────────────────────────────────────
+  let _logTagsModal=null;
+  function openLogTagsModal(tab){
+    if (_logTagsModal) { _logTagsModal.remove(); _logTagsModal=null; }
+    if (!tab?.eventTypes?.size) return;
+    const overlay=document.createElement('div');overlay.className='filter-modal-overlay';
+    _logTagsModal=overlay;
+    const modal=document.createElement('div');modal.className='filter-modal';
+
+    // header
+    const hdr=document.createElement('div');hdr.className='filter-modal-hdr';
+    const title=document.createElement('span');title.className='filter-modal-title';title.textContent='Log Tags';
+    const search=document.createElement('input');search.className='filter-modal-search';search.placeholder='Filter…';search.type='search';
+    const closeBtn=document.createElement('button');closeBtn.className='btn btn-sm';closeBtn.textContent='✕';
+    closeBtn.addEventListener('click',closeLogTagsModal);
+    hdr.appendChild(title);hdr.appendChild(search);hdr.appendChild(closeBtn);
+
+    // body
+    const body=document.createElement('div');body.className='filter-modal-body';
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    function renderItems(filter){
+      body.innerHTML='';
+      sorted.forEach(([ev,count])=>{
+        if (filter&&!ev.toLowerCase().includes(filter)) return;
+        const row=document.createElement('div');row.className='filter-modal-item';
+        const cb=document.createElement('input');cb.type='checkbox';cb.id='fmi_'+ev;
+        cb.checked=!S.hiddenEventTypes.has(ev);
+        cb.addEventListener('change',()=>{
+          if(cb.checked) S.hiddenEventTypes.delete(ev); else S.hiddenEventTypes.add(ev);
+          applyHideToLog(tab);updateAllHlCounts();
+        });
+        const lbl=document.createElement('label');lbl.htmlFor='fmi_'+ev;lbl.textContent=ev;
+        const cnt=document.createElement('span');cnt.className='fmi-cnt';cnt.textContent=count;
+        row.appendChild(cb);row.appendChild(lbl);row.appendChild(cnt);body.appendChild(row);
+      });
+    }
+    renderItems('');
+    search.addEventListener('input',()=>renderItems(search.value.trim().toLowerCase()));
+
+    // footer
+    const footer=document.createElement('div');footer.className='filter-modal-footer';
+    const showAll=document.createElement('button');showAll.className='btn btn-sm';showAll.textContent='Show all';
+    showAll.addEventListener('click',()=>{S.hiddenEventTypes.clear();renderItems(search.value.trim().toLowerCase());applyHideToLog(tab);updateAllHlCounts()});
+    const hideAll=document.createElement('button');hideAll.className='btn btn-sm';hideAll.textContent='Hide all';
+    hideAll.addEventListener('click',()=>{tab.eventTypes.forEach((_,ev)=>S.hiddenEventTypes.add(ev));renderItems(search.value.trim().toLowerCase());applyHideToLog(tab);updateAllHlCounts()});
+    const count=document.createElement('span');count.style.cssText='font-size:11px;color:var(--dm);margin-left:auto';
+    count.textContent=`${tab.eventTypes.size} types`;
+    footer.appendChild(showAll);footer.appendChild(hideAll);footer.appendChild(count);
+
+    modal.appendChild(hdr);modal.appendChild(body);modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)closeLogTagsModal()});
+    overlay.addEventListener('keydown',e=>{if(e.key==='Escape')closeLogTagsModal()});
+    search.focus();
+  }
+  function closeLogTagsModal(){if(_logTagsModal){_logTagsModal.remove();_logTagsModal=null}}
+
+  // ── NS log filter (hide namespace from log lines) ──────────────────────────
+  function renderNsLogPopup(tab,pop,anchorBtn){
+    pop.innerHTML='';
+    const nsArr=[...tab.namespaces].sort();
+    if (!nsArr.length){pop.classList.remove('open');return}
+    // position below button
+    const rect=anchorBtn.getBoundingClientRect();
+    pop.style.top=(rect.bottom+4)+'px';
+    pop.style.left=rect.left+'px';
+    // "all" toggle
+    const allRow=document.createElement('div');allRow.className='ns-log-item';
+    const allCb=document.createElement('input');allCb.type='checkbox';
+    allCb.checked=S.hiddenNsLines.size===0;
+    allCb.addEventListener('change',()=>{
+      S.hiddenNsLines.clear();
+      renderNsLogPopup(tab,pop,anchorBtn);
+      applyHideToLog(tab);updateAllHlCounts();
+    });
+    const allLbl=document.createElement('label');allLbl.textContent='Show all namespaces';
+    allRow.appendChild(allCb);allRow.appendChild(allLbl);pop.appendChild(allRow);
+    const sep=document.createElement('div');sep.style.cssText='height:1px;background:var(--bd);margin:3px 0';pop.appendChild(sep);
+    nsArr.forEach(ns=>{
+      const row=document.createElement('div');row.className='ns-log-item';
+      const cb=document.createElement('input');cb.type='checkbox';
+      cb.checked=!S.hiddenNsLines.has(ns);
+      cb.addEventListener('change',()=>{
+        if(cb.checked) S.hiddenNsLines.delete(ns); else S.hiddenNsLines.add(ns);
+        allCb.checked=S.hiddenNsLines.size===0;
+        applyHideToLog(tab);updateAllHlCounts();
+      });
+      const lbl=document.createElement('label');lbl.textContent=ns;
+      row.appendChild(cb);row.appendChild(lbl);pop.appendChild(row);
     });
   }
 
@@ -1713,6 +1844,9 @@ function initAnalyzer(rootEl, fetchSource) {
     if (!e.target.closest('.ns-wrap')){
       $('nsPopup').classList.remove('open');
       $('logTagsPopup').classList.remove('open');
+    }
+    if (!e.target.closest('.ns-log-popup')&&!e.target.closest('[title="Hide namespaces from log"]')){
+      document.querySelectorAll('.ns-log-popup.open').forEach(p=>p.classList.remove('open'));
     }
     if (!e.target.closest('.gs-wrap')) $('gsResults').style.display='none';
   });
