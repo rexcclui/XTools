@@ -1072,7 +1072,7 @@ function diffRows(a,b,basePath){
 
 /* ══ CONTEXT MENU ══ */
 let _ctxTarget=null;
-function hideCtxMenu(){document.getElementById('ctx-menu').style.display='none';_ctxTarget=null;}
+function hideCtxMenu(){document.getElementById('ctx-menu').style.display='none';}
 function ctxCopyJSON(){
   if(!_ctxTarget)return;
   const v=getAt(_ctxTarget.cid,_ctxTarget.path);
@@ -1256,7 +1256,7 @@ function ctxLocateOtherSide(){
     },30);
   }
 }
-document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu'))hideCtxMenu();});
+document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu')){hideCtxMenu();_ctxTarget=null;}});
 document.getElementById('cmp-modal').addEventListener('click',e=>{if(e.target===document.getElementById('cmp-modal')){document.getElementById('cmp-modal').style.display='none';clearSel();}});
 document.getElementById('json-pick-modal').addEventListener('click',e=>{if(e.target===document.getElementById('json-pick-modal'))hideJsonPickModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideJsonPickModal();});
