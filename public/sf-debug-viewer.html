@@ -29,6 +29,9 @@ const CSS = `
 .hl-input{width:90px;background:transparent;border:none;color:var(--tx);font-size:11px;outline:none}
 .hl-clr{background:none;border:none;color:var(--vd);font-size:11px;line-height:1;padding:0 1px}
 .hl-clr:hover{color:var(--tx)}
+.hl-nav{display:none;background:none;border:none;color:var(--vd);font-size:9px;line-height:1;padding:0 1px;cursor:pointer}
+.hl-nav:hover{color:var(--tx)}
+.hl-slot.active-slot .hl-nav{display:inline}
 .btn{padding:4px 10px;border-radius:5px;border:1px solid var(--bd);background:transparent;color:var(--dm);transition:all .15s}
 .btn:hover{background:var(--b3);color:var(--tx)}
 .btn-sm{padding:2px 7px;font-size:11px}
@@ -1109,23 +1112,60 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   // ── Highlight system ───────────────────────────────────────────────────────
+  function navigateHighlight(h,dir){
+    const tab=S.tabs.find(t=>t.id===S.activeId);
+    if (!tab||!tab._logScroller||!h.query.trim()) return;
+    const vis=tab._visLines||[];
+    if (!vis.length) return;
+    const q=h.query.toLowerCase();
+    const cur=tab._cursorVisIdx??-1;
+    let idx=-1;
+    if (dir==='down'){
+      // search forward from cur+1, wrapping
+      for (let i=1;i<=vis.length;i++){
+        const c=(cur+i)%vis.length;
+        if (vis[c].raw.toLowerCase().includes(q)){idx=c;break}
+      }
+    } else {
+      // search backward from cur-1, wrapping
+      for (let i=1;i<=vis.length;i++){
+        const c=(cur-i+vis.length)%vis.length;
+        if (vis[c].raw.toLowerCase().includes(q)){idx=c;break}
+      }
+    }
+    if (idx>=0) moveLogCursor(tab,idx);
+  }
+
   function renderHlSlots(){
     const wrap=$('hlSlots');wrap.innerHTML='';
     S.highlights.forEach(h=>{
       const slot=document.createElement('div');slot.className='hl-slot';
       slot.style.borderColor=h.query?h.border:'var(--bd)';
+      if (h.query) slot.classList.add('active-slot');
       const dot=document.createElement('div');dot.className='hl-dot';
       dot.style.background=h.query?h.bg:'var(--b3)';
       dot.style.border=`2px solid ${h.border}`;dot.title='Click to cycle color';
       dot.addEventListener('click',()=>{});
       const inp=document.createElement('input');inp.className='hl-input';
       inp.value=h.query;inp.placeholder=`H${h.id}`;
-      const applyHlInput=()=>{h.query=inp.value;slot.style.borderColor=h.query?h.border:'var(--bd)';dot.style.background=h.query?h.bg:'var(--b3)';rerenderHighlights()};
+      const applyHlInput=()=>{
+        h.query=inp.value;
+        slot.style.borderColor=h.query?h.border:'var(--bd)';
+        dot.style.background=h.query?h.bg:'var(--b3)';
+        slot.classList.toggle('active-slot',!!h.query);
+        rerenderHighlights();
+      };
       inp.addEventListener('blur',applyHlInput);
       inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();applyHlInput()}});
+      const navUp=document.createElement('button');navUp.className='hl-nav';navUp.textContent='▲';
+      navUp.title=`Previous H${h.id} match`;
+      navUp.addEventListener('click',()=>navigateHighlight(h,'up'));
+      const navDn=document.createElement('button');navDn.className='hl-nav';navDn.textContent='▼';
+      navDn.title=`Next H${h.id} match`;
+      navDn.addEventListener('click',()=>navigateHighlight(h,'down'));
       const clr=document.createElement('button');clr.className='hl-clr';clr.textContent='×';
-      clr.addEventListener('click',()=>{h.query='';inp.value='';slot.style.borderColor='var(--bd)';dot.style.background='var(--b3)';rerenderHighlights()});
-      slot.appendChild(dot);slot.appendChild(inp);slot.appendChild(clr);wrap.appendChild(slot);
+      clr.addEventListener('click',()=>{h.query='';inp.value='';slot.style.borderColor='var(--bd)';dot.style.background='var(--b3)';slot.classList.remove('active-slot');rerenderHighlights()});
+      slot.appendChild(dot);slot.appendChild(inp);slot.appendChild(navUp);slot.appendChild(navDn);slot.appendChild(clr);wrap.appendChild(slot);
     });
   }
 
