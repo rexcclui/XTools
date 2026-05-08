@@ -161,7 +161,7 @@ const CSS = `
 .ll.ll-block{background:rgba(227,179,65,.08)}
 .ll.ll-block:not(.active){border-left-color:#e3b34188}
 .ll.active.ll-block{background:rgba(56,139,253,.15)}
-.log-ctx-menu{position:fixed;z-index:9999;background:#1c2128;border:1px solid #444c56;border-radius:7px;box-shadow:0 6px 24px #000c;min-width:180px;padding:4px 0;font-size:12px}
+.log-ctx-menu{position:fixed;z-index:9999;background:#1c2128;border:1px solid #444c56;border-radius:7px;box-shadow:0 6px 24px #000c;min-width:300px;padding:4px 0;font-size:12px}
 .log-ctx-item{padding:7px 16px;color:#e6edf3;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
 .log-ctx-item:hover{background:#2d333b;color:#fff}
 .log-ctx-item.danger{color:#f47067}
@@ -169,7 +169,7 @@ const CSS = `
 .log-ctx-sep{height:1px;background:#30363d;margin:3px 0}
 .log-ctx-label{padding:5px 16px 2px;font-size:10px;color:#768390;text-transform:uppercase;letter-spacing:.7px;user-select:none}
 .log-ctx-info{padding:6px 14px 5px;background:#0d1117;border-bottom:1px solid #30363d;margin-bottom:2px}
-.log-ctx-info-name{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#79c0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.log-ctx-info-name{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#79c0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px}
 .log-ctx-info-meta{font-size:10px;color:#768390;margin-top:2px}
 .log-tags-bar{padding:3px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:3px;align-items:center;flex-wrap:wrap;flex-shrink:0;max-height:52px;overflow-y:auto}
 .log-tag-chip{padding:1px 6px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--dm);font-size:10px;cursor:pointer;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace;transition:all .1s}
@@ -441,6 +441,68 @@ function findBlockAtNs(root,ns){
   return best;
 }
 
+// Returns chain from outermost to innermost block containing ns
+function findBlockChainAtNs(root,ns){
+  const chain=[];
+  function walk(node){
+    if (!BLOCK_TYPES.has(node.type)){node.children.forEach(walk);return}
+    if (node.ns>ns||(node.endNs>0&&node.endNs<ns)) return;
+    chain.push(node);
+    node.children.forEach(walk);
+  }
+  walk(root);
+  return chain;
+}
+
+function buildWorkerSrc(){
+  return (
+    '"use strict";\n'+
+    'const PUSH_EVS=new Set('+JSON.stringify([...PUSH_EVS])+');\n'+
+    'const EXIT_MAP='+JSON.stringify(EXIT_MAP)+';\n'+
+    'const SID_RE=/^01[a-zA-Z0-9]{13,16}$/;\n'+
+    parseLine.toString()+';\n'+
+    evType.toString()+';\n'+
+    evMeta.toString()+';\n'+
+    'self.onmessage=function(e){\n'+
+    '  const text=e.data,lines=text.split("\\n"),N=lines.length;\n'+
+    '  const stats={methods:0,soql:0,dml:0,exc:0,lines:N};\n'+
+    '  const nsArr=[],evCts=new Map(),lls=[];let seq=0;\n'+
+    '  const root={id:"root",type:"execution",cls:"",meth:"Execution",params:"",sig:"",lr:"",ts:"",ns:0,endNs:0,dur:0,children:[],expanded:true,rowCount:null,calloutResp:null};\n'+
+    '  const stk=[root];const cur=()=>stk[stk.length-1];\n'+
+    '  for(let i=0;i<N;i++){\n'+
+    '    if(i>0&&i%25000===0)self.postMessage({t:"p",p:i/N});\n'+
+    '    const r=lines[i].trim();if(!r)continue;\n'+
+    '    const pl=parseLine(r);\n'+
+    '    if(!pl){lls.push({idx:i,ns:0,ts:"",ev:"",rest:r,raw:r,depth:Math.max(0,stk.length-1)});continue}\n'+
+    '    const {ts,ns,ev,rest}=pl;\n'+
+    '    const depth=EXIT_MAP[ev]&&ev!=="EXECUTION_FINISHED"?Math.max(0,stk.length-2):Math.max(0,stk.length-1);\n'+
+    '    lls.push({idx:i,ns,ts,ev,rest,raw:r,depth});\n'+
+    '    if(ev)evCts.set(ev,(evCts.get(ev)||0)+1);\n'+
+    '    if(ev==="EXECUTION_STARTED"){root.ts=ts;root.ns=ns;continue}\n'+
+    '    if(ev==="EXECUTION_FINISHED"){root.endNs=ns;root.dur=ns-root.ns;continue}\n'+
+    '    if(EXIT_MAP[ev]){\n'+
+    '      if(stk.length>1){const n=stk.pop();n.endNs=ns;n.dur=ns-n.ns;\n'+
+    '        if(ev==="SOQL_EXECUTE_END"){const m=rest.match(/Rows:(\\d+)/i);if(m)n.rowCount=m[1]}\n'+
+    '        if(ev==="CALLOUT_RESPONSE"){const sc=rest.match(/StatusCode=(\\d+)/);if(sc)n.calloutResp="HTTP "+sc[1]}\n'+
+    '      }continue;}\n'+
+    '    if(ev==="USER_DEBUG"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"debug",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false,level:m.level});continue}\n'+
+    '    if(ev==="VARIABLE_ASSIGNMENT"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"varAssign",cls:"",meth:m.meth,params:"",sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});continue}\n'+
+    '    if(ev==="EXCEPTION_THROWN"||ev==="FATAL_ERROR"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"exception",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});stats.exc++;continue}\n'+
+    '    if(PUSH_EVS.has(ev)){\n'+
+    '      const m=evMeta(ev,rest);const nt=m.subtype||evType(ev);\n'+
+    '      const nd={id:"n"+(++seq),type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=="system_method",rowCount:null,calloutResp:null};\n'+
+    '      if(nt==="method"||nt==="constructor")stats.methods++;\n'+
+    '      if(nt==="soql")stats.soql++;\n'+
+    '      if(nt==="dml")stats.dml++;\n'+
+    '      if(m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes(".")?m.cls.match(/^([A-Z][a-zA-Z0-9]*)\\./) :null);if(nsm)nsArr.push(nsm[1])}\n'+
+    '      cur().children.push(nd);stk.push(nd);\n'+
+    '    }\n'+
+    '  }\n'+
+    '  self.postMessage({t:"done",lls,tree:root,stats,ns:[...new Set(nsArr)],evts:[...evCts]});\n'+
+    '};\n'
+  );
+}
+
 function fmtDur(ns) {
   if (!ns||ns<=0) return '';
   const ms=ns/1e6;
@@ -660,14 +722,20 @@ function initAnalyzer(rootEl, fetchSource) {
     }
 
     // ── block info + jump ──────────────────────────────────────────────────
-    const block=tab.tree&&ns>0?findBlockAtNs(tab.tree,ns):null;
+    const chain=tab.tree&&ns>0?findBlockChainAtNs(tab.tree,ns):[];
+    const block=chain.length?chain[chain.length-1]:null;
     if (block&&block.type!=='execution'){
       const info=document.createElement('div');info.className='log-ctx-info';
-      const cls=(block.cls?block.cls+'.':'')+block.meth;
+      // build breadcrumb: show up to last 2 meaningful frames
+      const frames=chain.filter(n=>n.type!=='execution');
+      const label=frames.length>=2
+        ? ((frames[frames.length-2].cls?frames[frames.length-2].cls+'.':'')+frames[frames.length-2].meth+
+           ' → '+(block.cls?block.cls+'.':'')+block.meth)
+        : ((block.cls?block.cls+'.':'')+block.meth);
       const lineCount=(tab.logLines||[]).filter(ll=>ll.ns>=block.ns&&ll.ns<=block.endNs).length;
       const dur=block.dur>0?fmtDur(block.dur):'—';
       const name=document.createElement('div');name.className='log-ctx-info-name';
-      name.title=cls;name.textContent=cls;
+      name.title=label;name.textContent=label;
       const meta=document.createElement('div');meta.className='log-ctx-info-meta';
       meta.textContent=`${lineCount} lines · ${dur}`;
       info.appendChild(name);info.appendChild(meta);menu.appendChild(info);
@@ -702,7 +770,7 @@ function initAnalyzer(rootEl, fetchSource) {
     }
 
     document.body.appendChild(menu);
-    const mw=248;
+    const mw=300;
     menu.style.minWidth=mw+'px';
     menu.style.left=Math.min(e.clientX,window.innerWidth-mw-4)+'px';
     menu.style.top=Math.min(e.clientY,window.innerHeight-menu.offsetHeight-4)+'px';
@@ -1050,9 +1118,45 @@ function initAnalyzer(rootEl, fetchSource) {
     if(pctEl)pctEl.textContent=p+'%';
   }
 
+  function parseWithWorker(text, onProgress){
+    return new Promise((resolve,reject)=>{
+      let src;
+      try { src=buildWorkerSrc(); } catch(e){ return reject(e); }
+      const blob=new Blob([src],{type:'application/javascript'});
+      const url=URL.createObjectURL(blob);
+      const w=new Worker(url);
+      w.onmessage=function(e){
+        const d=e.data;
+        if(d.t==='p'){ onProgress&&onProgress(d.p); return; }
+        if(d.t==='done'){
+          URL.revokeObjectURL(url);
+          w.terminate();
+          resolve({
+            logLines:d.lls,
+            tree:d.tree,
+            stats:d.stats,
+            namespaces:new Set(d.ns),
+            eventTypes:new Map(d.evts)
+          });
+        }
+      };
+      w.onerror=function(e){
+        URL.revokeObjectURL(url);
+        w.terminate();
+        reject(e);
+      };
+      w.postMessage(text);
+    });
+  }
+
   async function parseTab(tab){
     showParseProgress(tab,0);
-    const result=await parseLogAsync(tab.raw,pct=>showParseProgress(tab,pct));
+    let result;
+    try {
+      result=await parseWithWorker(tab.raw,pct=>showParseProgress(tab,pct));
+    } catch(_){
+      result=await parseLogAsync(tab.raw,pct=>showParseProgress(tab,pct));
+    }
     tab.logLines=result.logLines;tab.tree=result.tree;tab.stats=result.stats;
     tab.namespaces=result.namespaces;tab.eventTypes=result.eventTypes;tab.parsed=true;
     renderParsedTab(tab);
