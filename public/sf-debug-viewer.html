@@ -175,7 +175,7 @@ const CSS = `
 .log-tag-chip{padding:1px 6px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--dm);font-size:10px;cursor:pointer;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace;transition:all .1s}
 .log-tag-chip:hover{border-color:var(--dm);color:var(--tx)}
 .log-tag-chip.tag-hidden{opacity:.35;text-decoration:line-through;color:var(--vd)}
-.filter-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
+.filter-modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
 .filter-modal{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:440px;max-height:72vh;display:flex;flex-direction:column;box-shadow:0 16px 48px #000d}
 .filter-modal-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--bd);flex-shrink:0}
 .filter-modal-title{font-weight:600;font-size:13px;flex:1}
@@ -1552,7 +1552,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
     modal.appendChild(hdr);modal.appendChild(body);modal.appendChild(footer);
     overlay.appendChild(modal);
-    document.body.appendChild(overlay);
+    C.appendChild(overlay);
     overlay.addEventListener('click',e=>{if(e.target===overlay)closeLogTagsModal()});
     overlay.addEventListener('keydown',e=>{if(e.key==='Escape')closeLogTagsModal()});
     search.focus();
