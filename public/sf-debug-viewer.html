@@ -70,6 +70,8 @@ const CSS = `
 .ll.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
 .ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
 .ll-ind{flex-shrink:0;color:#2d333b;font-family:'SF Mono','Fira Code',monospace;letter-spacing:-.1px;user-select:none}
+.ll-fold-tog{color:var(--vd);flex-shrink:0;cursor:pointer;min-width:11px;font-size:9px;text-align:center;padding:0 2px;user-select:none}
+.ll-fold-tog:hover{color:var(--tx)}
 .ll-ts{color:var(--vd);flex-shrink:0}
 .ll-ev{flex-shrink:0;font-weight:600}
 .ll-rest{color:var(--dm);word-break:break-all}
@@ -341,7 +343,8 @@ function evMeta(ev, rest) {
     return {cls,meth,params,sig,lr};
   }
   if (ev==='CODE_UNIT_STARTED') {
-    const name=p.slice(1).join('|')||p[0];
+    const hasCid=p.length>=3&&SID_RE.test(p[1]);
+    const name=(hasCid?p.slice(2):p.slice(1)).join('|')||p[0];
     return {cls:'',meth:name,params:'',sig:'',lr:p[0],subtype:/trigger/i.test(name)?'trigger':null};
   }
   if (ev==='SOQL_EXECUTE_BEGIN') {
@@ -405,7 +408,7 @@ async function parseLogAsync(text, onProgress) {
     if (ev==='EXECUTION_FINISHED'){root.endNs=ns;root.dur=ns-root.ns;continue}
     if (EXIT_MAP[ev]) {
       if (stack.length>1) {
-        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;
+        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=logLines.length-1;
         if (ev==='SOQL_EXECUTE_END'){const m=rest.match(/Rows:(\d+)/i);if(m)n.rowCount=m[1]}
         if (ev==='CALLOUT_RESPONSE'){const sc=rest.match(/StatusCode=(\d+)/);if(sc)n.calloutResp=`HTTP ${sc[1]}`}
       }
@@ -433,7 +436,7 @@ async function parseLogAsync(text, onProgress) {
       const m=evMeta(ev,rest);
       const nt=m.subtype||evType(ev);
       const node={id:`n${++seq}`,type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,
-        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null};
+        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null,logIdx:logLines.length-1};
       if (nt==='method'||nt==='constructor') stats.methods++;
       if (nt==='soql') stats.soql++;
       if (nt==='dml') stats.dml++;
@@ -594,10 +597,24 @@ function initAnalyzer(rootEl, fetchSource) {
   const LOG_ROW_H = 18; // must match .ll height in CSS
   const LOG_OVERSCAN = 50;
 
+  function stripSids(s){return s.replace(/\|01[a-zA-Z0-9]{13,16}(?=\|)/g,'')}
+
+  function buildFoldableMap(tree,logLines){
+    const map=new Map();
+    function walk(node){
+      if (node.logIdx!==undefined&&node.logEndIdx!==undefined&&logLines[node.logIdx]&&logLines[node.logEndIdx])
+        map.set(logLines[node.logIdx].idx,{endRawIdx:logLines[node.logEndIdx].idx,folded:false});
+      node.children.forEach(walk);
+    }
+    walk(tree);
+    return map;
+  }
+
   function computeVisibleLines(tab){
     const kws=S.hideKeywords,hEvs=S.hiddenEventTypes,hNs=S.hiddenNsLines;
-    if (!kws.length&&!hEvs.size&&!hNs.size) return tab.logLines;
+    if (!kws.length&&!hEvs.size&&!hNs.size&&!tab._hasFolds) return tab.logLines;
     return tab.logLines.filter(ll=>{
+      if (ll._folded) return false;
       if (ll.ev&&hEvs.has(ll.ev)) return false;
       if (hNs.size&&ll.nsTag&&hNs.has(ll.nsTag)) return false;
       if (kws.length&&kws.some(k=>ll.raw.toLowerCase().includes(k))) return false;
@@ -641,6 +658,21 @@ function initAnalyzer(rootEl, fetchSource) {
     div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;div.dataset.visidx=visIdx;
     const num=document.createElement('span');num.className='ll-num';num.textContent=ll.idx+1;
     div.appendChild(num);
+    if (tab._foldableMap?.has(ll.idx)){
+      const fi=tab._foldableMap.get(ll.idx);
+      const tog=document.createElement('span');tog.className='ll-fold-tog';
+      tog.textContent=fi.folded?'▶':'▼';tog.title=fi.folded?'Expand block':'Collapse block';
+      tog.addEventListener('click',e=>{
+        e.stopPropagation();
+        fi.folded=!fi.folded;
+        tab._hasFolds=[...tab._foldableMap.values()].some(f=>f.folded);
+        for (const lll of tab.logLines){
+          if (lll.idx>ll.idx&&lll.idx<=fi.endRawIdx) lll._folded=fi.folded;
+        }
+        tab._logScroller?.refresh();
+      });
+      div.appendChild(tog);
+    }
     if (S.showLogIndent&&ll.depth>0){
       const ind=document.createElement('span');ind.className='ll-ind';
       // two non-breaking spaces per depth level, with subtle pipe guides
@@ -650,7 +682,7 @@ function initAnalyzer(rootEl, fetchSource) {
     if (ll.ev){
       const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
       const ev=document.createElement('span');ev.className='ll-ev';ev.innerHTML=applyHl(ll.ev,hls);
-      const rest=document.createElement('span');rest.className='ll-rest';rest.innerHTML=applyHl(ll.rest,hls);
+      const rest=document.createElement('span');rest.className='ll-rest';rest.innerHTML=applyHl(stripSids(ll.rest),hls);
       div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
     } else {
       const raw=document.createElement('span');raw.className='ll-rest';raw.innerHTML=applyHl(ll.raw,hls);
@@ -1207,6 +1239,8 @@ function initAnalyzer(rootEl, fetchSource) {
     tab.logLines=result.logLines;tab.tree=result.tree;tab.stats=result.stats;
     tab.namespaces=result.namespaces;tab.eventTypes=result.eventTypes;tab.parsed=true;
     tagLineNamespaces(tab.logLines);
+    tab._foldableMap=buildFoldableMap(tab.tree,tab.logLines);
+    tab._hasFolds=false;
     // collect any namespaces the parser missed (e.g. || empty-field format)
     tab.logLines.forEach(ll=>{if(ll.nsTag)tab.namespaces.add(ll.nsTag);});
     renderParsedTab(tab);
