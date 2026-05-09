@@ -15,7 +15,7 @@
   <script>
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
-.sda{--bg:#0d1117;--b2:#161b22;--b3:#21262d;--bd:#30363d;--tx:#c9d1d9;--dm:#8b949e;--vd:#484f58;--ac:#388bfd;--log-h:38vh;display:flex;flex-direction:column;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--tx)}
+.sda{--bg:#0d1117;--b2:#161b22;--b3:#21262d;--bd:#30363d;--tx:#c9d1d9;--dm:#8b949e;--vd:#484f58;--ac:#388bfd;--log-w:50%;display:flex;flex-direction:column;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--tx)}
 .sda *,.sda *::before,.sda *::after{box-sizing:border-box;margin:0;padding:0}
 .sda button{cursor:pointer;font-size:12px;font-family:inherit}
 .sda input{font-family:inherit}
@@ -29,6 +29,11 @@ const CSS = `
 .hl-input{width:90px;background:transparent;border:none;color:var(--tx);font-size:11px;outline:none}
 .hl-clr{background:none;border:none;color:var(--vd);font-size:11px;line-height:1;padding:0 1px}
 .hl-clr:hover{color:var(--tx)}
+.hl-nav{display:none;background:none;border:none;color:var(--vd);font-size:9px;line-height:1;padding:0 1px;cursor:pointer}
+.hl-nav:hover{color:var(--tx)}
+.hl-slot.active-slot .hl-nav{display:inline}
+.hl-count{display:none;font-size:10px;color:var(--vd);min-width:18px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
+.hl-slot.active-slot .hl-count{display:inline}
 .btn{padding:4px 10px;border-radius:5px;border:1px solid var(--bd);background:transparent;color:var(--dm);transition:all .15s}
 .btn:hover{background:var(--b3);color:var(--tx)}
 .btn-sm{padding:2px 7px;font-size:11px}
@@ -42,23 +47,29 @@ const CSS = `
 .tab-x:hover{color:#f85149}
 .tab-add{padding:5px 10px;border:none;background:transparent;color:var(--vd);font-size:16px;line-height:1}
 .tab-add:hover{color:var(--tx)}
-.split-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.log-pane{height:var(--log-h);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
-.hdivider{height:6px;background:var(--b3);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);cursor:row-resize;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.hdivider::after{content:'';width:32px;height:2px;background:var(--bd);border-radius:1px}
-.tree-pane{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:80px}
+.split-wrap{flex:1;display:flex;flex-direction:row;overflow:hidden}
+.log-pane{width:var(--log-w);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;min-width:180px}
+.vdivider{width:6px;background:var(--b3);border-left:1px solid var(--bd);border-right:1px solid var(--bd);cursor:col-resize;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.vdivider::after{content:'';height:32px;width:2px;background:var(--bd);border-radius:1px}
+.tree-pane{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:180px}
+.split-wrap.tree-hidden .tree-pane,.split-wrap.tree-hidden .vdivider{display:none}
+.split-wrap.tree-hidden .log-pane{width:100%!important}
+.tree-pane-hdr{padding:4px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:11px}
+.tree-pane-hdr-title{font-weight:600;color:var(--tx);font-size:12px}
 .log-input-wrap{flex:1;display:flex;flex-direction:column;padding:10px;gap:8px;overflow:auto}
 .log-textarea{flex:1;min-height:80px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--dm);font-family:'SF Mono','Fira Code',monospace;font-size:11px;padding:8px;resize:none;outline:none}
 .log-textarea:focus{border-color:var(--ac);color:var(--tx)}
 .btn-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .btn-primary{background:#238636;border-color:#2ea043;color:#fff}
 .btn-primary:hover{background:#2ea043}
-.log-rendered{flex:1;overflow:auto;font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5}
+.log-rendered{flex:1;overflow:auto;font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5;position:relative;outline:none}
+.log-rendered:focus{box-shadow:inset 0 0 0 1px var(--ac)}
 .log-toolbar{padding:4px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:6px;align-items:center;flex-shrink:0}
-.ll{display:flex;align-items:baseline;gap:6px;padding:0 8px;border-left:2px solid transparent;cursor:pointer;transition:background .08s}
+.ll{display:flex;align-items:center;gap:6px;padding:0 8px;border-left:2px solid transparent;cursor:pointer;height:18px;overflow:hidden;white-space:nowrap;box-sizing:border-box}
 .ll:hover{background:rgba(255,255,255,.03)}
 .ll.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
 .ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
+.ll-ind{flex-shrink:0;color:#2d333b;font-family:'SF Mono','Fira Code',monospace;letter-spacing:-.1px;user-select:none}
 .ll-ts{color:var(--vd);flex-shrink:0}
 .ll-ev{flex-shrink:0;font-weight:600}
 .ll-rest{color:var(--dm);word-break:break-all}
@@ -147,9 +158,43 @@ const CSS = `
 .hide-input:focus{border-color:#f85149}
 .hide-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;background:#2d1117;border:1px solid #f8514966;border-radius:10px;font-size:10px;color:#f85149}
 .hide-tag button{background:none;border:none;color:#f85149;font-size:11px;padding:0 1px;cursor:pointer;line-height:1}
-.ll.ll-hidden{display:none}
-.ll-fold-tog{color:var(--vd);flex-shrink:0;cursor:pointer;min-width:11px;font-size:9px;text-align:center;padding:0 2px;user-select:none}
-.ll-fold-tog:hover{color:var(--tx)}
+.ll.ll-block{background:rgba(227,179,65,.08)}
+.ll.ll-block:not(.active){border-left-color:#e3b34188}
+.ll.active.ll-block{background:rgba(56,139,253,.15)}
+.log-ctx-menu{position:fixed;z-index:9999;background:#1c2128;border:1px solid #444c56;border-radius:7px;box-shadow:0 6px 24px #000c;min-width:300px;padding:4px 0;font-size:12px}
+.log-ctx-item{padding:7px 16px;color:#e6edf3;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
+.log-ctx-item:hover{background:#2d333b;color:#fff}
+.log-ctx-item.danger{color:#f47067}
+.log-ctx-item.danger:hover{background:#2d1117;color:#ff7b72}
+.log-ctx-sep{height:1px;background:#30363d;margin:3px 0}
+.log-ctx-label{padding:5px 16px 2px;font-size:10px;color:#768390;text-transform:uppercase;letter-spacing:.7px;user-select:none}
+.log-ctx-info{padding:6px 14px 5px;background:#0d1117;border-bottom:1px solid #30363d;margin-bottom:2px}
+.log-ctx-info-name{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#79c0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px}
+.log-ctx-info-meta{font-size:10px;color:#768390;margin-top:2px}
+.log-tags-bar{padding:3px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:3px;align-items:center;flex-wrap:wrap;flex-shrink:0;max-height:52px;overflow-y:auto}
+.log-tag-chip{padding:1px 6px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--dm);font-size:10px;cursor:pointer;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace;transition:all .1s}
+.log-tag-chip:hover{border-color:var(--dm);color:var(--tx)}
+.log-tag-chip.tag-hidden{opacity:.35;text-decoration:line-through;color:var(--vd)}
+.filter-modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
+.filter-modal{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:440px;max-height:72vh;display:flex;flex-direction:column;box-shadow:0 16px 48px #000d}
+.filter-modal-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.filter-modal-title{font-weight:600;font-size:13px;flex:1}
+.filter-modal-search{background:var(--b3);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:3px 8px;font-size:12px;width:130px;outline:none}
+.filter-modal-search:focus{border-color:var(--ac)}
+.filter-modal-body{overflow-y:auto;padding:4px 2px;flex:1}
+.filter-modal-item{display:flex;align-items:center;gap:8px;padding:4px 12px;border-radius:5px;cursor:pointer;user-select:none}
+.filter-modal-item:hover{background:var(--b3)}
+.filter-modal-item label{flex:1;font-family:'SF Mono','Fira Code',monospace;font-size:11px;cursor:pointer;color:var(--tx)}
+.filter-modal-item .fmi-cnt{font-size:10px;color:var(--vd)}
+.filter-modal-footer{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--bd);flex-shrink:0}
+.ns-log-popup{position:fixed;z-index:8000;background:var(--b2);border:1px solid var(--bd);border-radius:7px;box-shadow:0 8px 28px #000b;padding:4px 0;min-width:190px;max-height:300px;overflow-y:auto;display:none}
+.ns-log-popup.open{display:block}
+.ns-log-item{display:flex;align-items:center;gap:8px;padding:4px 12px;cursor:pointer;user-select:none}
+.ns-log-item:hover{background:var(--b3)}
+.ns-log-item label{font-family:monospace;font-size:11px;flex:1;cursor:pointer;color:var(--tx)}
+.parse-progress-bar{width:220px;height:4px;background:var(--b3);border-radius:2px;overflow:hidden}
+.parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
+.parse-progress-pct{font-size:10px;color:var(--vd)}
 .sda.hide-vars .t-varAssign{display:none}
 .snippet-popup{position:fixed;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;min-width:686px;max-width:1030px;font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden}
 .snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e}
@@ -191,10 +236,14 @@ const HTML = `
 <div class="tab-bar" id="tabBar">
   <button class="tab-add" id="btn-addTab" title="New tab">＋</button>
 </div>
-<div class="split-wrap" id="splitWrap">
+<div class="split-wrap tree-hidden" id="splitWrap">
   <div class="log-pane" id="logPane"></div>
-  <div class="hdivider" id="hdivider" title="Drag to resize"></div>
+  <div class="vdivider" id="vdivider" title="Drag to resize"></div>
   <div class="tree-pane" id="treePane">
+    <div class="tree-pane-hdr" id="treePaneHdr" style="display:none">
+      <span class="tree-pane-hdr-title">Call Stack</span>
+      <button class="btn btn-sm" id="btn-hideTree" style="margin-left:auto" title="Hide call stack">Hide ✕</button>
+    </div>
     <div class="tree-controls" id="treeControls" style="display:none">
       <button class="chip on" data-f="all">All</button>
       <button class="chip" data-f="method">Methods</button>
@@ -253,8 +302,21 @@ const EXIT_MAP = {
 const SID_RE = /^01[a-zA-Z0-9]{13,16}$/;
 
 function parseLine(raw) {
-  const m = raw.match(/^(\d{2}:\d{2}:\d{2}\.\d+) \((\d*)\)\|([A-Z_0-9]+)\|?(.*)/);
-  return m ? {ts:m[1], ns:m[2]?parseInt(m[2]):0, ev:m[3], rest:m[4]||''} : null;
+  // Fast indexOf-based parser, ~3x faster than regex for large logs
+  if (raw.length < 20 || raw[2] !== ':' || raw[5] !== ':') return null;
+  const sp = raw.indexOf(' ');
+  if (sp < 0 || raw[sp+1] !== '(') return null;
+  const cp = raw.indexOf(')', sp+2);
+  if (cp < 0 || raw[cp+1] !== '|') return null;
+  const p1 = cp+2;
+  const p2 = raw.indexOf('|', p1);
+  const ts = raw.slice(0, sp);
+  const nsRaw = raw.slice(sp+2, cp);
+  const ns = nsRaw.length ? parseInt(nsRaw) : 0;
+  const ev = p2 < 0 ? raw.slice(p1) : raw.slice(p1, p2);
+  const rest = p2 < 0 ? '' : raw.slice(p2+1);
+  if (!ev || !/^[A-Z_0-9]+$/.test(ev)) return null;
+  return {ts, ns, ev, rest};
 }
 
 function evType(ev) {
@@ -268,7 +330,7 @@ function evMeta(ev, rest) {
   const p = rest.split('|');
   if (ev==='METHOD_ENTRY'||ev==='CONSTRUCTOR_ENTRY'||ev==='SYSTEM_METHOD_ENTRY') {
     const lr=p[0]||'';
-    const hasCid=p.length>=3&&SID_RE.test(p[1]);
+    const hasCid=p.length>=3&&(SID_RE.test(p[1])||p[1]==='');
     const sig=hasCid?p.slice(2).join('|'):p.slice(1).join('|');
     const pL=sig.indexOf('('),pR=sig.lastIndexOf(')');
     const namePart=pL>=0?sig.slice(0,pL):sig;
@@ -279,8 +341,7 @@ function evMeta(ev, rest) {
     return {cls,meth,params,sig,lr};
   }
   if (ev==='CODE_UNIT_STARTED') {
-    const hasCid=p.length>=3&&SID_RE.test(p[1]);
-    const name=(hasCid?p.slice(2):p.slice(1)).join('|')||p[0];
+    const name=p.slice(1).join('|')||p[0];
     return {cls:'',meth:name,params:'',sig:'',lr:p[0],subtype:/trigger/i.test(name)?'trigger':null};
   }
   if (ev==='SOQL_EXECUTE_BEGIN') {
@@ -310,7 +371,9 @@ function evMeta(ev, rest) {
   return {cls:'',meth:rest||ev,params:'',sig:'',lr:''};
 }
 
-function parseLog(text) {
+const PARSE_CHUNK = 8000; // lines per async tick
+
+async function parseLogAsync(text, onProgress) {
   const rawLines=text.split('\n');
   const stats={methods:0,soql:0,dml:0,exc:0,lines:rawLines.length};
   const namespaces=new Set();
@@ -322,18 +385,27 @@ function parseLog(text) {
   const stack=[root];
   const cur=()=>stack[stack.length-1];
   for (let i=0;i<rawLines.length;i++) {
+    // yield to browser every PARSE_CHUNK lines so UI stays responsive
+    if (i>0&&i%PARSE_CHUNK===0){
+      onProgress&&onProgress(i/rawLines.length);
+      await new Promise(r=>setTimeout(r,0));
+    }
     const raw=rawLines[i].trim();
     if (!raw) continue;
     const pl=parseLine(raw);
-    if (!pl){logLines.push({idx:i,ns:0,ts:'',ev:'',rest:raw,raw});continue}
+    if (!pl){logLines.push({idx:i,ns:0,ts:'',ev:'',rest:raw,raw,depth:Math.max(0,stack.length-1)});continue}
     const {ts,ns,ev,rest}=pl;
-    logLines.push({idx:i,ns,ts,ev,rest,raw});
+    // depth: exit lines match their entry level; push lines are at current depth before push
+    const depth=EXIT_MAP[ev]&&ev!=='EXECUTION_FINISHED'
+      ? Math.max(0,stack.length-2)
+      : Math.max(0,stack.length-1);
+    logLines.push({idx:i,ns,ts,ev,rest,raw,depth});
     if (ev) eventTypeCounts.set(ev,(eventTypeCounts.get(ev)||0)+1);
     if (ev==='EXECUTION_STARTED'){root.ts=ts;root.ns=ns;continue}
     if (ev==='EXECUTION_FINISHED'){root.endNs=ns;root.dur=ns-root.ns;continue}
     if (EXIT_MAP[ev]) {
       if (stack.length>1) {
-        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=logLines.length-1;
+        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;
         if (ev==='SOQL_EXECUTE_END'){const m=rest.match(/Rows:(\d+)/i);if(m)n.rowCount=m[1]}
         if (ev==='CALLOUT_RESPONSE'){const sc=rest.match(/StatusCode=(\d+)/);if(sc)n.calloutResp=`HTTP ${sc[1]}`}
       }
@@ -361,16 +433,91 @@ function parseLog(text) {
       const m=evMeta(ev,rest);
       const nt=m.subtype||evType(ev);
       const node={id:`n${++seq}`,type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,
-        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null,logIdx:logLines.length-1};
+        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null};
       if (nt==='method'||nt==='constructor') stats.methods++;
       if (nt==='soql') stats.soql++;
       if (nt==='dml') stats.dml++;
-      if (m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes('.')?m.cls.match(/^([A-Z][a-zA-Z0-9]*)\./):null);if(nsm)namespaces.add(nsm[1])}
+      if (m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes('.')?m.cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\./):null);if(nsm)namespaces.add(nsm[1])}
       cur().children.push(node);
       stack.push(node);
     }
   }
   return {tree:root,stats,logLines,namespaces,eventTypes:eventTypeCounts};
+}
+
+const BLOCK_TYPES=new Set(['execution','code_unit','trigger','method','constructor','soql','dml','callout','flow']);
+function findBlockAtNs(root,ns){
+  let best=null;
+  function walk(node){
+    if (!BLOCK_TYPES.has(node.type)) {node.children.forEach(walk);return}
+    if (node.ns>ns||(node.endNs>0&&node.endNs<ns)) return;
+    best=node;
+    node.children.forEach(walk);
+  }
+  walk(root);
+  return best;
+}
+
+// Returns chain from outermost to innermost block containing ns
+function findBlockChainAtNs(root,ns){
+  const chain=[];
+  function walk(node){
+    if (!BLOCK_TYPES.has(node.type)){node.children.forEach(walk);return}
+    if (node.ns>ns||(node.endNs>0&&node.endNs<ns)) return;
+    chain.push(node);
+    node.children.forEach(walk);
+  }
+  walk(root);
+  return chain;
+}
+
+function buildWorkerSrc(){
+  return (
+    '"use strict";\n'+
+    'const PUSH_EVS=new Set('+JSON.stringify([...PUSH_EVS])+');\n'+
+    'const EXIT_MAP='+JSON.stringify(EXIT_MAP)+';\n'+
+    'const SID_RE=/^01[a-zA-Z0-9]{13,16}$/;\n'+
+    parseLine.toString()+';\n'+
+    evType.toString()+';\n'+
+    evMeta.toString()+';\n'+
+    'self.onmessage=function(e){\n'+
+    '  const text=e.data,lines=text.split("\\n"),N=lines.length;\n'+
+    '  const stats={methods:0,soql:0,dml:0,exc:0,lines:N};\n'+
+    '  const nsArr=[],evCts=new Map(),lls=[];let seq=0;\n'+
+    '  const root={id:"root",type:"execution",cls:"",meth:"Execution",params:"",sig:"",lr:"",ts:"",ns:0,endNs:0,dur:0,children:[],expanded:true,rowCount:null,calloutResp:null};\n'+
+    '  const stk=[root];const cur=()=>stk[stk.length-1];\n'+
+    '  for(let i=0;i<N;i++){\n'+
+    '    if(i>0&&i%25000===0)self.postMessage({t:"p",p:i/N});\n'+
+    '    const r=lines[i].trim();if(!r)continue;\n'+
+    '    const pl=parseLine(r);\n'+
+    '    if(!pl){lls.push({idx:i,ns:0,ts:"",ev:"",rest:r,raw:r,depth:Math.max(0,stk.length-1)});continue}\n'+
+    '    const {ts,ns,ev,rest}=pl;\n'+
+    '    const depth=EXIT_MAP[ev]&&ev!=="EXECUTION_FINISHED"?Math.max(0,stk.length-2):Math.max(0,stk.length-1);\n'+
+    '    lls.push({idx:i,ns,ts,ev,rest,raw:r,depth});\n'+
+    '    if(ev)evCts.set(ev,(evCts.get(ev)||0)+1);\n'+
+    '    if(ev==="EXECUTION_STARTED"){root.ts=ts;root.ns=ns;continue}\n'+
+    '    if(ev==="EXECUTION_FINISHED"){root.endNs=ns;root.dur=ns-root.ns;continue}\n'+
+    '    if(EXIT_MAP[ev]){\n'+
+    '      if(stk.length>1){const n=stk.pop();n.endNs=ns;n.dur=ns-n.ns;\n'+
+    '        if(ev==="SOQL_EXECUTE_END"){const m=rest.match(/Rows:(\\d+)/i);if(m)n.rowCount=m[1]}\n'+
+    '        if(ev==="CALLOUT_RESPONSE"){const sc=rest.match(/StatusCode=(\\d+)/);if(sc)n.calloutResp="HTTP "+sc[1]}\n'+
+    '      }continue;}\n'+
+    '    if(ev==="USER_DEBUG"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"debug",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false,level:m.level});continue}\n'+
+    '    if(ev==="VARIABLE_ASSIGNMENT"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"varAssign",cls:"",meth:m.meth,params:"",sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});continue}\n'+
+    '    if(ev==="EXCEPTION_THROWN"||ev==="FATAL_ERROR"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"exception",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});stats.exc++;continue}\n'+
+    '    if(PUSH_EVS.has(ev)){\n'+
+    '      const m=evMeta(ev,rest);const nt=m.subtype||evType(ev);\n'+
+    '      const nd={id:"n"+(++seq),type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=="system_method",rowCount:null,calloutResp:null};\n'+
+    '      if(nt==="method"||nt==="constructor")stats.methods++;\n'+
+    '      if(nt==="soql")stats.soql++;\n'+
+    '      if(nt==="dml")stats.dml++;\n'+
+    '      if(m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes(".")?m.cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\\./) :null);if(nsm)nsArr.push(nsm[1])}\n'+
+    '      cur().children.push(nd);stk.push(nd);\n'+
+    '    }\n'+
+    '  }\n'+
+    '  self.postMessage({t:"done",lls,tree:root,stats,ns:[...new Set(nsArr)],evts:[...evCts]});\n'+
+    '};\n'
+  );
 }
 
 function fmtDur(ns) {
@@ -409,8 +556,8 @@ function initAnalyzer(rootEl, fetchSource) {
   const S = {
     tabs:[],activeId:null,
     highlights:HL_COLORS.map((c,i)=>({id:i+1,query:'',bg:c.bg,fg:c.fg,border:c.border})),
-    typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,
-    nsFilter:null,hideKeywords:[],hiddenEventTypes:new Set(['HEAP_ALLOCATE','STATEMENT_EXECUTE']),treeSearch:'',
+    typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,showLogIndent:false,
+    nsFilter:null,hiddenNsLines:new Set(),hideKeywords:[],hiddenEventTypes:new Set(['HEAP_ALLOCATE','STATEMENT_EXECUTE']),treeSearch:'',
   };
   let tabSeq = 0;
 
@@ -443,74 +590,318 @@ function initAnalyzer(rootEl, fetchSource) {
     return null;
   }
 
-  // ── Log renderer ───────────────────────────────────────────────────────────
-  function stripSids(s){return s.replace(/\|01[a-zA-Z0-9]{13,16}(?=\|)/g,'')}
+  // ── Log renderer (virtual scroll) ─────────────────────────────────────────
+  const LOG_ROW_H = 18; // must match .ll height in CSS
+  const LOG_OVERSCAN = 50;
+
+  function computeVisibleLines(tab){
+    const kws=S.hideKeywords,hEvs=S.hiddenEventTypes,hNs=S.hiddenNsLines;
+    if (!kws.length&&!hEvs.size&&!hNs.size) return tab.logLines;
+    return tab.logLines.filter(ll=>{
+      if (ll.ev&&hEvs.has(ll.ev)) return false;
+      if (hNs.size&&ll.nsTag&&hNs.has(ll.nsTag)) return false;
+      if (kws.length&&kws.some(k=>ll.raw.toLowerCase().includes(k))) return false;
+      return true;
+    });
+  }
+
+  // Tag each log line with its namespace using a call-stack approach so that
+  // Tag each log line with its namespace using a call-stack approach so that
+  // VARIABLE_ASSIGNMENT / USER_DEBUG / etc. inside a namespace method also get
+  // tagged, not just the METHOD_ENTRY line itself.
+  function tagLineNamespaces(logLines){
+    if(!logLines.length||logLines[0].nsTag!==undefined) return;
+    const NS_RE=/\|([a-zA-Z][a-zA-Z0-9]*)(?:\.|__)/;
+    function restNs(rest){if(!rest)return'';const m=rest.match(NS_RE);return m?m[1]:'';}
+    const nsStack=[''];
+    for(let i=0;i<logLines.length;i++){
+      const ll=logLines[i];
+      const curNs=nsStack[nsStack.length-1];
+      if(PUSH_EVS.has(ll.ev)){
+        // SYSTEM_METHOD_ENTRY always runs on behalf of the caller — don't extract
+        // its own "System" namespace, just inherit the enclosing namespace so that
+        // hiding e.g. fferpcore also hides System.debug calls made inside it.
+        const myNs=ll.ev==='SYSTEM_METHOD_ENTRY'?'':restNs(ll.rest);
+        ll.nsTag=myNs||curNs;
+        nsStack.push(ll.nsTag);
+      } else if(EXIT_MAP[ll.ev]&&ll.ev!=='EXECUTION_FINISHED'){
+        ll.nsTag=curNs;
+        if(nsStack.length>1) nsStack.pop();
+      } else {
+        ll.nsTag=curNs;
+      }
+    }
+  }
+
+  function buildLogRow(ll,tab,hls,visIdx){
+    const isActive=tab._cursorVisIdx===visIdx;
+    const inBlock=!!(tab._blockRange&&ll.ns>0&&ll.ns>=tab._blockRange.startNs&&ll.ns<=tab._blockRange.endNs);
+    const div=document.createElement('div');
+    div.className=`ll ev-${ll.ev}${isActive?' active':''}${inBlock?' ll-block':''}`;
+    div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;div.dataset.visidx=visIdx;
+    const num=document.createElement('span');num.className='ll-num';num.textContent=ll.idx+1;
+    div.appendChild(num);
+    if (S.showLogIndent&&ll.depth>0){
+      const ind=document.createElement('span');ind.className='ll-ind';
+      // two non-breaking spaces per depth level, with subtle pipe guides
+      ind.textContent=('\xa0\xa0│').repeat(ll.depth-1)+'\xa0\xa0┤';
+      div.appendChild(ind);
+    }
+    if (ll.ev){
+      const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
+      const ev=document.createElement('span');ev.className='ll-ev';ev.innerHTML=applyHl(ll.ev,hls);
+      const rest=document.createElement('span');rest.className='ll-rest';rest.innerHTML=applyHl(ll.rest,hls);
+      div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
+    } else {
+      const raw=document.createElement('span');raw.className='ll-rest';raw.innerHTML=applyHl(ll.raw,hls);
+      div.appendChild(raw);
+    }
+    div.addEventListener('click',()=>{
+      tab._cursorVisIdx=visIdx;
+      syncLogToTree(tab,ll.ns,div);
+    });
+    return div;
+  }
+
+  function makeLogScroller(container,tab){
+    let visLines=computeVisibleLines(tab);
+    tab._visLines=visLines;
+    let rendered={start:-1,end:-1};
+    const spacer=document.createElement('div');spacer.style.cssText='position:relative;';
+    const rowsEl=document.createElement('div');rowsEl.style.cssText='position:absolute;top:0;left:0;right:0;will-change:transform;';
+    spacer.appendChild(rowsEl);
+    container.appendChild(spacer);
+
+    function render(){
+      const scrollTop=container.scrollTop;
+      const viewH=container.clientHeight||600;
+      spacer.style.height=(visLines.length*LOG_ROW_H)+'px';
+      const start=Math.max(0,Math.floor(scrollTop/LOG_ROW_H)-LOG_OVERSCAN);
+      const end=Math.min(visLines.length,Math.ceil((scrollTop+viewH)/LOG_ROW_H)+LOG_OVERSCAN);
+      if (start===rendered.start&&end===rendered.end) return;
+      rendered={start,end};
+      rowsEl.style.transform=`translateY(${start*LOG_ROW_H}px)`;
+      const hls=getActiveHls();
+      const frag=document.createDocumentFragment();
+      for (let i=start;i<end;i++) frag.appendChild(buildLogRow(visLines[i],tab,hls,i));
+      rowsEl.innerHTML='';rowsEl.appendChild(frag);
+    }
+
+    function scrollToVisIdx(idx,center){
+      const rowTop=idx*LOG_ROW_H;
+      const rowBot=rowTop+LOG_ROW_H;
+      const viewTop=container.scrollTop;
+      const viewBot=viewTop+container.clientHeight;
+      if (center||rowTop<viewTop) container.scrollTop=Math.max(0,rowTop-(container.clientHeight/2));
+      else if (rowBot>viewBot) container.scrollTop=rowBot-container.clientHeight;
+      rendered={start:-1,end:-1};render();
+    }
+
+    container.addEventListener('scroll',()=>render(),{passive:true});
+
+    return {
+      refresh(newVis){visLines=newVis??computeVisibleLines(tab);tab._visLines=visLines;rendered={start:-1,end:-1};render()},
+      scrollToNs(ns){
+        const idx=visLines.findIndex(ll=>ll.ns===ns);
+        if (idx<0) return null;
+        scrollToVisIdx(idx,true);
+        return rowsEl.querySelector(`.ll[data-ns="${ns}"]`);
+      },
+      scrollToVisIdx,
+      scrollToFirst(pred){
+        const idx=visLines.findIndex(pred);
+        if (idx>=0) scrollToVisIdx(idx,true);
+      },
+      forceRender:render,
+      pageSize(){return Math.max(1,Math.floor(container.clientHeight/LOG_ROW_H)-1)},
+    };
+  }
+
+  // ── Block highlight ────────────────────────────────────────────────────────
+  function highlightBlock(tab,ns){
+    if (!tab.tree) return;
+    const node=findBlockAtNs(tab.tree,ns);
+    if (!node||node.endNs<=0) return;
+    tab._blockRange={startNs:node.ns,endNs:node.endNs,label:`${node.cls?node.cls+'.':''}${node.meth}`};
+    tab._logScroller?.refresh();
+  }
+
+  function clearBlock(tab){
+    tab._blockRange=null;
+    tab._logScroller?.refresh();
+  }
+
+  let _ctxMenu=null;
+  function closeLogContextMenu(){if(_ctxMenu){_ctxMenu.remove();_ctxMenu=null}}
+
+  function applyHighlight(query){
+    const slot=S.highlights.find(h=>!h.query.trim());
+    if (!slot) return false;
+    slot.query=query;
+    renderHlSlots();
+    rerenderHighlights();
+    return true;
+  }
+
+  function jumpToNs(tab,targetNs){
+    const vis=tab._visLines||[];
+    const idx=vis.findIndex(ll=>ll.ns===targetNs);
+    if (idx>=0){moveLogCursor(tab,idx);return true}
+    return false;
+  }
+
+  function sep(menu){const d=document.createElement('div');d.className='log-ctx-sep';menu.appendChild(d)}
+
+  function showLogContextMenu(e,tab,ns,sel=''){
+    closeLogContextMenu();
+    const menu=document.createElement('div');menu.className='log-ctx-menu';_ctxMenu=menu;
+    const vis=tab._visLines||[];
+    const ll=vis.find(l=>l.ns===ns)||(tab.logLines||[]).find(l=>l.ns===ns);
+
+    function item(text,cls,fn){
+      const d=document.createElement('div');d.className='log-ctx-item'+(cls?' '+cls:'');d.textContent=text;
+      d.addEventListener('click',()=>{closeLogContextMenu();fn()});
+      menu.appendChild(d);
+    }
+    function lbl(text){
+      const d=document.createElement('div');d.className='log-ctx-label';d.textContent=text;menu.appendChild(d);
+    }
+
+    // ── block info + jump ──────────────────────────────────────────────────
+    const chain=tab.tree&&ns>0?findBlockChainAtNs(tab.tree,ns):[];
+    const block=chain.length?chain[chain.length-1]:null;
+    if (block&&block.type!=='execution'){
+      const info=document.createElement('div');info.className='log-ctx-info';
+      // build breadcrumb: show up to last 2 meaningful frames
+      const frames=chain.filter(n=>n.type!=='execution');
+      const label=frames.length>=2
+        ? ((frames[frames.length-2].cls?frames[frames.length-2].cls+'.':'')+frames[frames.length-2].meth+
+           ' → '+(block.cls?block.cls+'.':'')+block.meth)
+        : ((block.cls?block.cls+'.':'')+block.meth);
+      const lineCount=(tab.logLines||[]).filter(ll=>ll.ns>=block.ns&&ll.ns<=block.endNs).length;
+      const dur=block.dur>0?fmtDur(block.dur):'—';
+      const name=document.createElement('div');name.className='log-ctx-info-name';
+      name.title=label;name.textContent=label;
+      const meta=document.createElement('div');meta.className='log-ctx-info-meta';
+      meta.textContent=`${lineCount} lines · ${dur}`;
+      info.appendChild(name);info.appendChild(meta);menu.appendChild(info);
+      item('↑ Jump to entry','',()=>jumpToNs(tab,block.ns));
+      if (block.endNs>0) item('↓ Jump to exit','',()=>jumpToNs(tab,block.endNs));
+      sep(menu);
+    } else if (ll?.ev){
+      lbl(ll.ev);
+    }
+
+    // ── highlight selection ───────────────────────────────────────────────
+    if (sel){
+      const freeSlot=S.highlights.find(h=>!h.query.trim());
+      const label=sel.length>32?sel.slice(0,32)+'…':sel;
+      if (freeSlot){
+        item(`Highlight "${label}" → H${freeSlot.id}`,'',()=>applyHighlight(sel));
+      } else {
+        const d=document.createElement('div');d.className='log-ctx-item';
+        d.style.cssText='opacity:.45;cursor:default';
+        d.textContent='No free highlight slot (H1–H4 all used)';
+        menu.appendChild(d);
+      }
+      sep(menu);
+    }
+
+    // ── block highlight ───────────────────────────────────────────────────
+    item('Show current block','',()=>highlightBlock(tab,ns));
+    if (tab._blockRange){
+      sep(menu);
+      lbl('Block: '+tab._blockRange.label.slice(0,28));
+      item('Clear block highlight','danger',()=>clearBlock(tab));
+    }
+
+    document.body.appendChild(menu);
+    const mw=300;
+    menu.style.minWidth=mw+'px';
+    menu.style.left=Math.min(e.clientX,window.innerWidth-mw-4)+'px';
+    menu.style.top=Math.min(e.clientY,window.innerHeight-menu.offsetHeight-4)+'px';
+  }
+
+  document.addEventListener('click',e=>{if(_ctxMenu&&!_ctxMenu.contains(e.target))closeLogContextMenu()},true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();}});
+
+  function moveLogCursor(tab,newIdx){
+    const vis=tab._visLines||[];
+    if (!vis.length) return;
+    newIdx=Math.max(0,Math.min(vis.length-1,newIdx));
+    tab._cursorVisIdx=newIdx;
+    const ll=vis[newIdx];
+    tab._activeLogNs=ll.ns;
+    tab._logScroller?.scrollToVisIdx(newIdx,false);
+    // update tree selection
+    $$('.nrow.active').forEach(e=>e.classList.remove('active'));
+    const nodeEl=C.querySelector(`.nrow[data-ns="${ll.ns}"]`);
+    if (nodeEl){
+      nodeEl.classList.add('active');
+      let p=nodeEl.parentElement;
+      while (p&&!p.classList.contains('tree-content')){
+        if (p.classList.contains('nchildren')) p.style.display='block';
+        p=p.parentElement;
+      }
+      nodeEl.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  }
 
   function renderLogView(tab){
-    const hls=getActiveHls();
-    const frag=document.createDocumentFragment();
-    let firstHlIdx=-1;
-    const foldMap=new Map();
-    if (tab.tree){
-      (function collect(node){
-        if (node.logIdx!==undefined&&node.logEndIdx!==undefined)
-          foldMap.set(node.logIdx,{endIdx:node.logEndIdx,folded:false});
-        node.children.forEach(collect);
-      })(tab.tree);
-    }
-    const idxToDiv=new Map();
-    for (const ll of tab.logLines){
-      const div=document.createElement('div');
-      div.className=`ll ev-${ll.ev}`;
-      div.dataset.ns=ll.ns;
-      div.dataset.idx=ll.idx;
-      div.dataset.ev=ll.ev;
-      idxToDiv.set(ll.idx,div);
-      const num=document.createElement('span');
-      num.className='ll-num';num.textContent=ll.idx+1;
-      div.appendChild(num);
-      if (foldMap.has(ll.idx)){
-        const fi=foldMap.get(ll.idx);const llIdx=ll.idx;
-        const tog=document.createElement('span');tog.className='ll-fold-tog';tog.textContent='▼';
-        tog.title='Collapse block';
-        tog.addEventListener('click',e=>{
-          e.stopPropagation();
-          fi.folded=!fi.folded;tog.textContent=fi.folded?'▶':'▼';
-          for (const lll of tab.logLines){
-            if (lll.idx>llIdx&&lll.idx<=fi.endIdx){
-              const d=idxToDiv.get(lll.idx);if(d)d.classList.toggle('ll-hidden',fi.folded);
-            }
-          }
-        });
-        div.appendChild(tog);
-      }
-      if (ll.ev){
-        const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
-        const ev=document.createElement('span');ev.className='ll-ev';ev.dataset.raw=ll.ev;
-        ev.innerHTML=applyHl(ll.ev,hls);
-        const rest=document.createElement('span');rest.className='ll-rest';rest.dataset.raw=ll.rest;
-        rest.innerHTML=applyHl(stripSids(ll.rest),hls);
-        div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
-      } else {
-        const raw=document.createElement('span');raw.className='ll-rest';raw.dataset.raw=ll.raw;
-        raw.innerHTML=applyHl(ll.raw,hls);
-        div.appendChild(raw);
-      }
-      if (hls.length&&hlMatchesBg(ll.raw,hls)){if(firstHlIdx<0)firstHlIdx=ll.idx}
-      div.addEventListener('click',()=>syncLogToTree(tab,ll.ns,div));
-      frag.appendChild(div);
-    }
+    tab._cursorVisIdx=-1;
     const wrap=document.createElement('div');
     wrap.className='log-rendered';
     wrap.id='logRendered_'+tab.id;
-    wrap.appendChild(frag);
-    return {el:wrap,firstHlIdx};
+    wrap.tabIndex=0;
+    wrap.setAttribute('aria-label','Log lines — use arrow keys to navigate');
+
+    wrap.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      const rowEl=e.target.closest('.ll');
+      if (!rowEl) return;
+      const ns=parseInt(rowEl.dataset.ns);
+      // capture selection before the menu causes it to collapse
+      const sel=window.getSelection()?.toString().trim()||'';
+      showLogContextMenu(e,tab,ns,sel);
+    });
+
+    wrap.addEventListener('keydown',e=>{
+      const vis=tab._visLines||[];
+      if (!vis.length) return;
+      const cur=tab._cursorVisIdx<0?0:tab._cursorVisIdx;
+      const ps=tab._logScroller?.pageSize()??20;
+      let next=-1;
+      if (e.key==='ArrowDown')  {next=cur+1;e.preventDefault()}
+      else if (e.key==='ArrowUp')    {next=cur-1;e.preventDefault()}
+      else if (e.key==='PageDown')   {next=cur+ps;e.preventDefault()}
+      else if (e.key==='PageUp')     {next=cur-ps;e.preventDefault()}
+      else if (e.key==='Home')       {next=0;e.preventDefault()}
+      else if (e.key==='End')        {next=vis.length-1;e.preventDefault()}
+      if (next>=0) moveLogCursor(tab,next);
+    });
+
+    // Scroller needs actual layout — init after element is in DOM
+    setTimeout(()=>{
+      tab._logScroller=makeLogScroller(wrap,tab);
+      tab._logScroller.forceRender();
+      const hls=getActiveHls();
+      if (hls.length){
+        tab._logScroller.scrollToFirst(ll=>hls.some(h=>h.query&&ll.raw.toLowerCase().includes(h.query.toLowerCase())));
+      }
+    },0);
+    return {el:wrap};
   }
 
   function syncLogToTree(tab,ns,lineEl){
     $$('.ll.active').forEach(e=>e.classList.remove('active'));
     $$('.nrow.active').forEach(e=>e.classList.remove('active'));
-    if (lineEl) lineEl.classList.add('active');
+    tab._activeLogNs=ns;
+    if (lineEl){
+      lineEl.classList.add('active');
+      // keep _cursorVisIdx in sync when row is clicked directly
+      const vi=lineEl.dataset.visidx;
+      if (vi!=null) tab._cursorVisIdx=parseInt(vi);
+    }
     const nodeEl=C.querySelector(`.nrow[data-ns="${ns}"]`);
     if (nodeEl){
       nodeEl.classList.add('active');
@@ -524,11 +915,15 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   function syncTreeToLog(tab,ns){
+    tab._activeLogNs=ns;
     $$('.ll.active').forEach(e=>e.classList.remove('active'));
-    const logEl=$('logRendered_'+tab.id);
-    if (!logEl) return;
-    const lineEl=logEl.querySelector(`.ll[data-ns="${ns}"]`);
-    if (lineEl){lineEl.classList.add('active');lineEl.scrollIntoView({block:'nearest',behavior:'smooth'})}
+    if (!tab._logScroller) return;
+    const rowEl=tab._logScroller.scrollToNs(ns);
+    if (rowEl){
+      rowEl.classList.add('active');
+      const vi=rowEl.dataset.visidx;
+      if (vi!=null) tab._cursorVisIdx=parseInt(vi);
+    }
   }
 
   // ── Tree renderer ──────────────────────────────────────────────────────────
@@ -545,7 +940,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
   function nsMatchesFilter(cls){
     if (!S.nsFilter||!S.nsFilter.size) return true;
-    const m=cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(cls.includes('.')?cls.match(/^([A-Z][a-zA-Z0-9]*)\./):null);
+    const m=cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(cls.includes('.')?cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\./):null);
     return S.nsFilter.has(m?m[1]:'(none)');
   }
   function nodeText(node){return`${node.cls} ${node.meth} ${node.params} ${node.sig}`.toLowerCase()}
@@ -720,7 +1115,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const wrap=document.createElement('div');wrap.className='log-input-wrap';
     const ta=document.createElement('textarea');ta.className='log-textarea';
     ta.id='logTA_'+tab.id;ta.placeholder='Paste Salesforce debug log here…';
-    ta.textContent=tab.raw||'';
+    ta.value=tab.raw||'';
     wrap.appendChild(ta);
     const btnRow=document.createElement('div');btnRow.className='btn-row';
     const parseBtn=document.createElement('button');parseBtn.className='btn btn-primary';
@@ -729,36 +1124,126 @@ function initAnalyzer(rootEl, fetchSource) {
     sampleBtn.textContent='Sample';sampleBtn.addEventListener('click',loadSample);
     const status=document.createElement('span');status.id='parseStatus';
     status.style.cssText='font-size:11px;color:var(--dm)';
+    if (tab.raw&&tab.raw.length>RAW_INLINE_LIMIT) status.textContent=`${(tab.raw.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
     btnRow.appendChild(parseBtn);btnRow.appendChild(sampleBtn);btnRow.appendChild(status);
     wrap.appendChild(btnRow);logPane.appendChild(wrap);
+    $('treePaneHdr').style.display='none';
     $('treeControls').style.display='none';
     $('treeContent').innerHTML='<div class="empty"><div class="ico">📋</div><p>Click Parse Log to visualize the call stack</p></div>';
     $('statsBar').style.display='none';
   }
 
-  function parseActiveTab(){
+  async function parseActiveTab(){
     const tab=S.tabs.find(t=>t.id===S.activeId);
     if (!tab) return;
     const ta=$('logTA_'+tab.id);
     if (ta) tab.raw=ta.value;
     if (!tab.raw.trim()){const ps=$('parseStatus');if(ps)ps.textContent='Paste a log first.';return}
-    parseTab(tab);saveToHistory(tab);
+    await parseTab(tab);
+    saveToHistory(tab);
   }
 
-  function parseTab(tab){
-    const result=parseLog(tab.raw);
+  function showParseProgress(tab,pct){
+    const logPane=$('logPane');
+    let wrap=logPane.querySelector('.parse-progress-wrap');
+    if (!wrap){
+      logPane.innerHTML='';
+      wrap=document.createElement('div');wrap.className='parse-progress-wrap';
+      const label=document.createElement('div');label.className='parse-progress-label';
+      label.textContent='Parsing log…';
+      const bar=document.createElement('div');bar.className='parse-progress-bar';
+      const fill=document.createElement('div');fill.className='parse-progress-fill';fill.style.width='0%';
+      bar.appendChild(fill);
+      const pctEl=document.createElement('div');pctEl.className='parse-progress-pct';pctEl.textContent='0%';
+      wrap.appendChild(label);wrap.appendChild(bar);wrap.appendChild(pctEl);
+      logPane.appendChild(wrap);
+    }
+    const fill=wrap.querySelector('.parse-progress-fill');
+    const pctEl=wrap.querySelector('.parse-progress-pct');
+    const p=Math.round(pct*100);
+    if(fill)fill.style.width=p+'%';
+    if(pctEl)pctEl.textContent=p+'%';
+  }
+
+  function parseWithWorker(text, onProgress){
+    return new Promise((resolve,reject)=>{
+      let src;
+      try { src=buildWorkerSrc(); } catch(e){ return reject(e); }
+      const blob=new Blob([src],{type:'application/javascript'});
+      const url=URL.createObjectURL(blob);
+      const w=new Worker(url);
+      w.onmessage=function(e){
+        const d=e.data;
+        if(d.t==='p'){ onProgress&&onProgress(d.p); return; }
+        if(d.t==='done'){
+          URL.revokeObjectURL(url);
+          w.terminate();
+          resolve({
+            logLines:d.lls,
+            tree:d.tree,
+            stats:d.stats,
+            namespaces:new Set(d.ns),
+            eventTypes:new Map(d.evts)
+          });
+        }
+      };
+      w.onerror=function(e){
+        URL.revokeObjectURL(url);
+        w.terminate();
+        reject(e);
+      };
+      w.postMessage(text);
+    });
+  }
+
+  async function parseTab(tab){
+    showParseProgress(tab,0);
+    let result;
+    try {
+      result=await parseWithWorker(tab.raw,pct=>showParseProgress(tab,pct));
+    } catch(_){
+      result=await parseLogAsync(tab.raw,pct=>showParseProgress(tab,pct));
+    }
     tab.logLines=result.logLines;tab.tree=result.tree;tab.stats=result.stats;
     tab.namespaces=result.namespaces;tab.eventTypes=result.eventTypes;tab.parsed=true;
+    tagLineNamespaces(tab.logLines);
+    // collect any namespaces the parser missed (e.g. || empty-field format)
+    tab.logLines.forEach(ll=>{if(ll.nsTag)tab.namespaces.add(ll.nsTag);});
     renderParsedTab(tab);
   }
 
   function renderParsedTab(tab){
-    renderLogPane(tab);renderTreePane(tab);renderStats(tab);
-    renderNsPopup(tab);renderLogTagsPopup(tab);
+    renderLogPane(tab);
+    $('treePaneHdr').style.display='flex';
     $('treeControls').style.display='flex';
     $('statsBar').style.display='flex';
+    const wrap=$('splitWrap');
+    if (wrap.classList.contains('tree-hidden')){
+      tab._treeDirty=true;
+    } else {
+      renderTreePane(tab);
+    }
+    renderStats(tab);renderNsPopup(tab);renderLogTagsPopup(tab);
     const tsb=$('treeSearchBox');if(tsb)tsb.value=S.treeSearch;
-    setTimeout(()=>applyHideToLog(tab),0);
+  }
+
+  function renderLogTagsBar(tab){
+    if (!tab?.eventTypes?.size) return null;
+    const bar=document.createElement('div');bar.className='log-tags-bar';
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    sorted.forEach(([ev,count])=>{
+      const chip=document.createElement('button');
+      chip.className='log-tag-chip'+(S.hiddenEventTypes.has(ev)?' tag-hidden':'');
+      chip.textContent=ev;chip.title=`${ev} — ${count} occurrences. Click to hide/show`;
+      chip.addEventListener('click',()=>{
+        const nowHidden=!S.hiddenEventTypes.has(ev);
+        if (nowHidden) S.hiddenEventTypes.add(ev); else S.hiddenEventTypes.delete(ev);
+        chip.classList.toggle('tag-hidden',nowHidden);
+        applyHideToLog(tab);updateAllHlCounts();
+      });
+      bar.appendChild(chip);
+    });
+    return bar;
   }
 
   function renderLogPane(tab){
@@ -766,15 +1251,35 @@ function initAnalyzer(rootEl, fetchSource) {
     const toolbar=document.createElement('div');toolbar.className='log-toolbar';
     const info=document.createElement('span');info.style.cssText='font-size:11px;color:var(--dm)';
     info.textContent=`${tab.name} — ${tab.logLines.length} lines`;
+    const showTreeBtn=document.createElement('button');showTreeBtn.className='btn btn-sm';
+    showTreeBtn.id='btn-showTree';showTreeBtn.textContent='◀ Stack';
+    showTreeBtn.style.display=$('splitWrap').classList.contains('tree-hidden')?'':'none';
+    showTreeBtn.addEventListener('click',showTreePane);
+    const indentBtn=document.createElement('button');
+    indentBtn.className='btn btn-sm'+(S.showLogIndent?' toggle-btn on':'');
+    indentBtn.id='btn-logIndent';indentBtn.title='Toggle call-depth indentation';indentBtn.textContent='⇥ Indent';
+    indentBtn.addEventListener('click',()=>{
+      S.showLogIndent=!S.showLogIndent;
+      indentBtn.className='btn btn-sm'+(S.showLogIndent?' toggle-btn on':'');
+      tab._logScroller?.refresh();
+    });
     const editBtn=document.createElement('button');editBtn.className='btn btn-sm';
     editBtn.textContent='✎ Edit';editBtn.addEventListener('click',()=>editTab(tab.id));
-    toolbar.appendChild(info);toolbar.appendChild(editBtn);
-    const {el,firstHlIdx}=renderLogView(tab);
-    logPane.innerHTML='';logPane.appendChild(toolbar);logPane.appendChild(el);
-    if (firstHlIdx>=0){
-      const target=el.querySelector(`.ll[data-idx="${firstHlIdx}"]`);
-      if (target) setTimeout(()=>target.scrollIntoView({block:'center'}),50);
-    }
+    const logTagsModalBtn=document.createElement('button');logTagsModalBtn.className='btn btn-sm';
+    logTagsModalBtn.textContent='Log Tags';
+    logTagsModalBtn.addEventListener('click',()=>openLogTagsModal(tab));
+    const nsLogWrap=document.createElement('div');nsLogWrap.style.cssText='position:relative;display:inline-block';
+    const nsLogBtn=document.createElement('button');nsLogBtn.className='btn btn-sm';
+    nsLogBtn.textContent='NS ▾';nsLogBtn.title='Hide namespaces from log';
+    const nsLogPop=document.createElement('div');nsLogPop.className='ns-log-popup';
+    nsLogWrap.appendChild(nsLogBtn);nsLogWrap.appendChild(nsLogPop);
+    nsLogBtn.addEventListener('click',e=>{e.stopPropagation();nsLogPop.classList.toggle('open');if(nsLogPop.classList.contains('open')){renderNsLogPopup(tab,nsLogPop,nsLogBtn)}});
+    toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(indentBtn);toolbar.appendChild(editBtn);
+    toolbar.appendChild(logTagsModalBtn);toolbar.appendChild(nsLogWrap);
+    const {el}=renderLogView(tab);
+    logPane.innerHTML='';
+    logPane.appendChild(toolbar);
+    logPane.appendChild(el);
   }
 
   function renderTreePane(tab){
@@ -796,9 +1301,24 @@ function initAnalyzer(rootEl, fetchSource) {
     tab.parsed=false;renderInputTab(tab);
   }
 
+  function showTreePane(){
+    const wrap=$('splitWrap');
+    wrap.classList.remove('tree-hidden');
+    const showBtn=C.querySelector('#btn-showTree');
+    if (showBtn) showBtn.style.display='none';
+    const tab=getActiveTab();
+    if (tab?.parsed&&tab._treeDirty){tab._treeDirty=false;renderTreePane(tab)}
+  }
+  function hideTreePane(){
+    $('splitWrap').classList.add('tree-hidden');
+    const showBtn=C.querySelector('#btn-showTree');
+    if (showBtn) showBtn.style.display='';
+  }
+
   function renderEmpty(){
     $('logPane').innerHTML='<div class="empty" style="padding:40px"><div class="ico">📋</div><p>Open or drag a log file</p></div>';
     $('treeContent').innerHTML='<div class="empty"><div class="ico">📋</div><p>Paste a Salesforce debug log and click Parse</p></div>';
+    $('treePaneHdr').style.display='none';
     $('treeControls').style.display='none';
     $('statsBar').style.display='none';
   }
@@ -810,53 +1330,96 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   // ── Highlight system ───────────────────────────────────────────────────────
+  function navigateHighlight(h,dir){
+    const tab=S.tabs.find(t=>t.id===S.activeId);
+    if (!tab||!tab._logScroller||!h.query.trim()) return;
+    const vis=tab._visLines||[];
+    if (!vis.length) return;
+    const q=h.query.toLowerCase();
+    const cur=tab._cursorVisIdx??-1;
+    let idx=-1;
+    if (dir==='down'){
+      // search forward from cur+1, wrapping
+      for (let i=1;i<=vis.length;i++){
+        const c=(cur+i)%vis.length;
+        if (vis[c].raw.toLowerCase().includes(q)){idx=c;break}
+      }
+    } else {
+      // search backward from cur-1, wrapping
+      for (let i=1;i<=vis.length;i++){
+        const c=(cur-i+vis.length)%vis.length;
+        if (vis[c].raw.toLowerCase().includes(q)){idx=c;break}
+      }
+    }
+    if (idx>=0) moveLogCursor(tab,idx);
+  }
+
+  let _hlCountRefreshers=[];
+  function updateAllHlCounts(){_hlCountRefreshers.forEach(fn=>fn())}
+
   function renderHlSlots(){
     const wrap=$('hlSlots');wrap.innerHTML='';
+    _hlCountRefreshers=[];
     S.highlights.forEach(h=>{
       const slot=document.createElement('div');slot.className='hl-slot';
       slot.style.borderColor=h.query?h.border:'var(--bd)';
+      if (h.query) slot.classList.add('active-slot');
       const dot=document.createElement('div');dot.className='hl-dot';
       dot.style.background=h.query?h.bg:'var(--b3)';
       dot.style.border=`2px solid ${h.border}`;dot.title='Click to cycle color';
       dot.addEventListener('click',()=>{});
       const inp=document.createElement('input');inp.className='hl-input';
       inp.value=h.query;inp.placeholder=`H${h.id}`;
-      const applyHlInput=()=>{h.query=inp.value;slot.style.borderColor=h.query?h.border:'var(--bd)';dot.style.background=h.query?h.bg:'var(--b3)';rerenderHighlights()};
+      const cnt=document.createElement('span');cnt.className='hl-count';
+      function refreshCount(){
+        if (!h.query.trim()){cnt.textContent='';return}
+        const tab=S.tabs.find(t=>t.id===S.activeId);
+        const vis=tab?._visLines||(tab?.logLines)||[];
+        const q=h.query.toLowerCase();
+        cnt.textContent=vis.filter(ll=>ll.raw.toLowerCase().includes(q)).length;
+      }
+      _hlCountRefreshers.push(refreshCount);
+      refreshCount();
+      const applyHlInput=()=>{
+        h.query=inp.value;
+        slot.style.borderColor=h.query?h.border:'var(--bd)';
+        dot.style.background=h.query?h.bg:'var(--b3)';
+        slot.classList.toggle('active-slot',!!h.query);
+        rerenderHighlights();
+      };
       inp.addEventListener('blur',applyHlInput);
       inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();applyHlInput()}});
+      const navUp=document.createElement('button');navUp.className='hl-nav';navUp.textContent='▲';
+      navUp.title=`Previous H${h.id} match`;
+      navUp.addEventListener('click',()=>navigateHighlight(h,'up'));
+      const navDn=document.createElement('button');navDn.className='hl-nav';navDn.textContent='▼';
+      navDn.title=`Next H${h.id} match`;
+      navDn.addEventListener('click',()=>navigateHighlight(h,'down'));
       const clr=document.createElement('button');clr.className='hl-clr';clr.textContent='×';
-      clr.addEventListener('click',()=>{h.query='';inp.value='';slot.style.borderColor='var(--bd)';dot.style.background='var(--b3)';rerenderHighlights()});
-      slot.appendChild(dot);slot.appendChild(inp);slot.appendChild(clr);wrap.appendChild(slot);
+      clr.addEventListener('click',()=>{h.query='';inp.value='';slot.style.borderColor='var(--bd)';dot.style.background='var(--b3)';slot.classList.remove('active-slot');refreshCount();rerenderHighlights()});
+      slot.appendChild(dot);slot.appendChild(inp);slot.appendChild(cnt);slot.appendChild(navUp);slot.appendChild(navDn);slot.appendChild(clr);wrap.appendChild(slot);
     });
   }
 
   function rerenderHighlights(){
     const tab=S.tabs.find(t=>t.id===S.activeId);
     if (!tab||!tab.parsed) return;
+    // Re-render visible log rows via virtual scroller
+    if (tab._logScroller) tab._logScroller.refresh();
+    // Update tree node highlights in-place (tree is fully in DOM)
     const hls=getActiveHls();
-    $$('.ll [data-raw], .nrow [data-raw]').forEach(span=>{
+    $$('.nrow [data-raw]').forEach(span=>{
       const raw=span.dataset.raw;
       if (span.className==='nparams') span.innerHTML='('+applyHl(raw,hls)+')';
       else span.innerHTML=applyHl(raw,hls);
     });
-    applyHideToLog(tab);
-    const firstMark=C.querySelector('.log-rendered mark');
-    if (firstMark) firstMark.closest('.ll').scrollIntoView({block:'center',behavior:'smooth'});
+    updateAllHlCounts();
   }
 
   function applyHideToLog(tab){
     const t=tab||getActiveTab();
-    const logEl=C.querySelector('#logRendered_'+t?.id);
-    if (!logEl) return;
-    const kws=S.hideKeywords,hEvs=S.hiddenEventTypes,noFilter=!kws.length&&!hEvs.size;
-    logEl.querySelectorAll('.ll').forEach(ll=>{
-      if (noFilter){ll.classList.remove('ll-hidden');return}
-      const ev=ll.dataset.ev||'';
-      const evHidden=hEvs.size&&hEvs.has(ev);
-      const idx=parseInt(ll.dataset.idx);
-      const raw=evHidden?'':(t?.logLines[idx]?.raw||'');
-      ll.classList.toggle('ll-hidden',evHidden||(kws.length&&kws.some(k=>raw.toLowerCase().includes(k))));
-    });
+    if (!t?._logScroller) return;
+    t._logScroller.refresh(computeVisibleLines(t));
   }
 
   function getActiveTab(){return S.tabs.find(t=>t.id===S.activeId)}
@@ -897,7 +1460,12 @@ function initAnalyzer(rootEl, fetchSource) {
     rerender();
   }
   function toggleOpt(key,btn){S[key]=!S[key];btn.classList.toggle('on',S[key]);rerender()}
-  function rerender(){const tab=S.tabs.find(t=>t.id===S.activeId);if(tab&&tab.parsed)renderTreePane(tab)}
+  function rerender(){
+    const tab=S.tabs.find(t=>t.id===S.activeId);
+    if (!tab||!tab.parsed) return;
+    if ($('splitWrap').classList.contains('tree-hidden')){tab._treeDirty=true;return}
+    renderTreePane(tab);
+  }
 
   // ── Namespace filter ───────────────────────────────────────────────────────
   function renderNsPopup(tab){
@@ -938,7 +1506,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const hideAll=document.createElement('button');hideAll.className='btn btn-sm';hideAll.textContent='Hide all';
     hideAll.addEventListener('click',()=>{tab.eventTypes.forEach((_,ev)=>S.hiddenEventTypes.add(ev));renderLogTagsPopup(tab);applyHideToLog(tab)});
     ctrl.appendChild(showAll);ctrl.appendChild(hideAll);pop.appendChild(ctrl);
-    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>b[1]-a[1]);
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
     sorted.forEach(([ev,count])=>{
       const item=document.createElement('div');item.className='ns-item';
       const cb=document.createElement('input');cb.type='checkbox';cb.checked=!S.hiddenEventTypes.has(ev);
@@ -949,6 +1517,100 @@ function initAnalyzer(rootEl, fetchSource) {
       const label=document.createElement('span');label.style.cssText='flex:1;font-family:monospace;font-size:10px';label.textContent=ev;
       const cnt=document.createElement('span');cnt.style.cssText='color:var(--vd);font-size:10px;margin-left:auto';cnt.textContent=count;
       item.appendChild(cb);item.appendChild(label);item.appendChild(cnt);pop.appendChild(item);
+    });
+  }
+
+  // ── Log Tags modal ─────────────────────────────────────────────────────────
+  let _logTagsModal=null;
+  function openLogTagsModal(tab){
+    if (_logTagsModal) { _logTagsModal.remove(); _logTagsModal=null; }
+    if (!tab?.eventTypes?.size) return;
+    const overlay=document.createElement('div');overlay.className='filter-modal-overlay';
+    _logTagsModal=overlay;
+    const modal=document.createElement('div');modal.className='filter-modal';
+
+    // header
+    const hdr=document.createElement('div');hdr.className='filter-modal-hdr';
+    const title=document.createElement('span');title.className='filter-modal-title';title.textContent='Log Tags';
+    const search=document.createElement('input');search.className='filter-modal-search';search.placeholder='Filter…';search.type='search';
+    const closeBtn=document.createElement('button');closeBtn.className='btn btn-sm';closeBtn.textContent='✕';
+    closeBtn.addEventListener('click',closeLogTagsModal);
+    hdr.appendChild(title);hdr.appendChild(search);hdr.appendChild(closeBtn);
+
+    // body
+    const body=document.createElement('div');body.className='filter-modal-body';
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    function renderItems(filter){
+      body.innerHTML='';
+      sorted.forEach(([ev,count])=>{
+        if (filter&&!ev.toLowerCase().includes(filter)) return;
+        const row=document.createElement('div');row.className='filter-modal-item';
+        const cb=document.createElement('input');cb.type='checkbox';cb.id='fmi_'+ev;
+        cb.checked=!S.hiddenEventTypes.has(ev);
+        cb.addEventListener('change',()=>{
+          if(cb.checked) S.hiddenEventTypes.delete(ev); else S.hiddenEventTypes.add(ev);
+          applyHideToLog(tab);updateAllHlCounts();
+        });
+        const lbl=document.createElement('label');lbl.htmlFor='fmi_'+ev;lbl.textContent=ev;
+        const cnt=document.createElement('span');cnt.className='fmi-cnt';cnt.textContent=count;
+        row.appendChild(cb);row.appendChild(lbl);row.appendChild(cnt);body.appendChild(row);
+      });
+    }
+    renderItems('');
+    search.addEventListener('input',()=>renderItems(search.value.trim().toLowerCase()));
+
+    // footer
+    const footer=document.createElement('div');footer.className='filter-modal-footer';
+    const showAll=document.createElement('button');showAll.className='btn btn-sm';showAll.textContent='Show all';
+    showAll.addEventListener('click',()=>{S.hiddenEventTypes.clear();renderItems(search.value.trim().toLowerCase());applyHideToLog(tab);updateAllHlCounts()});
+    const hideAll=document.createElement('button');hideAll.className='btn btn-sm';hideAll.textContent='Hide all';
+    hideAll.addEventListener('click',()=>{tab.eventTypes.forEach((_,ev)=>S.hiddenEventTypes.add(ev));renderItems(search.value.trim().toLowerCase());applyHideToLog(tab);updateAllHlCounts()});
+    const count=document.createElement('span');count.style.cssText='font-size:11px;color:var(--dm);margin-left:auto';
+    count.textContent=`${tab.eventTypes.size} types`;
+    footer.appendChild(showAll);footer.appendChild(hideAll);footer.appendChild(count);
+
+    modal.appendChild(hdr);modal.appendChild(body);modal.appendChild(footer);
+    overlay.appendChild(modal);
+    C.appendChild(overlay);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)closeLogTagsModal()});
+    overlay.addEventListener('keydown',e=>{if(e.key==='Escape')closeLogTagsModal()});
+    search.focus();
+  }
+  function closeLogTagsModal(){if(_logTagsModal){_logTagsModal.remove();_logTagsModal=null}}
+
+  // ── NS log filter (hide namespace from log lines) ──────────────────────────
+  function renderNsLogPopup(tab,pop,anchorBtn){
+    pop.innerHTML='';
+    const nsArr=[...tab.namespaces].sort();
+    if (!nsArr.length){pop.classList.remove('open');return}
+    // position below button
+    const rect=anchorBtn.getBoundingClientRect();
+    pop.style.top=(rect.bottom+4)+'px';
+    pop.style.left=rect.left+'px';
+    // "all" toggle
+    const allRow=document.createElement('div');allRow.className='ns-log-item';
+    const allCb=document.createElement('input');allCb.type='checkbox';
+    allCb.checked=S.hiddenNsLines.size===0;
+    allCb.addEventListener('change',()=>{
+      if(allCb.checked){ S.hiddenNsLines.clear(); }
+      else { nsArr.forEach(ns=>S.hiddenNsLines.add(ns)); }
+      renderNsLogPopup(tab,pop,anchorBtn);
+      applyHideToLog(tab);updateAllHlCounts();
+    });
+    const allLbl=document.createElement('label');allLbl.textContent='Show all namespaces';
+    allRow.appendChild(allCb);allRow.appendChild(allLbl);pop.appendChild(allRow);
+    const sep=document.createElement('div');sep.style.cssText='height:1px;background:var(--bd);margin:3px 0';pop.appendChild(sep);
+    nsArr.forEach(ns=>{
+      const row=document.createElement('div');row.className='ns-log-item';
+      const cb=document.createElement('input');cb.type='checkbox';
+      cb.checked=!S.hiddenNsLines.has(ns);
+      cb.addEventListener('change',()=>{
+        if(cb.checked) S.hiddenNsLines.delete(ns); else S.hiddenNsLines.add(ns);
+        allCb.checked=S.hiddenNsLines.size===0;
+        applyHideToLog(tab);updateAllHlCounts();
+      });
+      const lbl=document.createElement('label');lbl.textContent=ns;
+      row.appendChild(cb);row.appendChild(lbl);pop.appendChild(row);
     });
   }
 
@@ -1175,6 +1837,7 @@ function initAnalyzer(rootEl, fetchSource) {
   $('btn-history').addEventListener('click', toggleHistory);
   $('btn-addTab').addEventListener('click', ()=>addTab(null,'Untitled',''));
   $('btn-closeHist').addEventListener('click', toggleHistory);
+  $('btn-hideTree').addEventListener('click', hideTreePane);
   $('togDebug').addEventListener('click', ()=>toggleOpt('showDebug',$('togDebug')));
   $('togSys').addEventListener('click', ()=>toggleOpt('showSystem',$('togSys')));
   $('togVarAssign').addEventListener('click', ()=>{
@@ -1202,40 +1865,54 @@ function initAnalyzer(rootEl, fetchSource) {
       $('nsPopup').classList.remove('open');
       $('logTagsPopup').classList.remove('open');
     }
+    if (!e.target.closest('.ns-log-popup')&&!e.target.closest('[title="Hide namespaces from log"]')){
+      document.querySelectorAll('.ns-log-popup.open').forEach(p=>p.classList.remove('open'));
+    }
     if (!e.target.closest('.gs-wrap')) $('gsResults').style.display='none';
   });
 
-  // ── Split pane ─────────────────────────────────────────────────────────────
+  // ── Split pane (vertical drag) ─────────────────────────────────────────────
   (()=>{
-    let dragging=false,startY=0,startH=0;
-    const div=$('hdivider');
+    let dragging=false,startX=0,startW=0;
+    const div=$('vdivider');
     div.addEventListener('mousedown',e=>{
-      dragging=true;startY=e.clientY;
-      startH=$('logPane').getBoundingClientRect().height;
+      dragging=true;startX=e.clientX;
+      startW=$('logPane').getBoundingClientRect().width;
       e.preventDefault();
     });
     document.addEventListener('mousemove',e=>{
       if (!dragging) return;
-      const delta=e.clientY-startY;
-      const wrap=$('splitWrap');
-      const total=wrap.getBoundingClientRect().height;
-      const newH=Math.max(60,Math.min(total-100,startH+delta));
-      C.style.setProperty('--log-h',newH+'px');
+      const delta=e.clientX-startX;
+      const total=$('splitWrap').getBoundingClientRect().width;
+      const newW=Math.max(180,Math.min(total-180,startW+delta));
+      C.style.setProperty('--log-w',newW+'px');
     });
     document.addEventListener('mouseup',()=>{dragging=false});
   })();
 
   // ── Drag & drop ────────────────────────────────────────────────────────────
   const dropOverlay=$('dropOverlay');
-  document.addEventListener('dragover',e=>{e.preventDefault();dropOverlay.classList.add('show')});
+  document.addEventListener('dragover',e=>{
+    e.preventDefault();
+    const hasText=e.dataTransfer.types&&(e.dataTransfer.types.includes('text/plain')||e.dataTransfer.types.includes('Text'));
+    dropOverlay.textContent=hasText?'Drop to open as log':'Drop log file(s) to open';
+    dropOverlay.classList.add('show');
+  });
   document.addEventListener('dragleave',e=>{if(!e.relatedTarget)dropOverlay.classList.remove('show')});
   document.addEventListener('drop',e=>{
     e.preventDefault();dropOverlay.classList.remove('show');
-    [...e.dataTransfer.files].forEach(f=>{
-      const reader=new FileReader();
-      reader.onload=ev=>addTab(null,f.name,ev.target.result);
-      reader.readAsText(f);
-    });
+    const files=[...e.dataTransfer.files];
+    if (files.length){
+      files.forEach(f=>{
+        const reader=new FileReader();
+        reader.onload=ev=>addTab(null,f.name,ev.target.result);
+        reader.readAsText(f);
+      });
+      return;
+    }
+    // plain-text drag from other apps (selected text, terminal output, etc.)
+    const text=e.dataTransfer.getData('text/plain')||e.dataTransfer.getData('Text');
+    if (text&&text.trim()) addTab(null,'Dropped log',text.trim());
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────

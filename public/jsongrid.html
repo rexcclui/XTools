@@ -97,6 +97,12 @@ body{font-family:var(--sans);font-size:13px;background:var(--bg3);color:var(--tx
 .src-hl{background:var(--hl-src);border-radius:2px}
 .grid-hl{background:var(--hl-grid)!important;outline:1px solid rgba(55,138,221,0.35);outline-offset:-1px}
 .sel-node{outline:2px solid #f0932b!important;outline-offset:-2px;background:rgba(240,147,43,0.12)!important}
+.cell-search-bar{display:flex;align-items:center;gap:4px;padding:3px 6px;border-bottom:0.5px solid var(--bd);background:var(--bg2);flex-shrink:0}
+.cell-search-inp{flex:1;font-size:11px;background:var(--bg);border:0.5px solid var(--bd2);border-radius:4px;color:var(--tx);padding:2px 6px;outline:none;min-width:0}
+.cell-search-inp:focus{border-color:var(--accent-m)}
+.cell-search-cnt{font-size:10px;color:var(--tx3);white-space:nowrap;min-width:54px;text-align:right}
+.search-hl{background:rgba(250,199,50,.45)!important;outline:1px solid #f0b800;border-radius:2px}
+.search-hl-cur{background:rgba(240,120,20,.55)!important;outline:2px solid #e07000;border-radius:2px}
 
 /* Syntax colors */
 .jk{color:#ffff00}.js{color:#00ffff}.jn{color:#ff8c00}.jb{color:#00ff88}.jnu{color:var(--tx3);font-style:italic}.jbr{color:var(--tx2)}
@@ -189,12 +195,12 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
   <button class="tbtn" onclick="adj('rows',1)">+</button>
   <input id="gs" placeholder="Global search…" oninput="gSearch(this.value)"/>
   <button id="btn-hide-src" class="tbtn" onclick="togAllSrc()" title="Hide/show all source panels">⊡ Hide Source</button>
-  <button id="btn-scroll-sync" class="tbtn accent" onclick="togScrollSync()" title="Scroll sync ON — when hovering one side, the other side auto-scrolls to show the highlighted element">⇳ Scroll Sync</button>
-  <button class="tbtn" title="Click any two value cells in the grid to compare" onclick="showCmpHelp()" id="btn-cmp">⇄ Compare <span id="sel-count" class="sel-badge"></span></button>
+  <button class="tbtn" title="Select two cells then right-click to compare" onclick="showCmpHelp()" id="btn-cmp">⇄ Compare <span id="sel-count" class="sel-badge"></span></button>
   <button class="tbtn danger" style="margin-left:auto" onclick="clearAll()">✕ Clear Tab</button>
 </div>
 <div id="tab-bar"></div>
 <div id="ctx-menu">
+  <div id="ctx-locate-other" class="ctx-item" onclick="ctxLocateOtherSide()" style="display:none"><span>⇆</span> Locate on other side</div>
   <div id="ctx-copy-json" class="ctx-item" onclick="ctxCopyJSON()"><span>⎘</span> Copy node JSON</div>
   <div id="ctx-parse-json" class="ctx-item" onclick="ctxParseJSON()"><span>⊞</span> Convert string to JSON table</div>
   <div id="ctx-compare" class="ctx-item" onclick="openCompare()"><span>⇄</span> Compare selected nodes</div>
@@ -208,7 +214,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 /* ══ STATE ══ */
 let App={activeTab:0,tabs:[]};
 let G;
-let _dat={},_exp={},_debounce={},_srcHidden=false,_scrollSync=true;
+let _dat={},_exp={},_debounce={},_srcHidden=false;
 let _sel=[];
 
 function initApp(){
@@ -296,28 +302,17 @@ function highlightPath(cellEl,path){
   if(gp)gp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('grid-hl'));
   if(sp)sp.querySelectorAll(`[data-p="${escA(path)}"]`).forEach(el=>el.classList.add('src-hl'));
 }
-function togScrollSync(){
-  _scrollSync=!_scrollSync;
-  const btn=document.getElementById('btn-scroll-sync');
-  if(btn){
-    btn.className='tbtn'+(_scrollSync?' accent':'');
-    btn.title=_scrollSync
-      ?'Scroll sync ON — when hovering one side, the other side auto-scrolls to show the highlighted element'
-      :'Scroll sync OFF — highlighted elements will not auto-scroll into view';
-  }
-}
-/* Scroll the first highlighted element into view only if it is outside the
-   visible area of its scrollable container. */
+/* Scroll the highlighted element to the center of its container.
+   Uses direct scrollTo so only the target panel scrolls. */
 function scrollHlIntoView(container,hlClass){
-  if(!_scrollSync)return;
   if(!container)return;
   const el=container.querySelector('.'+hlClass);
   if(!el)return;
   const cr=container.getBoundingClientRect();
   const er=el.getBoundingClientRect();
-  if(er.bottom<cr.top||er.top>cr.bottom){
-    el.scrollIntoView({block:'nearest',behavior:'smooth'});
-  }
+  if(!cr.width&&!cr.height)return; // container hidden
+  const relTop=er.top-cr.top+container.scrollTop;
+  container.scrollTo({top:Math.max(0,relTop-container.clientHeight/2+er.height/2),behavior:'smooth'});
 }
 function clearHighlight(cellEl){
   cellEl.querySelectorAll('.grid-hl').forEach(el=>el.classList.remove('grid-hl'));
@@ -395,6 +390,9 @@ function cellHTML(id,r,c,s){
     <button class="ib dx" title="Clear cell" onclick="clearCell('${id}')">✕</button>
     <input class="title-inp" value="${escH(s.title||'')}" oninput="G.cells['${id}'].title=this.value;lsSave('${id}');saveAppState();" placeholder="Untitled…"/>
     <div style="flex:1"></div>
+  </div>
+  <div class="cell-search-bar">
+    <input class="cell-search-inp" id="csi-${id}" type="search" placeholder="🔍 Search…" oninput="doCellSearch('${id}',this.value)"/><span class="cell-search-cnt" id="csc-${id}"></span><button class="ib" onclick="navSearch('${id}',-1)" title="Previous match">▲</button><button class="ib" onclick="navSearch('${id}',1)" title="Next match">▼</button>
   </div>
   <div class="cell-body">
     <div class="src-panel" id="src-${id}">
@@ -614,6 +612,7 @@ function rebuildGP(id){
   gp.innerHTML=buildGrid(id,s);
   const cell=document.getElementById('cell-'+id);if(cell)setupSyncEvents(cell,id);
   reapplySelNodes();
+  applySearchHL(id);
 }
 function reapplySelNodes(){
   // After any DOM rebuild, re-highlight selected nodes by path+cid match
@@ -870,8 +869,6 @@ function setupSyncEvents(cellEl,id){
       if(!el)return;
       highlightPath(cellEl,el.dataset.p);
       showNodePopup(el.dataset.p,el.dataset.cid||cid,e.clientX,e.clientY);
-      // scroll the corresponding src-pretty highlight into view if off-screen
-      scrollHlIntoView(cellEl.querySelector('.src-pretty'),'src-hl');
     });
     gp.addEventListener('mousemove',e=>moveNodePopup(e.clientX,e.clientY));
     gp.addEventListener('mouseleave',()=>{clearHighlight(cellEl);hideNodePopup();});
@@ -881,19 +878,13 @@ function setupSyncEvents(cellEl,id){
       const el=e.target.closest('[data-p]');
       if(!el)return;
       highlightPath(cellEl,el.dataset.p);
-      // scroll the corresponding grid highlight into view if off-screen
-      scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
     });
     sp.addEventListener('mouseleave',()=>clearHighlight(cellEl));
   }
   if(ta){
     const syncH=()=>{
       const path=pathAtPos(ta.value,ta.selectionStart,cid);
-      if(path){
-        highlightPath(cellEl,path);
-        // scroll the corresponding grid highlight into view if off-screen
-        scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
-      }
+      if(path) highlightPath(cellEl,path);
     };
     ta.addEventListener('keyup',syncH);ta.addEventListener('click',syncH);
   }
@@ -972,7 +963,6 @@ function toggleSel(el,cid,path){
   if(idx>-1){_sel[idx].el.classList.remove('sel-node');_sel.splice(idx,1);}
   else{if(_sel.length>=2){const o=_sel.shift();if(o.el)o.el.classList.remove('sel-node');}el.classList.add('sel-node');_sel.push({cid,path,key:k,el});}
   updSelBadge();
-  if(_sel.length===2)openCompare();
 }
 function updSelBadge(){
   const badge=document.getElementById('sel-count');
@@ -980,7 +970,7 @@ function updSelBadge(){
 }
 function showCmpHelp(){
   if(_sel.length===2){openCompare();return;}
-  alert('Click any value cell in the grid table to select it (turns orange). Click a second value to automatically open the compare view. Click a selected cell again to deselect it.');
+  alert('Click any value cell in the grid table to select it (turns orange). Select two cells, then right-click and choose "Compare selected nodes". Click a selected cell again to deselect it.');
 }
 
 function openCompare(){
@@ -1082,7 +1072,7 @@ function diffRows(a,b,basePath){
 
 /* ══ CONTEXT MENU ══ */
 let _ctxTarget=null;
-function hideCtxMenu(){document.getElementById('ctx-menu').style.display='none';_ctxTarget=null;}
+function hideCtxMenu(){document.getElementById('ctx-menu').style.display='none';}
 function ctxCopyJSON(){
   if(!_ctxTarget)return;
   const v=getAt(_ctxTarget.cid,_ctxTarget.path);
@@ -1124,25 +1114,149 @@ document.addEventListener('click',e=>{
   toggleSel(el,resolvedCid,el.dataset.p);
 },true);
 
+/* ══ PER-CELL SEARCH ══ */
+let _searchState={};
+
+function walkSearch(data,path,q,results){
+  if(data===null||typeof data!=='object'){
+    const sv=data===null?'null':String(data);
+    if(sv.toLowerCase().includes(q))results.push(path);
+    return;
+  }
+  if(Array.isArray(data)){data.forEach((v,i)=>walkSearch(v,path+'['+i+']',q,results));}
+  else{Object.keys(data).forEach(k=>{const cp=path+'.'+k;if(k.toLowerCase().includes(q))results.push(cp);walkSearch(data[k],cp,q,results);});}
+}
+
+function expandAncestors(fullPath){
+  const idx=fullPath.indexOf('::$');if(idx<0)return;
+  const base=fullPath.slice(0,idx+3);
+  _exp[base]=true;
+  let acc=base;
+  for(const m of fullPath.slice(base.length).matchAll(/(\.[^.\[]+|\[\d+\])/g)){acc+=m[0];_exp[acc]=true;}
+}
+
+function doCellSearch(id,query){
+  const q=query.trim().toLowerCase();
+  const cid='t'+G.id+'_'+id;
+  if(!q){_searchState[id]={query:'',matches:[],idx:0};rebuildGP(id);const cnt=document.getElementById('csc-'+id);if(cnt)cnt.textContent='';return;}
+  const data=_dat[cid];
+  if(!data){return;}
+  const matches=[];
+  walkSearch(data,cid+'::$',q,matches);
+  matches.forEach(p=>expandAncestors(p));
+  _searchState[id]={query:q,matches,idx:0};
+  rebuildGP(id);
+  updateSearchCount(id);
+  if(matches.length)scrollToSearchMatch(id,0);
+}
+
+function applySearchHL(id){
+  const state=_searchState[id];
+  if(!state||!state.matches.length)return;
+  const gp=document.getElementById('gp-'+id);if(!gp)return;
+  const cid='t'+G.id+'_'+id;
+  state.matches.forEach((p,i)=>{
+    gp.querySelectorAll(`[data-p="${escA2(p)}"][data-cid="${escA2(cid)}"]`).forEach(el=>{
+      el.classList.add('search-hl');
+      if(i===state.idx)el.classList.add('search-hl-cur');
+    });
+  });
+}
+
+function updateSearchCount(id){
+  const state=_searchState[id];
+  const cnt=document.getElementById('csc-'+id);if(!cnt)return;
+  if(!state||!state.matches.length){cnt.textContent=state&&state.query?'0 results':'';return;}
+  cnt.textContent=`${state.idx+1}/${state.matches.length}`;
+}
+
+function scrollToSearchMatch(id,idx){
+  const state=_searchState[id];if(!state||!state.matches.length)return;
+  const gp=document.getElementById('gp-'+id);if(!gp)return;
+  const jgWrap=gp.querySelector('.jg-wrap');if(!jgWrap)return;
+  const cid='t'+G.id+'_'+id;
+  const path=state.matches[idx];
+  const el=jgWrap.querySelector(`[data-p="${escA2(path)}"][data-cid="${escA2(cid)}"]`);
+  if(!el)return;
+  const cr=jgWrap.getBoundingClientRect();
+  const er=el.getBoundingClientRect();
+  const relTop=er.top-cr.top+jgWrap.scrollTop;
+  jgWrap.scrollTo({top:Math.max(0,relTop-jgWrap.clientHeight/2+er.height/2),behavior:'smooth'});
+}
+
+function navSearch(id,dir){
+  const state=_searchState[id];if(!state||!state.matches.length)return;
+  state.idx=(state.idx+dir+state.matches.length)%state.matches.length;
+  const gp=document.getElementById('gp-'+id);
+  if(gp)gp.querySelectorAll('.search-hl-cur').forEach(el=>el.classList.remove('search-hl-cur'));
+  const cid='t'+G.id+'_'+id;
+  const path=state.matches[state.idx];
+  if(gp)gp.querySelectorAll(`[data-p="${escA2(path)}"][data-cid="${escA2(cid)}"]`).forEach(el=>el.classList.add('search-hl-cur'));
+  updateSearchCount(id);
+  scrollToSearchMatch(id,state.idx);
+}
+
 document.addEventListener('contextmenu',e=>{
-  // Walk up to find any element with data-p and data-cid
-  const el=e.target.closest('[data-p][data-cid],.jv');
-  if(!el||!el.dataset.p||!el.dataset.cid){hideCtxMenu();return;}
+  const elCid=e.target.closest('[data-p][data-cid],.jv');
+  const elP=e.target.closest('[data-p]');
+  if(!elP&&!elCid){hideCtxMenu();return;}
   e.preventDefault();
-  _ctxTarget={el,path:el.dataset.p,cid:el.dataset.cid};
+  const useEl=elCid||elP;
+  // derive cid from element or from parent cell
+  let cid=useEl.dataset.cid;
+  if(!cid){
+    const cellEl=useEl.closest('[id^="cell-"]');
+    if(cellEl) cid='t'+G.id+'_'+cellEl.id.replace('cell-','');
+  }
+  const inGrid=!!useEl.closest('.grid-panel,.jg-wrap');
+  const inSrc=!!useEl.closest('.src-pretty');
+  _ctxTarget={el:useEl,path:useEl.dataset.p,cid,inGrid,inSrc};
   const m=document.getElementById('ctx-menu');
-  const v=getAt(_ctxTarget.cid,_ctxTarget.path);
+  const v=cid?getAt(cid,useEl.dataset.p):undefined;
   const isJsonStr=typeof v==='string'&&(v.trim().startsWith('{')||v.trim().startsWith('['));
+  const canLocate=inGrid||inSrc;
+  document.getElementById('ctx-locate-other').style.display=canLocate?'flex':'none';
   document.getElementById('ctx-copy-json').style.display=v!==undefined?'flex':'none';
   document.getElementById('ctx-parse-json').style.display=isJsonStr?'flex':'none';
   document.getElementById('ctx-compare').style.display=_sel.length===2?'flex':'none';
-  if(v===undefined&&!isJsonStr&&_sel.length!==2){hideCtxMenu();return;}
+  if(!canLocate&&v===undefined&&!isJsonStr&&_sel.length!==2){hideCtxMenu();return;}
   const vw=window.innerWidth,vh=window.innerHeight;
   m.style.display='block';
   m.style.left=(e.clientX+220>vw?e.clientX-220:e.clientX)+'px';
   m.style.top=(e.clientY+120>vh?e.clientY-120:e.clientY)+'px';
 });
-document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu'))hideCtxMenu();});
+
+function ctxLocateOtherSide(){
+  hideCtxMenu();
+  if(!_ctxTarget)return;
+  const {el,path,inGrid,inSrc}=_ctxTarget;
+  const cellEl=el.closest('[id^="cell-"]');
+  if(!cellEl||!path)return;
+  const id=cellEl.id.replace('cell-','');
+  // Expand ancestors so the target element is rendered in the destination panel
+  expandAncestors(path);
+  if(inGrid){
+    // clicked in grid → locate in src-pretty
+    const sp=cellEl.querySelector('.src-pretty');
+    if(!sp||!sp.classList.contains('on')){
+      togPretty(id); // switches to pretty mode and re-renders with updated _exp
+    } else {
+      renderPretty(id); // re-render with updated _exp so expanded ancestors appear
+    }
+    setTimeout(()=>{
+      highlightPath(cellEl,path);
+      scrollHlIntoView(cellEl.querySelector('.src-pretty'),'src-hl');
+    },30);
+  } else if(inSrc){
+    // clicked in src-pretty → locate in grid
+    rebuildGP(id); // rebuilds grid DOM with expanded ancestors
+    setTimeout(()=>{
+      highlightPath(cellEl,path);
+      scrollHlIntoView(cellEl.querySelector('.jg-wrap'),'grid-hl');
+    },30);
+  }
+}
+document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu')){hideCtxMenu();_ctxTarget=null;}});
 document.getElementById('cmp-modal').addEventListener('click',e=>{if(e.target===document.getElementById('cmp-modal')){document.getElementById('cmp-modal').style.display='none';clearSel();}});
 document.getElementById('json-pick-modal').addEventListener('click',e=>{if(e.target===document.getElementById('json-pick-modal'))hideJsonPickModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hideJsonPickModal();});
