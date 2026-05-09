@@ -509,7 +509,7 @@ function buildWorkerSrc(){
     '    if(ev==="EXECUTION_STARTED"){root.ts=ts;root.ns=ns;continue}\n'+
     '    if(ev==="EXECUTION_FINISHED"){root.endNs=ns;root.dur=ns-root.ns;continue}\n'+
     '    if(EXIT_MAP[ev]){\n'+
-    '      if(stk.length>1){const n=stk.pop();n.endNs=ns;n.dur=ns-n.ns;\n'+
+    '      if(stk.length>1){const n=stk.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=lls.length-1;\n'+
     '        if(ev==="SOQL_EXECUTE_END"){const m=rest.match(/Rows:(\\d+)/i);if(m)n.rowCount=m[1]}\n'+
     '        if(ev==="CALLOUT_RESPONSE"){const sc=rest.match(/StatusCode=(\\d+)/);if(sc)n.calloutResp="HTTP "+sc[1]}\n'+
     '      }continue;}\n'+
@@ -518,7 +518,7 @@ function buildWorkerSrc(){
     '    if(ev==="EXCEPTION_THROWN"||ev==="FATAL_ERROR"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"exception",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});stats.exc++;continue}\n'+
     '    if(PUSH_EVS.has(ev)){\n'+
     '      const m=evMeta(ev,rest);const nt=m.subtype||evType(ev);\n'+
-    '      const nd={id:"n"+(++seq),type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=="system_method",rowCount:null,calloutResp:null};\n'+
+    '      const nd={id:"n"+(++seq),type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=="system_method",rowCount:null,calloutResp:null,logIdx:lls.length-1};\n'+
     '      if(nt==="method"||nt==="constructor")stats.methods++;\n'+
     '      if(nt==="soql")stats.soql++;\n'+
     '      if(nt==="dml")stats.dml++;\n'+
