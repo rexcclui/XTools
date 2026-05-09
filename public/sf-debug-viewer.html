@@ -201,13 +201,14 @@ const CSS = `
 .parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
 .parse-progress-pct{font-size:10px;color:var(--vd)}
 .sda.hide-vars .t-varAssign{display:none}
-.snippet-popup{position:fixed;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;min-width:686px;max-width:1030px;font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden}
-.snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e}
+.snippet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
+.snippet-popup{background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;width:720px;max-width:90%;max-height:72vh;font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden;display:flex;flex-direction:column}
+.snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e;flex-shrink:0}
 .snippet-cls{color:#79c0ff;font-weight:600}
 .snippet-ln{color:#e3b341}
 .snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:14px;cursor:pointer;padding:0 3px;line-height:1}
 .snippet-close:hover{color:#f85149}
-.snippet-body{overflow:auto;max-height:380px;padding:8px 0}
+.snippet-body{overflow:auto;flex:1;padding:8px 0}
 .snippet-loading{padding:20px;text-align:center;color:#8b949e;font-size:11px}
 .snippet-error{padding:12px 16px;color:#f85149;font-size:11px}
 .sline{display:flex;align-items:baseline;padding:1px 0}
@@ -862,7 +863,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   document.addEventListener('click',e=>{if(_ctxMenu&&!_ctxMenu.contains(e.target))closeLogContextMenu()},true);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();closeSnippet();}});
 
   function moveLogCursor(tab,newIdx){
     const vis=tab._visLines||[];
@@ -1076,7 +1077,7 @@ function initAnalyzer(rootEl, fetchSource) {
       if (node.lr&&node.lr!=='[EXTERNAL]') row.dataset.snippetLr=node.lr;
       const srcBtn=document.createElement('span');
       srcBtn.className='nsrc-btn';srcBtn.textContent='⌗';srcBtn.title='View source';
-      srcBtn.addEventListener('click',e=>{e.stopPropagation();showSnippet(node.cls,node.lr&&node.lr!=='[EXTERNAL]'?node.lr:'',row)});
+      srcBtn.addEventListener('click',e=>{e.stopPropagation();showSnippet(node.cls,node.lr&&node.lr!=='[EXTERNAL]'?node.lr:'')});
       row.appendChild(srcBtn);
     }
     wrap.appendChild(row);
@@ -1857,31 +1858,33 @@ function initAnalyzer(rootEl, fetchSource) {
     if (_snippetEl) { _snippetEl.remove(); _snippetEl = null; }
   }
 
-  function showSnippet(cls, lr, anchorEl) {
+  function showSnippet(cls, lr) {
     if (!cls) return;
     const lineNum = parseLineNum(lr);
     closeSnippet();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'snippet-overlay';
+    _snippetEl = overlay;
+
     const pop = document.createElement('div');
     pop.className = 'snippet-popup';
-    _snippetEl = pop;
+
     const hdr = document.createElement('div');
     hdr.className = 'snippet-hdr';
     hdr.innerHTML = `<span class="snippet-cls">${esc(cls)}</span>`
-      + (lineNum ? `<span>:</span><span class="snippet-ln">${lineNum}</span>` : '')
+      + (lineNum ? `<span style="color:var(--vd)">:</span><span class="snippet-ln">${lineNum}</span>` : '')
       + `<button class="snippet-close" title="Close">✕</button>`;
     hdr.querySelector('.snippet-close').addEventListener('click', closeSnippet);
+
     const body = document.createElement('div');
     body.className = 'snippet-body';
-    pop.appendChild(hdr);pop.appendChild(body);
-    document.body.appendChild(pop);
-    const rect = anchorEl.getBoundingClientRect();
-    const pw = 648, ph = 420;
-    let top = rect.bottom + 6;
-    let left = rect.left;
-    if (top + ph > window.innerHeight) top = rect.top - ph - 6;
-    if (left + pw > window.innerWidth) left = window.innerWidth - pw - 12;
-    pop.style.top = Math.max(4, top) + 'px';
-    pop.style.left = Math.max(4, left) + 'px';
+
+    pop.appendChild(hdr); pop.appendChild(body);
+    overlay.appendChild(pop);
+    C.appendChild(overlay);
+
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeSnippet(); });
 
     if (!_srcFileMap.size) {
       body.innerHTML = '<div class="snippet-error" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No project folder open.<button class="btn btn-sm" id="snippetOpenFolderBtn" style="margin-top:2px">📂 Open Source Folder</button></div>';
@@ -1903,7 +1906,7 @@ function initAnalyzer(rootEl, fetchSource) {
         row.appendChild(num); row.appendChild(code);
         frag.appendChild(row);
       }
-      body.innerHTML = '';body.appendChild(frag);
+      body.innerHTML = ''; body.appendChild(frag);
       const target = body.querySelector('.sline-target');
       if (target) target.scrollIntoView({ block: 'center' });
     };
@@ -1918,10 +1921,6 @@ function initAnalyzer(rootEl, fetchSource) {
       });
     }
   }
-
-  document.addEventListener('click', e => {
-    if (_snippetEl && !_snippetEl.contains(e.target)) closeSnippet();
-  }, true);
 
   // ── Sample log ─────────────────────────────────────────────────────────────
   function loadSample(){
@@ -2034,7 +2033,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const row = e.target.closest('[data-snippet-cls]');
     if (!row) return;
     e.preventDefault();
-    showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'', row);
+    showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'');
   });
 
   renderHlSlots();
