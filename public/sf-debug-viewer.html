@@ -234,6 +234,10 @@ const HTML = `
     <div id="hideTags" class="hide-row"></div>
   </div>
   <button class="btn btn-sm" id="btn-history">📚 History</button>
+  <div style="width:1px;height:20px;background:var(--bd)"></div>
+  <button class="btn btn-sm" id="btn-openSrc" title="Open Salesforce source project folder">📂 Source</button>
+  <span id="srcFolderName" style="font-size:10px;color:var(--vd);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default"></span>
+  <input id="srcFolderFallback" type="file" webkitdirectory multiple style="display:none">
 </div>
 <div class="tab-bar" id="tabBar">
   <button class="tab-add" id="btn-addTab" title="New tab">＋</button>
@@ -1064,7 +1068,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const dur=fmtDur(node.dur);
     if (dur){const dd=document.createElement('span');dd.className='ndur';dd.textContent=dur;row.appendChild(dd)}
     if (gapAfter&&S.showTiming){const g=document.createElement('span');g.className='ngap-inline';g.textContent=`+${gapAfter}`;row.appendChild(g)}
-    if (fetchSource&&node.cls&&node.lr&&node.lr!=='[EXTERNAL]'){
+    if (node.cls&&node.lr&&node.lr!=='[EXTERNAL]'){
       row.addEventListener('contextmenu',e=>{e.preventDefault();showSnippet(node.cls,node.lr,row)});
       row.title='Right-click for source snippet';
     }
@@ -1730,7 +1734,63 @@ function initAnalyzer(rootEl, fetchSource) {
     if (panel.classList.contains('open')) renderHistoryPanel();
   }
 
-  // ── Code snippet popup (disabled — no Apex source outside Salesforce) ──────
+  // ── Source folder ──────────────────────────────────────────────────────────
+  let _srcFileMap = new Map(); // simpleCls.toLowerCase() -> FileSystemFileHandle | {_rawFile}
+  let _srcFolderName = '';
+
+  async function walkDirForSrc(dh) {
+    for await (const [name, h] of dh.entries()) {
+      if (h.kind==='file'&&/\.(cls|trigger)$/i.test(name))
+        _srcFileMap.set(name.replace(/\.(cls|trigger)$/i,'').toLowerCase(), h);
+      else if (h.kind==='directory')
+        await walkDirForSrc(h);
+    }
+  }
+
+  async function openSourceFolder() {
+    if (window.showDirectoryPicker) {
+      try {
+        const dh=await window.showDirectoryPicker({mode:'read'});
+        _srcFileMap.clear();_bodyCache.clear();
+        await walkDirForSrc(dh);
+        _srcFolderName=dh.name;
+        updateSrcFolderUI();
+      } catch(e){if(e.name!=='AbortError')console.error(e);}
+    } else {
+      $('srcFolderFallback').click();
+    }
+  }
+
+  function updateSrcFolderUI() {
+    const el=$('srcFolderName');if(!el)return;
+    if (_srcFolderName){
+      el.textContent=_srcFolderName;
+      el.title=`${_srcFileMap.size} Apex files in "${_srcFolderName}"`;
+    } else {el.textContent='';el.title='';}
+  }
+
+  async function readSrcFile(simpleCls) {
+    const h=_srcFileMap.get(simpleCls.toLowerCase());
+    if (!h) return null;
+    const f=h._rawFile||await h.getFile();
+    return f.text();
+  }
+
+  $('btn-openSrc').addEventListener('click', openSourceFolder);
+  const _srcFallback=$('srcFolderFallback');
+  if (_srcFallback) {
+    _srcFallback.addEventListener('change',()=>{
+      _srcFileMap.clear();_bodyCache.clear();
+      for (const f of _srcFallback.files){
+        if (/\.(cls|trigger)$/i.test(f.name))
+          _srcFileMap.set(f.name.replace(/\.(cls|trigger)$/i,'').toLowerCase(),{_rawFile:f});
+      }
+      if (_srcFallback.files.length){_srcFolderName='Loaded files';updateSrcFolderUI();}
+      _srcFallback.value='';
+    });
+  }
+
+  // ── Code snippet popup ─────────────────────────────────────────────────────
   const _bodyCache = new Map();
   let _snippetEl = null;
 
@@ -1786,7 +1846,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   function showSnippet(cls, lr, anchorEl) {
-    if (!fetchSource || !cls) return;
+    if (!cls) return;
     const lineNum = parseLineNum(lr);
     closeSnippet();
     const pop = document.createElement('div');
@@ -1800,7 +1860,6 @@ function initAnalyzer(rootEl, fetchSource) {
     hdr.querySelector('.snippet-close').addEventListener('click', closeSnippet);
     const body = document.createElement('div');
     body.className = 'snippet-body';
-    body.innerHTML = '<div class="snippet-loading">Loading source…</div>';
     pop.appendChild(hdr);pop.appendChild(body);
     document.body.appendChild(pop);
     const rect = anchorEl.getBoundingClientRect();
@@ -1811,9 +1870,17 @@ function initAnalyzer(rootEl, fetchSource) {
     if (left + pw > window.innerWidth) left = window.innerWidth - pw - 12;
     pop.style.top = Math.max(4, top) + 'px';
     pop.style.left = Math.max(4, left) + 'px';
+
+    if (!_srcFileMap.size) {
+      body.innerHTML = '<div class="snippet-error" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No project folder open.<button class="btn btn-sm" id="snippetOpenFolderBtn" style="margin-top:2px">📂 Open Source Folder</button></div>';
+      body.querySelector('#snippetOpenFolderBtn').addEventListener('click',()=>{closeSnippet();openSourceFolder();});
+      return;
+    }
+
+    body.innerHTML = '<div class="snippet-loading">Loading source…</div>';
     const simpleCls = cls.includes('.') ? cls.split('.').pop() : cls;
     const render = (src) => {
-      if (!src) { body.innerHTML = '<div class="snippet-error">Source not available</div>'; return; }
+      if (!src) { body.innerHTML = `<div class="snippet-error"><b>${esc(simpleCls)}.cls</b> not found in project folder</div>`; return; }
       const lines = src.split('\n');
       const frag = document.createDocumentFragment();
       for (let i = 0; i < lines.length; i++) {
@@ -1832,11 +1899,11 @@ function initAnalyzer(rootEl, fetchSource) {
     if (_bodyCache.has(simpleCls)) {
       render(_bodyCache.get(simpleCls));
     } else {
-      fetchSource(simpleCls).then(src => {
+      readSrcFile(simpleCls).then(src => {
         _bodyCache.set(simpleCls, src);
         render(src);
       }).catch(() => {
-        body.innerHTML = '<div class="snippet-error">Failed to load source</div>';
+        body.innerHTML = '<div class="snippet-error">Failed to read source file</div>';
       });
     }
   }
