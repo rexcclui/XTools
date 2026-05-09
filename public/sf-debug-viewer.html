@@ -277,7 +277,8 @@ function evMeta(ev, rest) {
     return {cls,meth,params,sig,lr};
   }
   if (ev==='CODE_UNIT_STARTED') {
-    const name=p.slice(1).join('|')||p[0];
+    const hasCid=p.length>=3&&SID_RE.test(p[1]);
+    const name=(hasCid?p.slice(2).join('|'):p.slice(1).join('|'))||p[0];
     return {cls:'',meth:name,params:'',sig:'',lr:p[0],subtype:/trigger/i.test(name)?'trigger':null};
   }
   if (ev==='SOQL_EXECUTE_BEGIN') {
