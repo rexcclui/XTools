@@ -1769,11 +1769,16 @@ function initAnalyzer(rootEl, fetchSource) {
     } else {el.textContent='';el.title='';}
   }
 
-  async function readSrcFile(simpleCls) {
-    const h=_srcFileMap.get(simpleCls.toLowerCase());
-    if (!h) return null;
-    const f=h._rawFile||await h.getFile();
-    return f.text();
+  async function readSrcFile(cls) {
+    // Try each dot-segment right-to-left: inner class last, then outer class, then namespace-prefix
+    // e.g. "fferpcore.ffasync_ProcessService.ProcessExecutionContext"
+    //   tries: ProcessExecutionContext → ffasync_ProcessService → fferpcore
+    const parts = cls.split('.').filter(Boolean);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const h = _srcFileMap.get(parts[i].toLowerCase());
+      if (h) { const f=h._rawFile||await h.getFile(); return f.text(); }
+    }
+    return null;
   }
 
   $('btn-openSrc').addEventListener('click', openSourceFolder);
@@ -1878,9 +1883,8 @@ function initAnalyzer(rootEl, fetchSource) {
     }
 
     body.innerHTML = '<div class="snippet-loading">Loading source…</div>';
-    const simpleCls = cls.includes('.') ? cls.split('.').pop() : cls;
     const render = (src) => {
-      if (!src) { body.innerHTML = `<div class="snippet-error"><b>${esc(simpleCls)}.cls</b> not found in project folder</div>`; return; }
+      if (!src) { body.innerHTML = `<div class="snippet-error"><b>${esc(cls)}</b> not found in project folder</div>`; return; }
       const lines = src.split('\n');
       const frag = document.createDocumentFragment();
       for (let i = 0; i < lines.length; i++) {
@@ -1896,11 +1900,11 @@ function initAnalyzer(rootEl, fetchSource) {
       const target = body.querySelector('.sline-target');
       if (target) target.scrollIntoView({ block: 'center' });
     };
-    if (_bodyCache.has(simpleCls)) {
-      render(_bodyCache.get(simpleCls));
+    if (_bodyCache.has(cls)) {
+      render(_bodyCache.get(cls));
     } else {
-      readSrcFile(simpleCls).then(src => {
-        _bodyCache.set(simpleCls, src);
+      readSrcFile(cls).then(src => {
+        _bodyCache.set(cls, src);
         render(src);
       }).catch(() => {
         body.innerHTML = '<div class="snippet-error">Failed to read source file</div>';
