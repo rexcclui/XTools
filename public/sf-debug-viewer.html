@@ -1935,33 +1935,29 @@ function initAnalyzer(rootEl, fetchSource) {
     }
 
     body.innerHTML = '<div class="snippet-loading">Loading source…</div>';
-    const render = (src) => {
-      if (!src || src?._notFound) {
-        const info = src?._notFound ? `<div style="margin-top:6px;color:#768390;font-size:10px">Tried: ${esc(src.tried)}<br>Folder has ${src.total} files, e.g.: ${esc(src.sample)}</div>` : '';
-        body.innerHTML = `<div class="snippet-error"><b>${esc(cls)}</b> not found in project folder${info}</div>`;
-        return;
-      }
-      const lines = src.split('\n');
-      const frag = document.createDocumentFragment();
-      for (let i = 0; i < lines.length; i++) {
-        const row = document.createElement('div');
-        row.className = 'sline' + (i + 1 === lineNum ? ' sline-target' : '');
-        const num = document.createElement('span'); num.className = 'sline-num'; num.textContent = i + 1;
-        const code = document.createElement('span'); code.className = 'sline-code';
-        code.innerHTML = apexHL(lines[i]);
-        row.appendChild(num); row.appendChild(code);
-        frag.appendChild(row);
-      }
-      body.innerHTML = ''; body.appendChild(frag);
+    const renderHtml = (html) => {
+      body.innerHTML = html;
       const target = body.querySelector('.sline-target');
       if (target) target.scrollIntoView({ block: 'center' });
     };
+    const buildHtml = (src) => {
+      if (!src || src?._notFound) {
+        const info = src?._notFound ? `<div style="margin-top:6px;color:#768390;font-size:10px">Tried: ${esc(src.tried)}<br>Folder has ${src.total} files, e.g.: ${esc(src.sample)}</div>` : '';
+        return `<div class="snippet-error"><b>${esc(cls)}</b> not found in project folder${info}</div>`;
+      }
+      const lines = src.split('\n');
+      let html = '';
+      for (let i = 0; i < lines.length; i++)
+        html += `<div class="sline${i+1===lineNum?' sline-target':''}"><span class="sline-num">${i+1}</span><span class="sline-code">${apexHL(lines[i])}</span></div>`;
+      return html;
+    };
     if (_bodyCache.has(cls)) {
-      render(_bodyCache.get(cls));
+      renderHtml(_bodyCache.get(cls));
     } else {
       readSrcFile(cls).then(src => {
-        if (!src?._notFound) _bodyCache.set(cls, src);
-        render(src);
+        const html = buildHtml(src);
+        if (!src?._notFound) _bodyCache.set(cls, html);
+        renderHtml(html);
       }).catch(() => {
         body.innerHTML = '<div class="snippet-error">Failed to read source file</div>';
       });
