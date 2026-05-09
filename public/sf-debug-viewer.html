@@ -59,6 +59,10 @@ const CSS = `
 .ll:hover{background:rgba(255,255,255,.03)}
 .ll.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
 .ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
+.ll-tog{font-size:9px;color:var(--vd);min-width:11px;text-align:center;flex-shrink:0;user-select:none;line-height:1;cursor:pointer}
+.ll-tog:hover{color:var(--ac)}
+.ll-block-body{border-left:1px solid #21262d;margin-left:6px;padding-left:2px}
+.ll-block>.ll.ll-hidden+.ll-block-body{display:none!important}
 .ll-ts{color:var(--vd);flex-shrink:0}
 .ll-ev{flex-shrink:0;font-weight:600}
 .ll-rest{color:var(--dm);word-break:break-all}
@@ -446,12 +450,29 @@ function initAnalyzer(rootEl, fetchSource) {
     const hls=getActiveHls();
     const frag=document.createDocumentFragment();
     let firstHlIdx=-1;
+    // stack of {body:Element, ev:string} for open collapsible blocks
+    const blockStack=[];
+    const curParent=()=>blockStack.length?blockStack[blockStack.length-1].body:frag;
     for (const ll of tab.logLines){
+      const isEntry=PUSH_EVS.has(ll.ev);
+      const isExit=!!EXIT_MAP[ll.ev];
+      // find matching open block for an exit event
+      let exitTarget=null;
+      if (isExit){
+        const want=EXIT_MAP[ll.ev];
+        for (let j=blockStack.length-1;j>=0;j--){
+          if (blockStack[j].ev===want){exitTarget=blockStack.splice(j,1)[0];break}
+        }
+      }
       const div=document.createElement('div');
       div.className=`ll ev-${ll.ev}`;
       div.dataset.ns=ll.ns;
       div.dataset.idx=ll.idx;
       div.dataset.ev=ll.ev;
+      if (isEntry){
+        const tog=document.createElement('span');tog.className='ll-tog';tog.textContent='▼';
+        div.appendChild(tog);
+      }
       const num=document.createElement('span');
       num.className='ll-num';num.textContent=ll.idx+1;
       div.appendChild(num);
@@ -469,7 +490,24 @@ function initAnalyzer(rootEl, fetchSource) {
       }
       if (hls.length&&hlMatchesBg(ll.raw,hls)){if(firstHlIdx<0)firstHlIdx=ll.idx}
       div.addEventListener('click',()=>syncLogToTree(tab,ll.ns,div));
-      frag.appendChild(div);
+      if (isEntry){
+        const block=document.createElement('div');block.className='ll-block';
+        const body=document.createElement('div');body.className='ll-block-body';
+        block.appendChild(div);block.appendChild(body);
+        curParent().appendChild(block);
+        const tog=div.querySelector('.ll-tog');
+        tog.addEventListener('click',e=>{
+          e.stopPropagation();
+          const open=body.style.display!=='none';
+          body.style.display=open?'none':'';
+          tog.textContent=open?'▶':'▼';
+        });
+        blockStack.push({body,ev:ll.ev});
+      } else if (exitTarget){
+        exitTarget.body.appendChild(div);
+      } else {
+        curParent().appendChild(div);
+      }
     }
     const wrap=document.createElement('div');
     wrap.className='log-rendered';
