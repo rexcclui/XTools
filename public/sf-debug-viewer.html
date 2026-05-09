@@ -71,6 +71,9 @@ const CSS = `
 .ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
 .ll-ind{flex-shrink:0;color:#2d333b;font-family:'SF Mono','Fira Code',monospace;letter-spacing:-.1px;user-select:none}
 .ll-fold-tog{color:var(--vd);flex-shrink:0;cursor:pointer;min-width:11px;font-size:9px;text-align:center;padding:0 2px;user-select:none}
+.ll-src-btn{margin-left:auto;flex-shrink:0;font-size:10px;color:var(--vd);cursor:pointer;padding:0 4px;opacity:0;transition:opacity .1s;user-select:none}
+.ll:hover .ll-src-btn{opacity:1}
+.ll-src-btn:hover{color:var(--ac)}
 .ll-fold-tog:hover{color:var(--tx)}
 .ll-ts{color:var(--vd);flex-shrink:0}
 .ll-ev{flex-shrink:0;font-weight:600}
@@ -338,7 +341,9 @@ function evType(ev) {
 
 function evMeta(ev, rest) {
   const p = rest.split('|');
-  if (ev==='METHOD_ENTRY'||ev==='CONSTRUCTOR_ENTRY'||ev==='SYSTEM_METHOD_ENTRY') {
+  if (ev==='METHOD_ENTRY'||ev==='CONSTRUCTOR_ENTRY'||ev==='SYSTEM_METHOD_ENTRY'||
+      ev==='METHOD_EXIT' ||ev==='CONSTRUCTOR_EXIT' ||ev==='SYSTEM_METHOD_EXIT' ||
+      ev==='VF_APEX_CALL_START'||ev==='VF_APEX_CALL_END') {
     const lr=p[0]||'';
     const hasCid=p.length>=3&&(SID_RE.test(p[1])||p[1]==='');
     const sig=hasCid?p.slice(2).join('|'):p.slice(1).join('|');
@@ -692,6 +697,13 @@ function initAnalyzer(rootEl, fetchSource) {
       const ev=document.createElement('span');ev.className='ll-ev';ev.innerHTML=applyHl(ll.ev,hls);
       const rest=document.createElement('span');rest.className='ll-rest';rest.innerHTML=applyHl(stripSids(ll.rest),hls);
       div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
+      // hover source button
+      const m=evMeta(ll.ev,ll.rest);
+      if (m.cls){
+        const sb=document.createElement('span');sb.className='ll-src-btn';sb.textContent='⌗';sb.title='View source: '+m.cls;
+        sb.addEventListener('click',e=>{e.stopPropagation();showSnippet(m.cls,m.lr||'');});
+        div.appendChild(sb);
+      }
     } else {
       const raw=document.createElement('span');raw.className='ll-rest';raw.innerHTML=applyHl(ll.raw,hls);
       div.appendChild(raw);
