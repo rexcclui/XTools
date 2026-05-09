@@ -1767,12 +1767,13 @@ function initAnalyzer(rootEl, fetchSource) {
   let _srcFileMap = new Map(); // simpleCls.toLowerCase() -> FileSystemFileHandle | {_rawFile}
   let _srcFolderName = '';
 
-  async function walkDirForSrc(dh) {
+  async function walkDirForSrc(dh, underForceApp=false) {
     for await (const [name, h] of dh.entries()) {
-      if (h.kind==='file'&&/\.(cls|trigger)$/i.test(name))
+      const inScope = underForceApp || name.toLowerCase()==='force-app';
+      if (h.kind==='file'&&underForceApp&&/\.(cls|trigger)$/i.test(name))
         _srcFileMap.set(name.replace(/\.(cls|trigger)$/i,'').toLowerCase(), h);
-      else if (h.kind==='directory')
-        await walkDirForSrc(h);
+      else if (h.kind==='directory'&&inScope)
+        await walkDirForSrc(h, inScope);
     }
   }
 
@@ -1816,7 +1817,9 @@ function initAnalyzer(rootEl, fetchSource) {
     _srcFallback.addEventListener('change',()=>{
       _srcFileMap.clear();_bodyCache.clear();
       for (const f of _srcFallback.files){
-        if (/\.(cls|trigger)$/i.test(f.name))
+        const path=(f.webkitRelativePath||f.name).replace(/\\/g,'/');
+        const underForceApp=/(?:^|\/)force-app\//i.test(path);
+        if (underForceApp&&/\.(cls|trigger)$/i.test(f.name))
           _srcFileMap.set(f.name.replace(/\.(cls|trigger)$/i,'').toLowerCase(),{_rawFile:f});
       }
       if (_srcFallback.files.length){_srcFolderName='Loaded files';updateSrcFolderUI();}
