@@ -148,6 +148,8 @@ const CSS = `
 .hide-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;background:#2d1117;border:1px solid #f8514966;border-radius:10px;font-size:10px;color:#f85149}
 .hide-tag button{background:none;border:none;color:#f85149;font-size:11px;padding:0 1px;cursor:pointer;line-height:1}
 .ll.ll-hidden{display:none}
+.ll-fold-tog{color:var(--vd);flex-shrink:0;cursor:pointer;min-width:11px;font-size:9px;text-align:center;padding:0 2px;user-select:none}
+.ll-fold-tog:hover{color:var(--tx)}
 .sda.hide-vars .t-varAssign{display:none}
 .snippet-popup{position:fixed;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;min-width:686px;max-width:1030px;font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden}
 .snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e}
@@ -277,7 +279,8 @@ function evMeta(ev, rest) {
     return {cls,meth,params,sig,lr};
   }
   if (ev==='CODE_UNIT_STARTED') {
-    const name=p.slice(1).join('|')||p[0];
+    const hasCid=p.length>=3&&SID_RE.test(p[1]);
+    const name=(hasCid?p.slice(2):p.slice(1)).join('|')||p[0];
     return {cls:'',meth:name,params:'',sig:'',lr:p[0],subtype:/trigger/i.test(name)?'trigger':null};
   }
   if (ev==='SOQL_EXECUTE_BEGIN') {
@@ -330,7 +333,7 @@ function parseLog(text) {
     if (ev==='EXECUTION_FINISHED'){root.endNs=ns;root.dur=ns-root.ns;continue}
     if (EXIT_MAP[ev]) {
       if (stack.length>1) {
-        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;
+        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=logLines.length-1;
         if (ev==='SOQL_EXECUTE_END'){const m=rest.match(/Rows:(\d+)/i);if(m)n.rowCount=m[1]}
         if (ev==='CALLOUT_RESPONSE'){const sc=rest.match(/StatusCode=(\d+)/);if(sc)n.calloutResp=`HTTP ${sc[1]}`}
       }
@@ -358,7 +361,7 @@ function parseLog(text) {
       const m=evMeta(ev,rest);
       const nt=m.subtype||evType(ev);
       const node={id:`n${++seq}`,type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,
-        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null};
+        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null,logIdx:logLines.length-1};
       if (nt==='method'||nt==='constructor') stats.methods++;
       if (nt==='soql') stats.soql++;
       if (nt==='dml') stats.dml++;
@@ -441,25 +444,52 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   // ── Log renderer ───────────────────────────────────────────────────────────
+  function stripSids(s){return s.replace(/\|01[a-zA-Z0-9]{13,16}(?=\|)/g,'')}
+
   function renderLogView(tab){
     const hls=getActiveHls();
     const frag=document.createDocumentFragment();
     let firstHlIdx=-1;
+    const foldMap=new Map();
+    if (tab.tree){
+      (function collect(node){
+        if (node.logIdx!==undefined&&node.logEndIdx!==undefined)
+          foldMap.set(node.logIdx,{endIdx:node.logEndIdx,folded:false});
+        node.children.forEach(collect);
+      })(tab.tree);
+    }
+    const idxToDiv=new Map();
     for (const ll of tab.logLines){
       const div=document.createElement('div');
       div.className=`ll ev-${ll.ev}`;
       div.dataset.ns=ll.ns;
       div.dataset.idx=ll.idx;
       div.dataset.ev=ll.ev;
+      idxToDiv.set(ll.idx,div);
       const num=document.createElement('span');
       num.className='ll-num';num.textContent=ll.idx+1;
       div.appendChild(num);
+      if (foldMap.has(ll.idx)){
+        const fi=foldMap.get(ll.idx);const llIdx=ll.idx;
+        const tog=document.createElement('span');tog.className='ll-fold-tog';tog.textContent='▼';
+        tog.title='Collapse block';
+        tog.addEventListener('click',e=>{
+          e.stopPropagation();
+          fi.folded=!fi.folded;tog.textContent=fi.folded?'▶':'▼';
+          for (const lll of tab.logLines){
+            if (lll.idx>llIdx&&lll.idx<=fi.endIdx){
+              const d=idxToDiv.get(lll.idx);if(d)d.classList.toggle('ll-hidden',fi.folded);
+            }
+          }
+        });
+        div.appendChild(tog);
+      }
       if (ll.ev){
         const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
         const ev=document.createElement('span');ev.className='ll-ev';ev.dataset.raw=ll.ev;
         ev.innerHTML=applyHl(ll.ev,hls);
         const rest=document.createElement('span');rest.className='ll-rest';rest.dataset.raw=ll.rest;
-        rest.innerHTML=applyHl(ll.rest,hls);
+        rest.innerHTML=applyHl(stripSids(ll.rest),hls);
         div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
       } else {
         const raw=document.createElement('span');raw.className='ll-rest';raw.dataset.raw=ll.raw;
