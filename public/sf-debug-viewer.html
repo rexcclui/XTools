@@ -98,6 +98,9 @@ const CSS = `
 .ns-item{display:flex;align-items:center;gap:5px;padding:2px 4px;font-size:11px;color:var(--dm);cursor:pointer;border-radius:3px}
 .ns-item:hover{background:var(--b3);color:var(--tx)}
 .tree-content{flex:1;overflow:auto;padding:8px 12px}
+.nsrc-btn{font-size:10px;color:var(--vd);cursor:pointer;padding:0 3px;margin-left:2px;opacity:0;transition:opacity .1s;flex-shrink:0;user-select:none}
+.nrow:hover .nsrc-btn{opacity:1}
+.nsrc-btn:hover{color:var(--ac)}
 .tree-node{margin:1px 0}
 .nrow{display:flex;align-items:baseline;gap:4px;padding:2px 5px;border-radius:4px;cursor:pointer;border-left:2px solid transparent;transition:background .1s}
 .nrow:hover{background:rgba(255,255,255,.04)}
@@ -1071,7 +1074,10 @@ function initAnalyzer(rootEl, fetchSource) {
     if (node.cls){
       row.dataset.snippetCls=node.cls;
       if (node.lr&&node.lr!=='[EXTERNAL]') row.dataset.snippetLr=node.lr;
-      row.title='Right-click for source snippet';
+      const srcBtn=document.createElement('span');
+      srcBtn.className='nsrc-btn';srcBtn.textContent='⌗';srcBtn.title='View source';
+      srcBtn.addEventListener('click',e=>{e.stopPropagation();showSnippet(node.cls,node.lr&&node.lr!=='[EXTERNAL]'?node.lr:'',row)});
+      row.appendChild(srcBtn);
     }
     wrap.appendChild(row);
     if (visibleKids.length){
