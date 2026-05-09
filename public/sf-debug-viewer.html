@@ -1769,11 +1769,10 @@ function initAnalyzer(rootEl, fetchSource) {
 
   async function walkDirForSrc(dh, underForceApp=false) {
     for await (const [name, h] of dh.entries()) {
-      const inScope = underForceApp || name.toLowerCase()==='force-app';
-      if (h.kind==='file'&&underForceApp&&/\.(cls|trigger)$/i.test(name))
+      if (h.kind==='directory')
+        await walkDirForSrc(h, underForceApp || name.toLowerCase()==='force-app');
+      else if (h.kind==='file' && underForceApp && /\.(cls|trigger)$/i.test(name))
         _srcFileMap.set(name.replace(/\.(cls|trigger)$/i,'').toLowerCase(), h);
-      else if (h.kind==='directory'&&inScope)
-        await walkDirForSrc(h, inScope);
     }
   }
 
@@ -1782,7 +1781,9 @@ function initAnalyzer(rootEl, fetchSource) {
       try {
         const dh=await window.showDirectoryPicker({mode:'read'});
         _srcFileMap.clear();_bodyCache.clear();
-        await walkDirForSrc(dh);
+        // if user selects the force-app folder itself, start collecting immediately
+        const startInScope = dh.name.toLowerCase()==='force-app';
+        await walkDirForSrc(dh, startInScope);
         _srcFolderName=dh.name;
         updateSrcFolderUI();
       } catch(e){if(e.name!=='AbortError')console.error(e);}
@@ -1818,7 +1819,8 @@ function initAnalyzer(rootEl, fetchSource) {
       _srcFileMap.clear();_bodyCache.clear();
       for (const f of _srcFallback.files){
         const path=(f.webkitRelativePath||f.name).replace(/\\/g,'/');
-        const underForceApp=/(?:^|\/)force-app\//i.test(path);
+        // collect if path contains /force-app/ OR the root dir itself is force-app
+        const underForceApp=/(?:^|\/)force-app\//i.test(path)||/^force-app\//i.test(path);
         if (underForceApp&&/\.(cls|trigger)$/i.test(f.name))
           _srcFileMap.set(f.name.replace(/\.(cls|trigger)$/i,'').toLowerCase(),{_rawFile:f});
       }
