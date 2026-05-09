@@ -201,14 +201,14 @@ const CSS = `
 .parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
 .parse-progress-pct{font-size:10px;color:var(--vd)}
 .sda.hide-vars .t-varAssign{display:none}
-.snippet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
-.snippet-popup{position:absolute;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;width:900px;max-width:calc(100% - 24px);font-family:'SF Mono','Fira Code',monospace;font-size:11px;overflow:hidden;display:flex;flex-direction:column}
-.snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e;flex-shrink:0}
+.snippet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.65);z-index:9000;display:flex;align-items:center;justify-content:center}
+.snippet-popup{background:#0d1117;border:1px solid #388bfd66;border-radius:10px;box-shadow:0 16px 56px #000e;width:min(1100px,92%);height:75vh;font-family:'SF Mono','Fira Code',monospace;font-size:11px;overflow:hidden;display:flex;flex-direction:column}
+.snippet-hdr{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#161b22;border-bottom:1px solid #30363d;font-size:12px;color:#8b949e;flex-shrink:0}
 .snippet-cls{color:#79c0ff;font-weight:600}
 .snippet-ln{color:#e3b341}
-.snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:14px;cursor:pointer;padding:0 3px;line-height:1}
+.snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:16px;cursor:pointer;padding:0 4px;line-height:1}
 .snippet-close:hover{color:#f85149}
-.snippet-body{overflow:auto;max-height:520px;padding:8px 0;flex:1}
+.snippet-body{overflow:auto;flex:1;padding:8px 0}
 .snippet-loading{padding:20px;text-align:center;color:#8b949e;font-size:11px}
 .snippet-error{padding:12px 16px;color:#f85149;font-size:11px}
 .sline{display:flex;align-items:baseline;padding:1px 0}
@@ -1894,7 +1894,6 @@ function initAnalyzer(rootEl, fetchSource) {
 
     const pop = document.createElement('div');
     pop.className = 'snippet-popup';
-    _snippetEl = pop;
 
     const hdr = document.createElement('div');
     hdr.className = 'snippet-hdr';
@@ -1906,18 +1905,13 @@ function initAnalyzer(rootEl, fetchSource) {
     const body = document.createElement('div');
     body.className = 'snippet-body';
     pop.appendChild(hdr); pop.appendChild(body);
-    C.appendChild(pop);
 
-    // Position relative to C (which is position:relative)
-    const cRect = C.getBoundingClientRect();
-    const aRect = anchorEl ? anchorEl.getBoundingClientRect() : {top: cRect.top + 100, bottom: cRect.top + 116, left: cRect.left + 20};
-    const pw = Math.min(900, C.clientWidth - 24), ph = 560;
-    let top = (aRect.bottom - cRect.top) + 4;
-    let left = (aRect.left - cRect.left);
-    if (top + ph > C.clientHeight) top = Math.max(0, (aRect.top - cRect.top) - ph - 4);
-    if (left + pw > C.clientWidth) left = Math.max(0, C.clientWidth - pw - 8);
-    pop.style.top = top + 'px';
-    pop.style.left = left + 'px';
+    const overlay = document.createElement('div');
+    overlay.className = 'snippet-overlay';
+    overlay.appendChild(pop);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeSnippet(); });
+    C.appendChild(overlay);
+    _snippetEl = overlay;
 
     if (!_srcFileMap.size) {
       body.innerHTML = '<div class="snippet-error" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No project folder open.<button class="btn btn-sm" id="snippetOpenFolderBtn" style="margin-top:2px">📂 Open Source Folder</button></div>';
@@ -1956,7 +1950,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   document.addEventListener('click', e => {
-    if (_snippetEl && !_snippetEl.contains(e.target) && !e.target.closest('[data-snippet-cls]') && !e.target.closest('.nsrc-btn')) closeSnippet();
+    // snippet closes via its own overlay click handler
   }, true);
 
   // ── Sample log ─────────────────────────────────────────────────────────────
