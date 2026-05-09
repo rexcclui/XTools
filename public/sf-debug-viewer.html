@@ -70,6 +70,11 @@ const CSS = `
 .ll.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
 .ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
 .ll-ind{flex-shrink:0;color:#2d333b;font-family:'SF Mono','Fira Code',monospace;letter-spacing:-.1px;user-select:none}
+.ll-fold-tog{color:var(--vd);flex-shrink:0;cursor:pointer;min-width:11px;font-size:9px;text-align:center;padding:0 2px;user-select:none}
+.ll-src-btn{margin-left:auto;flex-shrink:0;font-size:10px;color:var(--vd);cursor:pointer;padding:0 4px;opacity:0;transition:opacity .1s;user-select:none}
+.ll:hover .ll-src-btn{opacity:1}
+.ll-src-btn:hover{color:var(--ac)}
+.ll-fold-tog:hover{color:var(--tx)}
 .ll-ts{color:var(--vd);flex-shrink:0}
 .ll-ev{flex-shrink:0;font-weight:600}
 .ll-rest{color:var(--dm);word-break:break-all}
@@ -96,6 +101,9 @@ const CSS = `
 .ns-item{display:flex;align-items:center;gap:5px;padding:2px 4px;font-size:11px;color:var(--dm);cursor:pointer;border-radius:3px}
 .ns-item:hover{background:var(--b3);color:var(--tx)}
 .tree-content{flex:1;overflow:auto;padding:8px 12px}
+.nsrc-btn{font-size:10px;color:var(--vd);cursor:pointer;padding:0 3px;margin-left:2px;opacity:0;transition:opacity .1s;flex-shrink:0;user-select:none}
+.nrow:hover .nsrc-btn{opacity:1}
+.nsrc-btn:hover{color:var(--ac)}
 .tree-node{margin:1px 0}
 .nrow{display:flex;align-items:baseline;gap:4px;padding:2px 5px;border-radius:4px;cursor:pointer;border-left:2px solid transparent;transition:background .1s}
 .nrow:hover{background:rgba(255,255,255,.04)}
@@ -176,12 +184,12 @@ const CSS = `
 .log-tag-chip:hover{border-color:var(--dm);color:var(--tx)}
 .log-tag-chip.tag-hidden{opacity:.35;text-decoration:line-through;color:var(--vd)}
 .filter-modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
-.filter-modal{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:440px;max-height:72vh;display:flex;flex-direction:column;box-shadow:0 16px 48px #000d}
+.filter-modal{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:640px;max-height:72vh;display:flex;flex-direction:column;box-shadow:0 16px 48px #000d}
 .filter-modal-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--bd);flex-shrink:0}
 .filter-modal-title{font-weight:600;font-size:13px;flex:1}
 .filter-modal-search{background:var(--b3);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:3px 8px;font-size:12px;width:130px;outline:none}
 .filter-modal-search:focus{border-color:var(--ac)}
-.filter-modal-body{overflow-y:auto;padding:4px 2px;flex:1}
+.filter-modal-body{overflow-y:auto;padding:4px 2px;flex:1;display:grid;grid-template-columns:repeat(2,1fr);align-content:start}
 .filter-modal-item{display:flex;align-items:center;gap:8px;padding:4px 12px;border-radius:5px;cursor:pointer;user-select:none}
 .filter-modal-item:hover{background:var(--b3)}
 .filter-modal-item label{flex:1;font-family:'SF Mono','Fira Code',monospace;font-size:11px;cursor:pointer;color:var(--tx)}
@@ -196,13 +204,14 @@ const CSS = `
 .parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
 .parse-progress-pct{font-size:10px;color:var(--vd)}
 .sda.hide-vars .t-varAssign{display:none}
-.snippet-popup{position:fixed;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;min-width:686px;max-width:1030px;font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden}
-.snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e}
+.snippet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.65);z-index:9000;display:flex;align-items:center;justify-content:center}
+.snippet-popup{background:#0d1117;border:1px solid #388bfd66;border-radius:10px;box-shadow:0 16px 56px #000e;width:min(1100px,92%);height:75vh;font-family:'SF Mono','Fira Code',monospace;font-size:11px;overflow:hidden;display:flex;flex-direction:column}
+.snippet-hdr{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#161b22;border-bottom:1px solid #30363d;font-size:12px;color:#8b949e;flex-shrink:0}
 .snippet-cls{color:#79c0ff;font-weight:600}
 .snippet-ln{color:#e3b341}
-.snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:14px;cursor:pointer;padding:0 3px;line-height:1}
+.snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:16px;cursor:pointer;padding:0 4px;line-height:1}
 .snippet-close:hover{color:#f85149}
-.snippet-body{overflow:auto;max-height:380px;padding:8px 0}
+.snippet-body{overflow:auto;flex:1;padding:8px 0}
 .snippet-loading{padding:20px;text-align:center;color:#8b949e;font-size:11px}
 .snippet-error{padding:12px 16px;color:#f85149;font-size:11px}
 .sline{display:flex;align-items:baseline;padding:1px 0}
@@ -232,6 +241,10 @@ const HTML = `
     <div id="hideTags" class="hide-row"></div>
   </div>
   <button class="btn btn-sm" id="btn-history">📚 History</button>
+  <div style="width:1px;height:20px;background:var(--bd)"></div>
+  <button class="btn btn-sm" id="btn-openSrc" title="Open Salesforce source project folder">📂 Source</button>
+  <span id="srcFolderName" style="font-size:10px;color:var(--vd);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default"></span>
+  <input id="srcFolderFallback" type="file" webkitdirectory multiple style="display:none">
 </div>
 <div class="tab-bar" id="tabBar">
   <button class="tab-add" id="btn-addTab" title="New tab">＋</button>
@@ -328,7 +341,9 @@ function evType(ev) {
 
 function evMeta(ev, rest) {
   const p = rest.split('|');
-  if (ev==='METHOD_ENTRY'||ev==='CONSTRUCTOR_ENTRY'||ev==='SYSTEM_METHOD_ENTRY') {
+  if (ev==='METHOD_ENTRY'||ev==='CONSTRUCTOR_ENTRY'||ev==='SYSTEM_METHOD_ENTRY'||
+      ev==='METHOD_EXIT' ||ev==='CONSTRUCTOR_EXIT' ||ev==='SYSTEM_METHOD_EXIT' ||
+      ev==='VF_APEX_CALL_START'||ev==='VF_APEX_CALL_END') {
     const lr=p[0]||'';
     const hasCid=p.length>=3&&(SID_RE.test(p[1])||p[1]==='');
     const sig=hasCid?p.slice(2).join('|'):p.slice(1).join('|');
@@ -341,7 +356,8 @@ function evMeta(ev, rest) {
     return {cls,meth,params,sig,lr};
   }
   if (ev==='CODE_UNIT_STARTED') {
-    const name=p.slice(1).join('|')||p[0];
+    const hasCid=p.length>=3&&SID_RE.test(p[1]);
+    const name=(hasCid?p.slice(2):p.slice(1)).join('|')||p[0];
     return {cls:'',meth:name,params:'',sig:'',lr:p[0],subtype:/trigger/i.test(name)?'trigger':null};
   }
   if (ev==='SOQL_EXECUTE_BEGIN') {
@@ -368,7 +384,9 @@ function evMeta(ev, rest) {
   if (ev==='EXCEPTION_THROWN'||ev==='FATAL_ERROR') {
     return {cls:'',meth:p.slice(1).join('|')||rest||'Exception',params:'',sig:'',lr:p[0]||''};
   }
-  return {cls:'',meth:rest||ev,params:'',sig:'',lr:''};
+  // default: extract lr from p[0] if it looks like [N]
+  const lr=/^\[\d+\]$/.test(p[0])?p[0]:'';
+  return {cls:'',meth:rest||ev,params:'',sig:'',lr};
 }
 
 const PARSE_CHUNK = 8000; // lines per async tick
@@ -405,7 +423,7 @@ async function parseLogAsync(text, onProgress) {
     if (ev==='EXECUTION_FINISHED'){root.endNs=ns;root.dur=ns-root.ns;continue}
     if (EXIT_MAP[ev]) {
       if (stack.length>1) {
-        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;
+        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=logLines.length-1;
         if (ev==='SOQL_EXECUTE_END'){const m=rest.match(/Rows:(\d+)/i);if(m)n.rowCount=m[1]}
         if (ev==='CALLOUT_RESPONSE'){const sc=rest.match(/StatusCode=(\d+)/);if(sc)n.calloutResp=`HTTP ${sc[1]}`}
       }
@@ -433,7 +451,7 @@ async function parseLogAsync(text, onProgress) {
       const m=evMeta(ev,rest);
       const nt=m.subtype||evType(ev);
       const node={id:`n${++seq}`,type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,
-        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null};
+        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null,logIdx:logLines.length-1};
       if (nt==='method'||nt==='constructor') stats.methods++;
       if (nt==='soql') stats.soql++;
       if (nt==='dml') stats.dml++;
@@ -498,7 +516,7 @@ function buildWorkerSrc(){
     '    if(ev==="EXECUTION_STARTED"){root.ts=ts;root.ns=ns;continue}\n'+
     '    if(ev==="EXECUTION_FINISHED"){root.endNs=ns;root.dur=ns-root.ns;continue}\n'+
     '    if(EXIT_MAP[ev]){\n'+
-    '      if(stk.length>1){const n=stk.pop();n.endNs=ns;n.dur=ns-n.ns;\n'+
+    '      if(stk.length>1){const n=stk.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=lls.length-1;\n'+
     '        if(ev==="SOQL_EXECUTE_END"){const m=rest.match(/Rows:(\\d+)/i);if(m)n.rowCount=m[1]}\n'+
     '        if(ev==="CALLOUT_RESPONSE"){const sc=rest.match(/StatusCode=(\\d+)/);if(sc)n.calloutResp="HTTP "+sc[1]}\n'+
     '      }continue;}\n'+
@@ -507,7 +525,7 @@ function buildWorkerSrc(){
     '    if(ev==="EXCEPTION_THROWN"||ev==="FATAL_ERROR"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"exception",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});stats.exc++;continue}\n'+
     '    if(PUSH_EVS.has(ev)){\n'+
     '      const m=evMeta(ev,rest);const nt=m.subtype||evType(ev);\n'+
-    '      const nd={id:"n"+(++seq),type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=="system_method",rowCount:null,calloutResp:null};\n'+
+    '      const nd={id:"n"+(++seq),type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=="system_method",rowCount:null,calloutResp:null,logIdx:lls.length-1};\n'+
     '      if(nt==="method"||nt==="constructor")stats.methods++;\n'+
     '      if(nt==="soql")stats.soql++;\n'+
     '      if(nt==="dml")stats.dml++;\n'+
@@ -594,10 +612,24 @@ function initAnalyzer(rootEl, fetchSource) {
   const LOG_ROW_H = 18; // must match .ll height in CSS
   const LOG_OVERSCAN = 50;
 
+  function stripSids(s){return s.replace(/\|01[a-zA-Z0-9]{13,16}(?=\|)/g,'')}
+
+  function buildFoldableMap(tree,logLines){
+    const map=new Map();
+    function walk(node){
+      if (node.logIdx!==undefined&&node.logEndIdx!==undefined&&logLines[node.logIdx]&&logLines[node.logEndIdx])
+        map.set(logLines[node.logIdx].idx,{endRawIdx:logLines[node.logEndIdx].idx,folded:false});
+      node.children.forEach(walk);
+    }
+    walk(tree);
+    return map;
+  }
+
   function computeVisibleLines(tab){
     const kws=S.hideKeywords,hEvs=S.hiddenEventTypes,hNs=S.hiddenNsLines;
-    if (!kws.length&&!hEvs.size&&!hNs.size) return tab.logLines;
+    if (!kws.length&&!hEvs.size&&!hNs.size&&!tab._hasFolds) return tab.logLines;
     return tab.logLines.filter(ll=>{
+      if (ll._folded) return false;
       if (ll.ev&&hEvs.has(ll.ev)) return false;
       if (hNs.size&&ll.nsTag&&hNs.has(ll.nsTag)) return false;
       if (kws.length&&kws.some(k=>ll.raw.toLowerCase().includes(k))) return false;
@@ -641,6 +673,21 @@ function initAnalyzer(rootEl, fetchSource) {
     div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;div.dataset.visidx=visIdx;
     const num=document.createElement('span');num.className='ll-num';num.textContent=ll.idx+1;
     div.appendChild(num);
+    if (tab._foldableMap?.has(ll.idx)){
+      const fi=tab._foldableMap.get(ll.idx);
+      const tog=document.createElement('span');tog.className='ll-fold-tog';
+      tog.textContent=fi.folded?'▶':'▼';tog.title=fi.folded?'Expand block':'Collapse block';
+      tog.addEventListener('click',e=>{
+        e.stopPropagation();
+        fi.folded=!fi.folded;
+        tab._hasFolds=[...tab._foldableMap.values()].some(f=>f.folded);
+        for (const lll of tab.logLines){
+          if (lll.idx>ll.idx&&lll.idx<=fi.endRawIdx) lll._folded=fi.folded;
+        }
+        tab._logScroller?.refresh();
+      });
+      div.appendChild(tog);
+    }
     if (S.showLogIndent&&ll.depth>0){
       const ind=document.createElement('span');ind.className='ll-ind';
       // two non-breaking spaces per depth level, with subtle pipe guides
@@ -650,8 +697,16 @@ function initAnalyzer(rootEl, fetchSource) {
     if (ll.ev){
       const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
       const ev=document.createElement('span');ev.className='ll-ev';ev.innerHTML=applyHl(ll.ev,hls);
-      const rest=document.createElement('span');rest.className='ll-rest';rest.innerHTML=applyHl(ll.rest,hls);
+      const rest=document.createElement('span');rest.className='ll-rest';rest.innerHTML=applyHl(stripSids(ll.rest),hls);
       div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
+      // hover source button
+      const m=evMeta(ll.ev,ll.rest);
+      const srcCls=m.cls||(m.lr&&tab.tree?([...findBlockChainAtNs(tab.tree,ll.ns)].reverse().find(n=>n.cls)?.cls||''):'');
+      if (srcCls){
+        const sb=document.createElement('span');sb.className='ll-src-btn';sb.textContent='⌗';sb.title='View source: '+srcCls;
+        sb.addEventListener('click',e=>{e.stopPropagation();showSnippet(srcCls,m.lr||'');});
+        div.appendChild(sb);
+      }
     } else {
       const raw=document.createElement('span');raw.className='ll-rest';raw.innerHTML=applyHl(ll.raw,hls);
       div.appendChild(raw);
@@ -752,7 +807,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
   function sep(menu){const d=document.createElement('div');d.className='log-ctx-sep';menu.appendChild(d)}
 
-  function showLogContextMenu(e,tab,ns,sel=''){
+  function showLogContextMenu(e,tab,ns,sel='',rowEl=null){
     closeLogContextMenu();
     const menu=document.createElement('div');menu.className='log-ctx-menu';_ctxMenu=menu;
     const vis=tab._visLines||[];
@@ -792,6 +847,27 @@ function initAnalyzer(rootEl, fetchSource) {
       lbl(ll.ev);
     }
 
+    // ── view source ──────────────────────────────────────────────────────
+    if (ll?.ev){
+      const m=evMeta(ll.ev,ll.rest);
+      if (m.cls){
+        item(`⌗ View source: ${m.cls}${m.lr?':'+m.lr.replace(/[\[\]]/g,''):''}`, '', ()=>{
+          closeLogContextMenu();
+          showSnippet(m.cls, m.lr||'', rowEl);
+        });
+        sep(menu);
+      } else if (m.lr && !m.cls) {
+        // event has a line ref but no class — show line ref only
+        const lr=m.lr.replace(/[\[\]]/g,'');
+        item(`⌗ Line ${lr} in current class`, '', ()=>{
+          closeLogContextMenu();
+          const chainCls=chain.length?[...chain].reverse().find(n=>n.cls)?.cls:'';
+          if (chainCls) showSnippet(chainCls, m.lr||'', rowEl);
+        });
+        sep(menu);
+      }
+    }
+
     // ── highlight selection ───────────────────────────────────────────────
     if (sel){
       const freeSlot=S.highlights.find(h=>!h.query.trim());
@@ -823,7 +899,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   document.addEventListener('click',e=>{if(_ctxMenu&&!_ctxMenu.contains(e.target))closeLogContextMenu()},true);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();closeSnippet();}});
 
   function moveLogCursor(tab,newIdx){
     const vis=tab._visLines||[];
@@ -862,7 +938,7 @@ function initAnalyzer(rootEl, fetchSource) {
       const ns=parseInt(rowEl.dataset.ns);
       // capture selection before the menu causes it to collapse
       const sel=window.getSelection()?.toString().trim()||'';
-      showLogContextMenu(e,tab,ns,sel);
+      showLogContextMenu(e,tab,ns,sel,rowEl);
     });
 
     wrap.addEventListener('keydown',e=>{
@@ -1032,9 +1108,13 @@ function initAnalyzer(rootEl, fetchSource) {
     const dur=fmtDur(node.dur);
     if (dur){const dd=document.createElement('span');dd.className='ndur';dd.textContent=dur;row.appendChild(dd)}
     if (gapAfter&&S.showTiming){const g=document.createElement('span');g.className='ngap-inline';g.textContent=`+${gapAfter}`;row.appendChild(g)}
-    if (fetchSource&&node.cls&&node.lr&&node.lr!=='[EXTERNAL]'){
-      row.addEventListener('contextmenu',e=>{e.preventDefault();showSnippet(node.cls,node.lr,row)});
-      row.title='Right-click for source snippet';
+    if (node.cls){
+      row.dataset.snippetCls=node.cls;
+      if (node.lr&&node.lr!=='[EXTERNAL]') row.dataset.snippetLr=node.lr;
+      const srcBtn=document.createElement('span');
+      srcBtn.className='nsrc-btn';srcBtn.textContent='⌗';srcBtn.title='View source';
+      srcBtn.addEventListener('click',e=>{e.stopPropagation();showSnippet(node.cls,node.lr&&node.lr!=='[EXTERNAL]'?node.lr:'',row)});
+      row.appendChild(srcBtn);
     }
     wrap.appendChild(row);
     if (visibleKids.length){
@@ -1207,6 +1287,8 @@ function initAnalyzer(rootEl, fetchSource) {
     tab.logLines=result.logLines;tab.tree=result.tree;tab.stats=result.stats;
     tab.namespaces=result.namespaces;tab.eventTypes=result.eventTypes;tab.parsed=true;
     tagLineNamespaces(tab.logLines);
+    tab._foldableMap=buildFoldableMap(tab.tree,tab.logLines);
+    tab._hasFolds=false;
     // collect any namespaces the parser missed (e.g. || empty-field format)
     tab.logLines.forEach(ll=>{if(ll.nsTag)tab.namespaces.add(ll.nsTag);});
     renderParsedTab(tab);
@@ -1696,7 +1778,76 @@ function initAnalyzer(rootEl, fetchSource) {
     if (panel.classList.contains('open')) renderHistoryPanel();
   }
 
-  // ── Code snippet popup (disabled — no Apex source outside Salesforce) ──────
+  // ── Source folder ──────────────────────────────────────────────────────────
+  let _srcFileMap = new Map(); // simpleCls.toLowerCase() -> FileSystemFileHandle | {_rawFile}
+  let _srcFolderName = '';
+
+  async function walkDirForSrc(dh, underForceApp=false) {
+    try {
+      for await (const [name, h] of dh.entries()) {
+        try {
+          if (h.kind==='directory')
+            await walkDirForSrc(h, underForceApp || name.toLowerCase()==='force-app');
+          else if (h.kind==='file' && underForceApp && /\.(cls|trigger)$/i.test(name))
+            _srcFileMap.set(name.replace(/\.(cls|trigger)$/i,'').toLowerCase(), h);
+        } catch(_){}
+      }
+    } catch(_){}
+  }
+
+  async function openSourceFolder() {
+    if (window.showDirectoryPicker) {
+      try {
+        const dh=await window.showDirectoryPicker({mode:'read'});
+        _srcFileMap.clear();_bodyCache.clear();
+        const startInScope = dh.name.toLowerCase()==='force-app';
+        await walkDirForSrc(dh, startInScope);
+        _srcFolderName=dh.name;
+        updateSrcFolderUI();
+      } catch(e){if(e.name!=='AbortError')console.error(e);}
+    } else {
+      $('srcFolderFallback').click();
+    }
+  }
+
+  function updateSrcFolderUI() {
+    const el=$('srcFolderName');if(!el)return;
+    if (_srcFolderName){
+      el.textContent=_srcFolderName;
+      el.title=`${_srcFileMap.size} Apex files found under force-app in "${_srcFolderName}"`;
+    } else {el.textContent='';el.title='';}
+  }
+
+  async function readSrcFile(cls) {
+    const parts = cls.split('.').filter(Boolean);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const h = _srcFileMap.get(parts[i].toLowerCase());
+      if (h) { const f=h._rawFile||await h.getFile(); return f.text(); }
+    }
+    // Return debug info so the user can see what was tried vs what's in the map
+    const tried = parts.map(p=>p+'.cls').join(', ');
+    const sample = [..._srcFileMap.keys()].slice(0,8).map(k=>k+'.cls').join(', ');
+    return {_notFound:true, tried, sample, total:_srcFileMap.size};
+  }
+
+  $('btn-openSrc').addEventListener('click', openSourceFolder);
+  const _srcFallback=$('srcFolderFallback');
+  if (_srcFallback) {
+    _srcFallback.addEventListener('change',()=>{
+      _srcFileMap.clear();_bodyCache.clear();
+      for (const f of _srcFallback.files){
+        const path=(f.webkitRelativePath||f.name).replace(/\\/g,'/');
+        // collect if path contains /force-app/ OR the root dir itself is force-app
+        const underForceApp=/(?:^|\/)force-app\//i.test(path)||/^force-app\//i.test(path);
+        if (underForceApp&&/\.(cls|trigger)$/i.test(f.name))
+          _srcFileMap.set(f.name.replace(/\.(cls|trigger)$/i,'').toLowerCase(),{_rawFile:f});
+      }
+      if (_srcFallback.files.length){_srcFolderName='Loaded files';updateSrcFolderUI();}
+      _srcFallback.value='';
+    });
+  }
+
+  // ── Code snippet popup ─────────────────────────────────────────────────────
   const _bodyCache = new Map();
   let _snippetEl = null;
 
@@ -1752,34 +1903,44 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   function showSnippet(cls, lr, anchorEl) {
-    if (!fetchSource || !cls) return;
+    if (!cls) return;
     const lineNum = parseLineNum(lr);
     closeSnippet();
+
     const pop = document.createElement('div');
     pop.className = 'snippet-popup';
-    _snippetEl = pop;
+
     const hdr = document.createElement('div');
     hdr.className = 'snippet-hdr';
     hdr.innerHTML = `<span class="snippet-cls">${esc(cls)}</span>`
-      + (lineNum ? `<span>:</span><span class="snippet-ln">${lineNum}</span>` : '')
+      + (lineNum ? `<span style="color:var(--vd)">:</span><span class="snippet-ln">${lineNum}</span>` : '')
       + `<button class="snippet-close" title="Close">✕</button>`;
     hdr.querySelector('.snippet-close').addEventListener('click', closeSnippet);
+
     const body = document.createElement('div');
     body.className = 'snippet-body';
+    pop.appendChild(hdr); pop.appendChild(body);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'snippet-overlay';
+    overlay.appendChild(pop);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeSnippet(); });
+    C.appendChild(overlay);
+    _snippetEl = overlay;
+
+    if (!_srcFileMap.size) {
+      body.innerHTML = '<div class="snippet-error" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No project folder open.<button class="btn btn-sm" id="snippetOpenFolderBtn" style="margin-top:2px">📂 Open Source Folder</button></div>';
+      body.querySelector('#snippetOpenFolderBtn').addEventListener('click',()=>{closeSnippet();openSourceFolder();});
+      return;
+    }
+
     body.innerHTML = '<div class="snippet-loading">Loading source…</div>';
-    pop.appendChild(hdr);pop.appendChild(body);
-    document.body.appendChild(pop);
-    const rect = anchorEl.getBoundingClientRect();
-    const pw = 648, ph = 420;
-    let top = rect.bottom + 6;
-    let left = rect.left;
-    if (top + ph > window.innerHeight) top = rect.top - ph - 6;
-    if (left + pw > window.innerWidth) left = window.innerWidth - pw - 12;
-    pop.style.top = Math.max(4, top) + 'px';
-    pop.style.left = Math.max(4, left) + 'px';
-    const simpleCls = cls.includes('.') ? cls.split('.').pop() : cls;
     const render = (src) => {
-      if (!src) { body.innerHTML = '<div class="snippet-error">Source not available</div>'; return; }
+      if (!src || src?._notFound) {
+        const info = src?._notFound ? `<div style="margin-top:6px;color:#768390;font-size:10px">Tried: ${esc(src.tried)}<br>Folder has ${src.total} files, e.g.: ${esc(src.sample)}</div>` : '';
+        body.innerHTML = `<div class="snippet-error"><b>${esc(cls)}</b> not found in project folder${info}</div>`;
+        return;
+      }
       const lines = src.split('\n');
       const frag = document.createDocumentFragment();
       for (let i = 0; i < lines.length; i++) {
@@ -1791,24 +1952,24 @@ function initAnalyzer(rootEl, fetchSource) {
         row.appendChild(num); row.appendChild(code);
         frag.appendChild(row);
       }
-      body.innerHTML = '';body.appendChild(frag);
+      body.innerHTML = ''; body.appendChild(frag);
       const target = body.querySelector('.sline-target');
       if (target) target.scrollIntoView({ block: 'center' });
     };
-    if (_bodyCache.has(simpleCls)) {
-      render(_bodyCache.get(simpleCls));
+    if (_bodyCache.has(cls)) {
+      render(_bodyCache.get(cls));
     } else {
-      fetchSource(simpleCls).then(src => {
-        _bodyCache.set(simpleCls, src);
+      readSrcFile(cls).then(src => {
+        if (!src?._notFound) _bodyCache.set(cls, src);
         render(src);
       }).catch(() => {
-        body.innerHTML = '<div class="snippet-error">Failed to load source</div>';
+        body.innerHTML = '<div class="snippet-error">Failed to read source file</div>';
       });
     }
   }
 
   document.addEventListener('click', e => {
-    if (_snippetEl && !_snippetEl.contains(e.target)) closeSnippet();
+    // snippet closes via its own overlay click handler
   }, true);
 
   // ── Sample log ─────────────────────────────────────────────────────────────
@@ -1916,6 +2077,15 @@ function initAnalyzer(rootEl, fetchSource) {
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
+  // Delegated right-click handler for tree snippet — catches clicks on any
+  // child span (class name, method name, etc.) not just the row itself.
+  $('treeContent').addEventListener('contextmenu', e => {
+    const row = e.target.closest('[data-snippet-cls]');
+    if (!row) return;
+    e.preventDefault();
+    showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'', row);
+  });
+
   renderHlSlots();
   addTab(null,'Log 1','');
 
