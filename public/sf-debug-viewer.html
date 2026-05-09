@@ -384,7 +384,9 @@ function evMeta(ev, rest) {
   if (ev==='EXCEPTION_THROWN'||ev==='FATAL_ERROR') {
     return {cls:'',meth:p.slice(1).join('|')||rest||'Exception',params:'',sig:'',lr:p[0]||''};
   }
-  return {cls:'',meth:rest||ev,params:'',sig:'',lr:''};
+  // default: extract lr from p[0] if it looks like [N]
+  const lr=/^\[\d+\]$/.test(p[0])?p[0]:'';
+  return {cls:'',meth:rest||ev,params:'',sig:'',lr};
 }
 
 const PARSE_CHUNK = 8000; // lines per async tick
@@ -699,9 +701,10 @@ function initAnalyzer(rootEl, fetchSource) {
       div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
       // hover source button
       const m=evMeta(ll.ev,ll.rest);
-      if (m.cls){
-        const sb=document.createElement('span');sb.className='ll-src-btn';sb.textContent='⌗';sb.title='View source: '+m.cls;
-        sb.addEventListener('click',e=>{e.stopPropagation();showSnippet(m.cls,m.lr||'');});
+      const srcCls=m.cls||(m.lr&&tab.tree?([...findBlockChainAtNs(tab.tree,ll.ns)].reverse().find(n=>n.cls)?.cls||''):'');
+      if (srcCls){
+        const sb=document.createElement('span');sb.className='ll-src-btn';sb.textContent='⌗';sb.title='View source: '+srcCls;
+        sb.addEventListener('click',e=>{e.stopPropagation();showSnippet(srcCls,m.lr||'');});
         div.appendChild(sb);
       }
     } else {
@@ -1816,15 +1819,15 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   async function readSrcFile(cls) {
-    // Try each dot-segment right-to-left: inner class last, then outer class, then namespace-prefix
-    // e.g. "fferpcore.ffasync_ProcessService.ProcessExecutionContext"
-    //   tries: ProcessExecutionContext → ffasync_ProcessService → fferpcore
     const parts = cls.split('.').filter(Boolean);
     for (let i = parts.length - 1; i >= 0; i--) {
       const h = _srcFileMap.get(parts[i].toLowerCase());
       if (h) { const f=h._rawFile||await h.getFile(); return f.text(); }
     }
-    return null;
+    // Return debug info so the user can see what was tried vs what's in the map
+    const tried = parts.map(p=>p+'.cls').join(', ');
+    const sample = [..._srcFileMap.keys()].slice(0,8).map(k=>k+'.cls').join(', ');
+    return {_notFound:true, tried, sample, total:_srcFileMap.size};
   }
 
   $('btn-openSrc').addEventListener('click', openSourceFolder);
@@ -1933,7 +1936,11 @@ function initAnalyzer(rootEl, fetchSource) {
 
     body.innerHTML = '<div class="snippet-loading">Loading source…</div>';
     const render = (src) => {
-      if (!src) { body.innerHTML = `<div class="snippet-error"><b>${esc(cls)}</b> not found in project folder</div>`; return; }
+      if (!src || src?._notFound) {
+        const info = src?._notFound ? `<div style="margin-top:6px;color:#768390;font-size:10px">Tried: ${esc(src.tried)}<br>Folder has ${src.total} files, e.g.: ${esc(src.sample)}</div>` : '';
+        body.innerHTML = `<div class="snippet-error"><b>${esc(cls)}</b> not found in project folder${info}</div>`;
+        return;
+      }
       const lines = src.split('\n');
       const frag = document.createDocumentFragment();
       for (let i = 0; i < lines.length; i++) {
@@ -1953,7 +1960,7 @@ function initAnalyzer(rootEl, fetchSource) {
       render(_bodyCache.get(cls));
     } else {
       readSrcFile(cls).then(src => {
-        _bodyCache.set(cls, src);
+        if (!src?._notFound) _bodyCache.set(cls, src);
         render(src);
       }).catch(() => {
         body.innerHTML = '<div class="snippet-error">Failed to read source file</div>';
