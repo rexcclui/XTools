@@ -202,13 +202,13 @@ const CSS = `
 .parse-progress-pct{font-size:10px;color:var(--vd)}
 .sda.hide-vars .t-varAssign{display:none}
 .snippet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
-.snippet-popup{background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;width:720px;max-width:90%;max-height:72vh;font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden;display:flex;flex-direction:column}
+.snippet-popup{position:absolute;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;width:680px;max-width:calc(100% - 24px);font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden;display:flex;flex-direction:column}
 .snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e;flex-shrink:0}
 .snippet-cls{color:#79c0ff;font-weight:600}
 .snippet-ln{color:#e3b341}
 .snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:14px;cursor:pointer;padding:0 3px;line-height:1}
 .snippet-close:hover{color:#f85149}
-.snippet-body{overflow:auto;flex:1;padding:8px 0}
+.snippet-body{overflow:auto;max-height:380px;padding:8px 0;flex:1}
 .snippet-loading{padding:20px;text-align:center;color:#8b949e;font-size:11px}
 .snippet-error{padding:12px 16px;color:#f85149;font-size:11px}
 .sline{display:flex;align-items:baseline;padding:1px 0}
@@ -1077,7 +1077,7 @@ function initAnalyzer(rootEl, fetchSource) {
       if (node.lr&&node.lr!=='[EXTERNAL]') row.dataset.snippetLr=node.lr;
       const srcBtn=document.createElement('span');
       srcBtn.className='nsrc-btn';srcBtn.textContent='⌗';srcBtn.title='View source';
-      srcBtn.addEventListener('click',e=>{e.stopPropagation();showSnippet(node.cls,node.lr&&node.lr!=='[EXTERNAL]'?node.lr:'')});
+      srcBtn.addEventListener('click',e=>{e.stopPropagation();showSnippet(node.cls,node.lr&&node.lr!=='[EXTERNAL]'?node.lr:'',row)});
       row.appendChild(srcBtn);
     }
     wrap.appendChild(row);
@@ -1858,17 +1858,14 @@ function initAnalyzer(rootEl, fetchSource) {
     if (_snippetEl) { _snippetEl.remove(); _snippetEl = null; }
   }
 
-  function showSnippet(cls, lr) {
+  function showSnippet(cls, lr, anchorEl) {
     if (!cls) return;
     const lineNum = parseLineNum(lr);
     closeSnippet();
 
-    const overlay = document.createElement('div');
-    overlay.className = 'snippet-overlay';
-    _snippetEl = overlay;
-
     const pop = document.createElement('div');
     pop.className = 'snippet-popup';
+    _snippetEl = pop;
 
     const hdr = document.createElement('div');
     hdr.className = 'snippet-hdr';
@@ -1879,12 +1876,19 @@ function initAnalyzer(rootEl, fetchSource) {
 
     const body = document.createElement('div');
     body.className = 'snippet-body';
-
     pop.appendChild(hdr); pop.appendChild(body);
-    overlay.appendChild(pop);
-    C.appendChild(overlay);
+    C.appendChild(pop);
 
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeSnippet(); });
+    // Position relative to C (which is position:relative)
+    const cRect = C.getBoundingClientRect();
+    const aRect = anchorEl ? anchorEl.getBoundingClientRect() : {top: cRect.top + 100, bottom: cRect.top + 116, left: cRect.left + 20};
+    const pw = 680, ph = 420;
+    let top = (aRect.bottom - cRect.top) + 4;
+    let left = (aRect.left - cRect.left);
+    if (top + ph > C.clientHeight) top = Math.max(0, (aRect.top - cRect.top) - ph - 4);
+    if (left + pw > C.clientWidth) left = Math.max(0, C.clientWidth - pw - 8);
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
 
     if (!_srcFileMap.size) {
       body.innerHTML = '<div class="snippet-error" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No project folder open.<button class="btn btn-sm" id="snippetOpenFolderBtn" style="margin-top:2px">📂 Open Source Folder</button></div>';
@@ -1921,6 +1925,10 @@ function initAnalyzer(rootEl, fetchSource) {
       });
     }
   }
+
+  document.addEventListener('click', e => {
+    if (_snippetEl && !_snippetEl.contains(e.target) && !e.target.closest('[data-snippet-cls]') && !e.target.closest('.nsrc-btn')) closeSnippet();
+  }, true);
 
   // ── Sample log ─────────────────────────────────────────────────────────────
   function loadSample(){
@@ -2033,7 +2041,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const row = e.target.closest('[data-snippet-cls]');
     if (!row) return;
     e.preventDefault();
-    showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'');
+    showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'', row);
   });
 
   renderHlSlots();
