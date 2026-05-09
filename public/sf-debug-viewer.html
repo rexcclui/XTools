@@ -1068,8 +1068,9 @@ function initAnalyzer(rootEl, fetchSource) {
     const dur=fmtDur(node.dur);
     if (dur){const dd=document.createElement('span');dd.className='ndur';dd.textContent=dur;row.appendChild(dd)}
     if (gapAfter&&S.showTiming){const g=document.createElement('span');g.className='ngap-inline';g.textContent=`+${gapAfter}`;row.appendChild(g)}
-    if (node.cls&&node.lr&&node.lr!=='[EXTERNAL]'){
-      row.addEventListener('contextmenu',e=>{e.preventDefault();showSnippet(node.cls,node.lr,row)});
+    if (node.cls){
+      row.dataset.snippetCls=node.cls;
+      if (node.lr&&node.lr!=='[EXTERNAL]') row.dataset.snippetLr=node.lr;
       row.title='Right-click for source snippet';
     }
     wrap.appendChild(row);
@@ -2021,6 +2022,15 @@ function initAnalyzer(rootEl, fetchSource) {
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
+  // Delegated right-click handler for tree snippet — catches clicks on any
+  // child span (class name, method name, etc.) not just the row itself.
+  $('treeContent').addEventListener('contextmenu', e => {
+    const row = e.target.closest('[data-snippet-cls]');
+    if (!row) return;
+    e.preventDefault();
+    showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'', row);
+  });
+
   renderHlSlots();
   addTab(null,'Log 1','');
 
