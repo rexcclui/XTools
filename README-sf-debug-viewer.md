@@ -19,6 +19,24 @@ A browser-based parser and visualiser for Salesforce Apex debug logs. Paste or d
 - Scrollable raw-log view with line numbers and timestamps
 - Click any line to sync the tree view to that event
 - Active line highlighted in blue
+- Hover any log line with class/method info to reveal a `⌗` source button — click to jump directly to that class and line in the source viewer
+- Right-click any log line for a context menu: jump to block entry/exit, highlight selection, show block highlight, and **View source** for events with a class reference
+- Events without an explicit class (`VARIABLE_SCOPE_BEGIN`, `USER_DEBUG`, `STATEMENT_EXECUTE`, etc.) resolve the enclosing class from the call tree so the source button still appears
+
+### Log Block Folding
+- Entry events (`METHOD_ENTRY`, `CODE_UNIT_STARTED`, `SOQL_EXECUTE_BEGIN`, etc.) show a `▼`/`▶` toggle to collapse or expand their entire execution block in the raw log view
+- Folded blocks are hidden from the virtual scroll; collapsed state persists while the tab is open
+
+### Source Code Viewer
+- Click **📂 Source** in the toolbar to open a local Salesforce project folder (uses File System Access API; falls back to a file-picker for unsupported browsers)
+- Only indexes `.cls` and `.trigger` files under a `force-app` subtree — works whether you open the project root or the `force-app` folder itself
+- When a class is found, it opens in a centered modal (92 % screen width, 75 vh tall) with Apex syntax highlighting and the targeted line scrolled into view and highlighted in blue
+- Multi-segment class names (`fferpcore.ffasync_ProcessService.ProcessExecutionContext`) are resolved right-to-left so inner-class references correctly open the outer `.cls` file
+- Source is also accessible from tree node `⌗` buttons (visible on hover) and the right-click context menu on log lines
+- Rendered HTML is cached per class so reopening the same file is instant
+
+### SID Stripping
+- Salesforce record IDs (`01p…`) embedded in log lines are automatically removed from both the raw log view and tree node labels for cleaner display
 
 ### Multi-Tab Support
 - Open multiple logs simultaneously as tabs; add, close, and switch between them freely

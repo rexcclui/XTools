@@ -103,12 +103,15 @@ A Salesforce debug log parser and visualizer. Paste a raw debug log to get a col
 - **Log parser** — Parses standard Salesforce debug log format into a structured call tree
 - **Call tree view** — Hierarchical tree of methods, constructors, SOQL, DML, callouts, flows, exceptions, and variable assignments — each with a distinct icon and color
 - **Raw log view** — Color-coded line-by-line view synchronized with the tree (click a log line to jump to the corresponding tree node, and vice versa)
+- **Log block folding** — `▼`/`▶` toggles on entry events to collapse entire execution blocks in the raw log view
+- **SID stripping** — Salesforce record IDs embedded in log lines are automatically hidden for cleaner display
+- **Source code viewer** — Open a local Salesforce project folder; hover any log line or tree node to reveal a `⌗` button that opens the corresponding `.cls` file in a centered modal with Apex syntax highlighting and the target line scrolled into view. Right-click a log line for a **View source** context menu option
 - **Resizable split pane** — Drag the divider between the raw log and tree panels
 - **Tabs** — Open and switch between multiple logs simultaneously
 - **Type filters** — Filter the tree to show only Methods, SOQL, DML, Debug statements, or Exceptions
 - **Toggle controls** — Show/hide User Debug, System Methods, Variable Assignments, and timing gaps
 - **Namespace filter** — Isolate nodes by Apex namespace prefix
-- **Log tag filter** — Show/hide specific event types (e.g. `HEAP_ALLOCATE`, `STATEMENT_EXECUTE`) from the raw log
+- **Log tag filter** — Show/hide specific event types (e.g. `HEAP_ALLOCATE`, `STATEMENT_EXECUTE`) from the raw log; displayed in a 2-column modal
 - **Keyword hide** — Suppress log lines matching one or more keywords
 - **Text highlights** — Four configurable highlight slots for marking keywords across both views
 - **Global search** — Search across all open log tabs at once
@@ -126,7 +129,8 @@ A Salesforce debug log parser and visualizer. Paste a raw debug log to get a col
 3. Use the **type filter chips** and **toggle buttons** in the tree toolbar to focus on relevant events.
 4. Click any tree node to highlight the corresponding raw log line. Click a raw log line to jump to the tree node.
 5. Use **Highlight** slots to mark keywords across both views simultaneously.
-6. Previously parsed logs are automatically saved; click **📚 History** to reload them.
+6. Click **📂 Source** to open your Salesforce project folder. Hover any log line or tree node to see a `⌗` source button; click it to open the class file at the exact line.
+7. Previously parsed logs are automatically saved; click **📚 History** to reload them.
 
 ---
 
