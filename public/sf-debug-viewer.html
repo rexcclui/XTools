@@ -202,13 +202,13 @@ const CSS = `
 .parse-progress-pct{font-size:10px;color:var(--vd)}
 .sda.hide-vars .t-varAssign{display:none}
 .snippet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
-.snippet-popup{position:absolute;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;width:680px;max-width:calc(100% - 24px);font-family:'SF Mono','Fira Code',monospace;font-size:10px;overflow:hidden;display:flex;flex-direction:column}
+.snippet-popup{position:absolute;z-index:9999;background:#0d1117;border:1px solid #388bfd66;border-radius:8px;box-shadow:0 8px 32px #0009;width:900px;max-width:calc(100% - 24px);font-family:'SF Mono','Fira Code',monospace;font-size:11px;overflow:hidden;display:flex;flex-direction:column}
 .snippet-hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:11px;color:#8b949e;flex-shrink:0}
 .snippet-cls{color:#79c0ff;font-weight:600}
 .snippet-ln{color:#e3b341}
 .snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:14px;cursor:pointer;padding:0 3px;line-height:1}
 .snippet-close:hover{color:#f85149}
-.snippet-body{overflow:auto;max-height:380px;padding:8px 0;flex:1}
+.snippet-body{overflow:auto;max-height:520px;padding:8px 0;flex:1}
 .snippet-loading{padding:20px;text-align:center;color:#8b949e;font-size:11px}
 .snippet-error{padding:12px 16px;color:#f85149;font-size:11px}
 .sline{display:flex;align-items:baseline;padding:1px 0}
@@ -792,7 +792,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
   function sep(menu){const d=document.createElement('div');d.className='log-ctx-sep';menu.appendChild(d)}
 
-  function showLogContextMenu(e,tab,ns,sel=''){
+  function showLogContextMenu(e,tab,ns,sel='',rowEl=null){
     closeLogContextMenu();
     const menu=document.createElement('div');menu.className='log-ctx-menu';_ctxMenu=menu;
     const vis=tab._visLines||[];
@@ -830,6 +830,27 @@ function initAnalyzer(rootEl, fetchSource) {
       sep(menu);
     } else if (ll?.ev){
       lbl(ll.ev);
+    }
+
+    // ── view source ──────────────────────────────────────────────────────
+    if (ll?.ev){
+      const m=evMeta(ll.ev,ll.rest);
+      if (m.cls){
+        item(`⌗ View source: ${m.cls}${m.lr?':'+m.lr.replace(/[\[\]]/g,''):''}`, '', ()=>{
+          closeLogContextMenu();
+          showSnippet(m.cls, m.lr||'', rowEl);
+        });
+        sep(menu);
+      } else if (m.lr && !m.cls) {
+        // event has a line ref but no class — show line ref only
+        const lr=m.lr.replace(/[\[\]]/g,'');
+        item(`⌗ Line ${lr} in current class`, '', ()=>{
+          closeLogContextMenu();
+          const chainCls=chain.length?[...chain].reverse().find(n=>n.cls)?.cls:'';
+          if (chainCls) showSnippet(chainCls, m.lr||'', rowEl);
+        });
+        sep(menu);
+      }
     }
 
     // ── highlight selection ───────────────────────────────────────────────
@@ -902,7 +923,7 @@ function initAnalyzer(rootEl, fetchSource) {
       const ns=parseInt(rowEl.dataset.ns);
       // capture selection before the menu causes it to collapse
       const sel=window.getSelection()?.toString().trim()||'';
-      showLogContextMenu(e,tab,ns,sel);
+      showLogContextMenu(e,tab,ns,sel,rowEl);
     });
 
     wrap.addEventListener('keydown',e=>{
@@ -1882,7 +1903,7 @@ function initAnalyzer(rootEl, fetchSource) {
     // Position relative to C (which is position:relative)
     const cRect = C.getBoundingClientRect();
     const aRect = anchorEl ? anchorEl.getBoundingClientRect() : {top: cRect.top + 100, bottom: cRect.top + 116, left: cRect.left + 20};
-    const pw = 680, ph = 420;
+    const pw = Math.min(900, C.clientWidth - 24), ph = 560;
     let top = (aRect.bottom - cRect.top) + 4;
     let left = (aRect.left - cRect.left);
     if (top + ph > C.clientHeight) top = Math.max(0, (aRect.top - cRect.top) - ph - 4);
