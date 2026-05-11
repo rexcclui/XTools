@@ -24,6 +24,7 @@ An interactive workspace for viewing, editing, and comparing JSON data using a f
 - **Tabs** — Manage multiple independent workspaces, each with its own grid
 - **Rendered table view** — Arrays of objects are automatically rendered as navigable tables
 - **Pretty-print with expand/collapse** — Toggle formatted JSON with nested object/array collapsing (collapsed by default beyond 3 levels)
+- **Apex debug object parsing** — Paste Salesforce Apex object print-outs (e.g., `TypeName:[field=value, ...]`) or extract from noisy debug log lines; automatically converts to JSON tables
 - **Side-by-side diff** — Select any two values and compare them with color-coded differences
 - **Live highlighting** — Hover over a cell element to highlight the corresponding path in the raw editor, and vice versa
 - **Copy buttons** — Copy full cell JSON from the header, or copy any nested object/array block
