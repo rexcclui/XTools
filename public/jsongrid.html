@@ -630,10 +630,10 @@ function togPretty(id){
   const s=cs(id),ta=document.getElementById('ta-'+id);
   if(ta)s.text=ta.value;
   if(!s.pretty){
-    // Smart trim: try to extract valid JSON from whatever is in the box
+    // Smart trim: try to extract valid structured data (JSON/Apex debug object)
     if(s.text.trim()){
-      const extracted=extractJSON(s.text);
-      const src=extracted!==null?extracted:s.text;
+      const extracted=extractStructured(s.text);
+      const src=extracted?extracted.jsonText:s.text;
       try{
         const fmt=JSON.stringify(JSON.parse(src),null,2);
         s.text=fmt;if(ta)ta.value=fmt;
@@ -660,7 +660,7 @@ function renderPretty(id){
 
 function tryAutoConvertPaste(id,text){
   const ta=document.getElementById('ta-'+id);if(!ta)return false;
-  const matches=extractJSONMessages(String(text||''));
+  const matches=extractStructuredMessages(String(text||''));
   if(matches.length>1){
     showJsonPickModal(id,matches);
     return true;
@@ -1093,8 +1093,14 @@ function ctxCopyJSON(){
 }
 function ctxParseJSON(){
   if(!_ctxTarget)return;const{path,cid}=_ctxTarget;hideCtxMenu();
-  try{const v=getAt(cid,path);const p=JSON.parse(v);const cellId=cellIdFromCid(cid);cs(cellId).parsedPaths[path]=p;rebuildGP(cellId);}
-  catch(e){alert('Not valid JSON: '+e.message);}
+  try{
+    const v=getAt(cid,path);
+    const parsed=parseStructuredInput(String(v==null?'':v));
+    if(!parsed)throw new Error('Could not parse value as JSON or Apex object');
+    const cellId=cellIdFromCid(cid);
+    cs(cellId).parsedPaths[path]=parsed.value;
+    rebuildGP(cellId);
+  }catch(e){alert('Not valid JSON/Apex object: '+e.message);}
 }
 // Single document-level handler for node selection - never stacks
 document.addEventListener('click',e=>{
@@ -1368,7 +1374,7 @@ function _outsideDD(e){const d=document.querySelector('.storage-drop');if(!d){do
 function hideStorageDrop(){document.querySelectorAll('.storage-drop').forEach(d=>d.remove());}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 
-/* Extract all valid top-level JSON objects/arrays from arbitrary text */
+/* Extract valid top-level JSON or Apex debug objects from arbitrary text */
 function findJsonEnd(text,start){
   const first=text[start];
   if(first!=='{'&&first!=='[')return-1;
@@ -1390,6 +1396,147 @@ function findJsonEnd(text,start){
   return-1;
 }
 
+function _isWs(ch){return ch===' '||ch==='\n'||ch==='\r'||ch==='\t';}
+function _isIdentStart(ch){return /[A-Za-z_]/.test(ch||'');}
+function _isIdentChar(ch){return /[A-Za-z0-9_]/.test(ch||'');}
+function _toAtom(token){
+  const t=String(token||'').trim();
+  if(!t)return '';
+  if(/^null$/i.test(t))return null;
+  if(/^true$/i.test(t))return true;
+  if(/^false$/i.test(t))return false;
+  if(/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(t))return Number(t);
+  return t;
+}
+
+function parseApexAt(text,start){
+  const p={text:String(text||''),i:start};
+  const len=p.text.length;
+
+  function skipWs(){while(p.i<len&&_isWs(p.text[p.i]))p.i++;}
+  function peek(){return p.text[p.i];}
+  function readIdent(){
+    if(!_isIdentStart(peek()))return null;
+    const s=p.i++;while(p.i<len&&_isIdentChar(p.text[p.i]))p.i++;
+    return p.text.slice(s,p.i);
+  }
+  function parseQuoted(){
+    const q=peek();if(q!=='"'&&q!=="'")return null;
+    p.i++;
+    let out='',esc=false;
+    while(p.i<len){
+      const ch=p.text[p.i++];
+      if(esc){out+=ch;esc=false;continue;}
+      if(ch==='\\'){esc=true;continue;}
+      if(ch===q)break;
+      out+=ch;
+    }
+    return{value:out,kind:'scalar'};
+  }
+  function parseBare(stopSet){
+    const s=p.i;
+    while(p.i<len){
+      const ch=p.text[p.i];
+      if(stopSet.has(ch))break;
+      p.i++;
+    }
+    const token=p.text.slice(s,p.i).trim();
+    return{value:_toAtom(token),kind:'scalar'};
+  }
+  function parseList(closeChar){
+    const open=peek();
+    if((open==='('&&closeChar!==')')||(open==='['&&closeChar!==']'))return null;
+    p.i++;
+    const arr=[];
+    skipWs();
+    if(peek()===closeChar){p.i++;return{value:arr,kind:'array'};}
+    while(p.i<len){
+      const v=parseValue(new Set([',',closeChar]));
+      if(!v)return null;
+      arr.push(v.value);
+      skipWs();
+      if(peek()===','){p.i++;skipWs();continue;}
+      if(peek()===closeChar){p.i++;break;}
+      return null;
+    }
+    return{value:arr,kind:'array'};
+  }
+  function parseTypedObject(){
+    const save=p.i;
+    const typeName=readIdent();
+    if(!typeName){p.i=save;return null;}
+    skipWs();
+    if(peek()!==':'||p.text[p.i+1]!=='['){p.i=save;return null;}
+    p.i+=2;
+    const obj={__type:typeName};
+    skipWs();
+    if(peek()===']'){p.i++;return{value:obj,kind:'typed'};}
+    while(p.i<len){
+      const key=readIdent();
+      if(!key)return null;
+      skipWs();
+      if(peek()!=='=')return null;
+      p.i++;
+      const val=parseValue(new Set([',',']']));
+      if(!val)return null;
+      obj[key]=val.value;
+      skipWs();
+      if(peek()===','){p.i++;skipWs();continue;}
+      if(peek()===']'){p.i++;break;}
+      return null;
+    }
+    return{value:obj,kind:'typed'};
+  }
+  function parseColonObject(){
+    const save=p.i;
+    const firstKey=readIdent();
+    if(!firstKey){p.i=save;return null;}
+    skipWs();
+    if(peek()!==':'||p.text[p.i+1]==='['){p.i=save;return null;}
+    const obj={};
+    while(p.i<len){
+      const key=Object.keys(obj).length?readIdent():firstKey;
+      if(!key)return null;
+      skipWs();
+      if(peek()!==':')return null;
+      p.i++;
+      const val=parseValue(new Set([',',')',']','\n','\r']));
+      if(!val)return null;
+      obj[key]=val.value;
+      skipWs();
+      if(peek()!==',')break;
+      const look=p.i+1;
+      let j=look;while(j<len&&_isWs(p.text[j]))j++;
+      if(!_isIdentStart(p.text[j]))break;
+      p.i++;
+      skipWs();
+    }
+    return{value:obj,kind:'object'};
+  }
+  function parseValue(stopSet){
+    skipWs();
+    if(p.i>=len)return null;
+    const ch=peek();
+    if(ch==='(')return parseList(')');
+    if(ch==='[')return parseList(']');
+    if(ch==='"'||ch==="'")return parseQuoted();
+    if(_isIdentStart(ch)){
+      const typed=parseTypedObject();
+      if(typed)return typed;
+      const colon=parseColonObject();
+      if(colon)return colon;
+    }
+    return parseBare(stopSet||new Set([',',')',']','\n','\r']));
+  }
+
+  skipWs();
+  const v=parseValue(new Set());
+  if(!v)return null;
+  if(v.kind==='scalar')return null;
+  while(p.i<len&&_isWs(p.text[p.i]))p.i++;
+  return{value:v.value,kind:v.kind,end:p.i-1};
+}
+
 function extractJSONMessages(text,maxMatches=20){
   const out=[];
   let i=0;
@@ -1401,7 +1548,7 @@ function extractJSONMessages(text,maxMatches=20){
     const candidate=text.slice(i,end+1);
     try{
       const value=JSON.parse(candidate);
-      out.push({start:i,end,jsonText:candidate,value});
+      out.push({start:i,end,jsonText:candidate,value,kind:'json'});
       i=end+1;
       continue;
     }catch(e){}
@@ -1410,9 +1557,90 @@ function extractJSONMessages(text,maxMatches=20){
   return out;
 }
 
-function extractJSON(text){
-  const msgs=extractJSONMessages(String(text||''),1);
-  return msgs.length?msgs[0].jsonText:null;
+function findMatchingParenEnd(text,start){
+  if(text[start]!=='(')return-1;
+  let depth=1;
+  let inStr=false,esc=false,quote='';
+  for(let i=start+1;i<text.length;i++){
+    const ch=text[i];
+    if(esc){esc=false;continue;}
+    if(inStr){
+      if(ch==='\\'){esc=true;continue;}
+      if(ch===quote){inStr=false;quote='';}
+      continue;
+    }
+    if(ch==='"'||ch==="'"){inStr=true;quote=ch;continue;}
+    if(ch==='('){depth++;continue;}
+    if(ch===')'){
+      depth--;
+      if(depth===0)return i;
+    }
+  }
+  return-1;
+}
+
+function extractApexMessages(text,maxMatches=20){
+  const out=[];
+  const src=String(text||'');
+  let i=0;
+  while(i<src.length&&out.length<maxMatches){
+    if(src[i]!=='('){i++;continue;}
+    const end=findMatchingParenEnd(src,i);
+    if(end===-1){i++;continue;}
+    const parsed=parseApexAt(src,i);
+    if(parsed&&parsed.end===end){
+      const base={start:i,end,kind:'apex'};
+      if(Array.isArray(parsed.value)&&parsed.value.length>1){
+        out.push({...base,jsonText:JSON.stringify(parsed.value,null,2),value:parsed.value});
+        parsed.value.forEach((item,idx)=>{
+          if(out.length>=maxMatches)return;
+          out.push({...base,jsonText:JSON.stringify(item,null,2),value:item,itemIndex:idx});
+        });
+      } else {
+        out.push({...base,jsonText:JSON.stringify(parsed.value,null,2),value:parsed.value});
+      }
+      i=end+1;
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
+function extractStructuredMessages(text,maxMatches=20){
+  const src=String(text||'');
+  const out=[];
+  const all=[...extractJSONMessages(src,maxMatches),...extractApexMessages(src,maxMatches)];
+  all.sort((a,b)=>a.start-b.start||b.end-a.end);
+  const used=[];
+  for(let i=0;i<all.length&&out.length<maxMatches;i++){
+    const m=all[i];
+    const hasCrossOverlap=used.some(u=>!(m.end<u.start||m.start>u.end)&&!(u.start===m.start&&u.end===m.end));
+    if(hasCrossOverlap)continue;
+    const duplicate=out.some(x=>x.start===m.start&&x.end===m.end&&x.kind===m.kind&&x.jsonText===m.jsonText);
+    if(duplicate)continue;
+    out.push(m);
+    used.push({start:m.start,end:m.end});
+  }
+  out.sort((a,b)=>a.start-b.start);
+  return out;
+}
+
+function extractStructured(text){
+  const msgs=extractStructuredMessages(String(text||''),1);
+  return msgs.length?msgs[0]:null;
+}
+
+function parseStructuredInput(text){
+  const src=String(text||'').trim();
+  if(!src)return null;
+  try{return{value:JSON.parse(src),jsonText:JSON.stringify(JSON.parse(src),null,2),kind:'json'};}catch(e){}
+  const parsed=parseApexAt(src,0);
+  if(parsed&&parsed.end>=src.length-1){
+    return{value:parsed.value,jsonText:JSON.stringify(parsed.value,null,2),kind:'apex'};
+  }
+  const extracted=extractStructured(src);
+  return extracted||null;
 }
 
 const escH=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
