@@ -61,6 +61,13 @@ body{font-family:var(--sans);font-size:13px;background:var(--bg3);color:var(--tx
 .row-tog,.max-btn{width:100%;border:0.5px solid var(--bd);border-radius:4px;background:var(--bg2);cursor:pointer;font-size:9px;color:var(--tx3);display:flex;align-items:center;justify-content:center;user-select:none}
 .row-tog{flex:1;writing-mode:vertical-rl;padding:4px 0}
 .max-btn{height:22px;font-size:11px;font-weight:bold}
+.del-row-btn{height:18px;width:100%;border:0.5px solid var(--danger);border-radius:4px;background:var(--danger-bg);cursor:pointer;font-size:12px;color:var(--danger);display:flex;align-items:center;justify-content:center;user-select:none;flex-shrink:0;opacity:0.55}
+.del-row-btn:hover{opacity:1}
+.row-drag-handle{height:18px;width:100%;border:0.5px solid var(--bd);border-radius:4px;background:var(--bg2);cursor:grab;font-size:11px;color:var(--tx3);display:flex;align-items:center;justify-content:center;user-select:none;flex-shrink:0}
+.row-drag-handle:hover{background:var(--bg3);color:var(--tx)}
+.row-drag-handle:active{cursor:grabbing}
+.row-wrap.row-drag-over-above{border-top:2px solid var(--accent-m)}
+.row-wrap.row-drag-over-below{border-bottom:2px solid var(--accent-m)}
 .row-resizer{height:8px;cursor:row-resize;z-index:50;display:flex;align-items:center;justify-content:center}
 .row-resizer:hover,.row-resizer.drag{background:var(--accent-m);opacity:.3}
 .row-resizer::after{content:'⋯';color:var(--tx3);font-size:14px}
@@ -360,7 +367,9 @@ function renderGrid(){
     const rc=document.createElement('div');rc.className='row-controls';
     const rb=document.createElement('div');rb.className='row-tog';rb.textContent=G.cR.has(r)?'▶':`▼ r${r+1}`;rb.onclick=(rr=>()=>togCR(rr))(r);
     const mb=document.createElement('div');mb.className='max-btn';mb.innerHTML=G.maxRow===r?'⤡':'⤢';mb.onclick=(rr=>()=>togMax(rr))(r);
-    rc.appendChild(rb);rc.appendChild(mb);rw.appendChild(rc);
+    const dh=document.createElement('div');dh.className='row-drag-handle';dh.title='Drag to reorder';dh.innerHTML='⠿';dh.draggable=true;setupRowDrag(dh,r);
+    const db=document.createElement('div');db.className='del-row-btn';db.title='Remove row';db.innerHTML='🗑';db.onclick=(rr=>()=>removeRow(rr))(r);if(G.rows<=1)db.style.display='none';
+    rc.appendChild(dh);rc.appendChild(rb);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
     const gr=document.createElement('div');gr.className='grid-row'+(G.cR.has(r)?' rcoll':'');gr.id='row-'+r;
     rw.appendChild(gr);
     ra.appendChild(rw); // append wrapper before adding cells so getElementById works
@@ -598,7 +607,9 @@ function patchGrid(oldRows,oldCols){
       const rc=document.createElement('div');rc.className='row-controls';
       const rb=document.createElement('div');rb.className='row-tog';rb.textContent=`▼ r${r+1}`;rb.onclick=(rr=>()=>togCR(rr))(r);
       const mb=document.createElement('div');mb.className='max-btn';mb.innerHTML='⤢';mb.onclick=(rr=>()=>togMax(rr))(r);
-      rc.appendChild(rb);rc.appendChild(mb);rw.appendChild(rc);
+      const dh=document.createElement('div');dh.className='row-drag-handle';dh.title='Drag to reorder';dh.innerHTML='⠿';dh.draggable=true;setupRowDrag(dh,r);
+      const db=document.createElement('div');db.className='del-row-btn';db.title='Remove row';db.innerHTML='🗑';db.onclick=(rr=>()=>removeRow(rr))(r);
+      rc.appendChild(dh);rc.appendChild(rb);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
       const gr=document.createElement('div');gr.className='grid-row';gr.id='row-'+r;
       for(let c=0;c<G.cols;c++)addCellToRow(gr,r,c);
       rw.appendChild(gr);ra.appendChild(rw);
@@ -656,6 +667,7 @@ function renderPretty(id){
   const s=cs(id),sp=document.getElementById('sp-'+id);if(!sp)return;
   try{const cid='t'+G.id+'_'+id;const p=JSON.parse(s.text);sp.innerHTML=prettySrc(p,0,cid+'::$',cid);}
   catch(e){sp.innerHTML=`<span style="color:var(--danger)">Invalid JSON</span>`;}
+  applySearchHL(id);
 }
 
 function tryAutoConvertPaste(id,text){
@@ -778,6 +790,105 @@ function syncTA(id){
 
 function clearCell(id){G.cells[id]={text:'',title:'',pretty:false,parsedPaths:{}};const cell=document.getElementById('cell-'+id);if(cell){const r=parseInt(id),c=parseInt(id.split('_')[1]);cell.innerHTML=cellHTML(id,parseInt(id.split('_')[0]),parseInt(id.split('_')[1]),G.cells[id]);const ta=document.getElementById('ta-'+id);if(ta)ta.value='';syncTA(id);setupColDivider(cell,id);setupSyncEvents(cell,id);setupDD(cell,id);}saveAppState();}
 function clearAll(){if(confirm('Clear Tab?')){G.cells={};renderGrid();saveAppState();}}
+/* ══ ROW DRAG REORDER ══ */
+let _dragRow=null;
+function setupRowDrag(handle,r){
+  const rw=()=>handle.closest('.row-wrap');
+  handle.addEventListener('dragstart',e=>{
+    _dragRow=r;
+    e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setData('text/plain',String(r));
+    setTimeout(()=>{const el=rw();if(el)el.style.opacity='0.4';},0);
+  });
+  handle.addEventListener('dragend',()=>{
+    _dragRow=null;
+    const el=rw();if(el)el.style.opacity='';
+    document.querySelectorAll('.row-wrap').forEach(w=>w.classList.remove('row-drag-over-above','row-drag-over-below'));
+  });
+  // Attach dragover/dragleave/drop on the row-wrap itself
+  // We do this lazily once per wrap after DOM is ready
+  setTimeout(()=>{
+    const wrap=rw();if(!wrap||wrap._dragBound)return;wrap._dragBound=true;
+    wrap.addEventListener('dragover',e=>{
+      if(_dragRow===null||_dragRow===r){e.preventDefault();return;}
+      e.preventDefault();e.dataTransfer.dropEffect='move';
+      const rect=wrap.getBoundingClientRect();
+      const below=e.clientY>rect.top+rect.height/2;
+      wrap.classList.toggle('row-drag-over-above',!below);
+      wrap.classList.toggle('row-drag-over-below',below);
+    });
+    wrap.addEventListener('dragleave',()=>wrap.classList.remove('row-drag-over-above','row-drag-over-below'));
+    wrap.addEventListener('drop',e=>{
+      e.preventDefault();
+      wrap.classList.remove('row-drag-over-above','row-drag-over-below');
+      if(_dragRow===null||_dragRow===r)return;
+      const rect=wrap.getBoundingClientRect();
+      const insertAfter=e.clientY>rect.top+rect.height/2;
+      let target=r+(insertAfter?1:0);
+      if(target>_dragRow)target--;
+      if(target!==_dragRow)reorderRows(_dragRow,target);
+    });
+  },0);
+}
+function reorderRows(from,to){
+  syncAll();
+  if(from===to||from<0||to<0||from>=G.rows||to>=G.rows)return;
+  // Snapshot all cell data in row order
+  const snap=[];
+  for(let r=0;r<G.rows;r++){
+    const row=[];
+    for(let c=0;c<G.cols;c++){
+      const s=cs(r+'_'+c);
+      row.push({text:s.text,title:s.title,pretty:s.pretty,parsedPaths:{}});
+    }
+    snap.push(row);
+  }
+  // Move row
+  const [moved]=snap.splice(from,1);
+  snap.splice(to,0,moved);
+  // Also reorder cR and rowHeights
+  const cRArr=[...G.cR];
+  const rhSnap=[...G.rowHeights];
+  const cRRow=cRArr.map(r=>r);
+  // Apply new order back to G.cells
+  for(let r=0;r<G.rows;r++){
+    for(let c=0;c<G.cols;c++){
+      G.cells[r+'_'+c]=snap[r][c];
+    }
+  }
+  // Rebuild cR
+  const newOrder=Array.from({length:G.rows},(_,i)=>i);
+  newOrder.splice(from,1);newOrder.splice(to,0,from);
+  const newCR=new Set();
+  newOrder.forEach((origR,newR)=>{if(G.cR.has(origR))newCR.add(newR);});
+  G.cR=newCR;
+  // Reorder rowHeights
+  const newRH=newOrder.map(origR=>rhSnap[origR]||1);
+  G.rowHeights=newRH;
+  if(G.maxRow!==null)G.maxRow=newOrder.indexOf(G.maxRow);
+  renderGrid();
+  saveAppState();
+}
+
+function removeRow(r){
+  syncAll();
+  if(G.rows<=1)return;
+  // Shift cell data from rows below r up by one
+  for(let rr=r;rr<G.rows-1;rr++){
+    for(let c=0;c<G.cols;c++){
+      const src=cs((rr+1)+'_'+c);
+      G.cells[rr+'_'+c]={text:src.text,title:src.title,pretty:src.pretty,parsedPaths:{}};
+    }
+  }
+  // Clear last row
+  for(let c=0;c<G.cols;c++) G.cells[(G.rows-1)+'_'+c]={text:'',title:'',pretty:false,parsedPaths:{}};
+  G.rows--;
+  if(G.maxRow!==null&&G.maxRow>=G.rows)G.maxRow=null;
+  G.cR.delete(G.rows);
+  document.getElementById('rv').textContent=G.rows;
+  renderGrid();
+  saveAppState();
+}
 function togMax(r){
   syncAll();
   G.maxRow=(G.maxRow===r)?null:r;
@@ -1159,12 +1270,16 @@ function doCellSearch(id,query){
 function applySearchHL(id){
   const state=_searchState[id];
   if(!state||!state.matches.length)return;
-  const gp=document.getElementById('gp-'+id);if(!gp)return;
+  const gp=document.getElementById('gp-'+id);
+  const sp=document.getElementById('sp-'+id);
   const cid='t'+G.id+'_'+id;
   state.matches.forEach((p,i)=>{
-    gp.querySelectorAll(`[data-p="${escA2(p)}"][data-cid="${escA2(cid)}"]`).forEach(el=>{
-      el.classList.add('search-hl');
-      if(i===state.idx)el.classList.add('search-hl-cur');
+    [gp,sp].forEach(panel=>{
+      if(!panel)return;
+      panel.querySelectorAll(`[data-p="${escA2(p)}"][data-cid="${escA2(cid)}"]`).forEach(el=>{
+        el.classList.add('search-hl');
+        if(i===state.idx)el.classList.add('search-hl-cur');
+      });
     });
   });
 }
@@ -1178,26 +1293,36 @@ function updateSearchCount(id){
 
 function scrollToSearchMatch(id,idx){
   const state=_searchState[id];if(!state||!state.matches.length)return;
-  const gp=document.getElementById('gp-'+id);if(!gp)return;
-  const jgWrap=gp.querySelector('.jg-wrap');if(!jgWrap)return;
   const cid='t'+G.id+'_'+id;
   const path=state.matches[idx];
-  const el=jgWrap.querySelector(`[data-p="${escA2(path)}"][data-cid="${escA2(cid)}"]`);
-  if(!el)return;
-  const cr=jgWrap.getBoundingClientRect();
-  const er=el.getBoundingClientRect();
-  const relTop=er.top-cr.top+jgWrap.scrollTop;
-  jgWrap.scrollTo({top:Math.max(0,relTop-jgWrap.clientHeight/2+er.height/2),behavior:'smooth'});
+  function scrollPanel(container){
+    if(!container)return;
+    const el=container.querySelector(`[data-p="${escA2(path)}"][data-cid="${escA2(cid)}"]`);
+    if(!el)return;
+    const cr=container.getBoundingClientRect();
+    const er=el.getBoundingClientRect();
+    const relTop=er.top-cr.top+container.scrollTop;
+    container.scrollTo({top:Math.max(0,relTop-container.clientHeight/2+er.height/2),behavior:'smooth'});
+  }
+  const gp=document.getElementById('gp-'+id);
+  if(gp)scrollPanel(gp.querySelector('.jg-wrap'));
+  const sp=document.getElementById('sp-'+id);
+  if(sp&&sp.classList.contains('on'))scrollPanel(sp);
 }
 
 function navSearch(id,dir){
   const state=_searchState[id];if(!state||!state.matches.length)return;
   state.idx=(state.idx+dir+state.matches.length)%state.matches.length;
   const gp=document.getElementById('gp-'+id);
-  if(gp)gp.querySelectorAll('.search-hl-cur').forEach(el=>el.classList.remove('search-hl-cur'));
+  const sp=document.getElementById('sp-'+id);
+  [gp,sp].forEach(panel=>{
+    if(panel)panel.querySelectorAll('.search-hl-cur').forEach(el=>el.classList.remove('search-hl-cur'));
+  });
   const cid='t'+G.id+'_'+id;
   const path=state.matches[state.idx];
-  if(gp)gp.querySelectorAll(`[data-p="${escA2(path)}"][data-cid="${escA2(cid)}"]`).forEach(el=>el.classList.add('search-hl-cur'));
+  [gp,sp].forEach(panel=>{
+    if(panel)panel.querySelectorAll(`[data-p="${escA2(path)}"][data-cid="${escA2(cid)}"]`).forEach(el=>el.classList.add('search-hl-cur'));
+  });
   updateSearchCount(id);
   scrollToSearchMatch(id,state.idx);
 }

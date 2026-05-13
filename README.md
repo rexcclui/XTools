@@ -25,12 +25,15 @@ An interactive workspace for viewing, editing, and comparing JSON data using a f
 - **Rendered table view** — Arrays of objects are automatically rendered as navigable tables
 - **Pretty-print with expand/collapse** — Toggle formatted JSON with nested object/array collapsing (collapsed by default beyond 3 levels)
 - **Apex debug object parsing** — Paste Salesforce Apex object print-outs (e.g., `TypeName:[field=value, ...]`) or extract from noisy debug log lines; automatically converts to JSON tables
+- **Row reorder (drag and drop)** — Drag a row using the handle on the left controls to move it above or below another row
+- **Row delete icon** — Remove a row quickly using the red bin button in the row controls (minimum 1 row retained)
 - **Side-by-side diff** — Select any two values and compare them with color-coded differences
 - **Live highlighting** — Hover over a cell element to highlight the corresponding path in the raw editor, and vice versa
 - **Copy buttons** — Copy full cell JSON from the header, or copy any nested object/array block
 - **localStorage snippets** — Cell contents are auto-saved and can be reloaded from a dropdown history
 - **Drag-and-drop** — Drop JSON files directly onto cells
 - **Global search** — Search across all open cells at once
+- **Per-cell search with dual-panel highlight** — Cell search highlights matches in both the rendered grid (right) and pretty source panel (left)
 - **Dark mode** — Follows system preference automatically
 
 **Usage**
@@ -45,7 +48,16 @@ Use the toolbar to set the number of **columns** (1–5) and **rows** (1–8). E
 | Maximize button | Expand a row to fill the viewport |
 | Copy button | Copy the full cell JSON to clipboard |
 
-Paste or type JSON into any cell's editor. Drag a `.json` file onto a cell to load it. Drag the divider between the raw editor and rendered view to resize the source panel. Drag column borders to resize columns.
+Each row also has left-side controls:
+
+| Row control | Action |
+|---|---|
+| Drag handle (`⠿`) | Drag the row to reorder it |
+| Toggle (`▼/▶`) | Collapse or expand the row |
+| Maximize (`⤢/⤡`) | Maximize or restore the row |
+| Delete (`🗑`) | Remove the row |
+
+Paste or type JSON into any cell's editor. Drag a `.json` file onto a cell to load it. Drag the divider between the raw editor and rendered view to resize the source panel. Drag column borders to resize columns. Use the row drag handle to move rows to a new position.
 
 **Comparing values**
 
@@ -62,6 +74,24 @@ Paste or type JSON into any cell's editor. Drag a `.json` file onto a cell to lo
 **Saved snippets**
 
 Cell content is automatically saved to `localStorage` with a timestamp. Focus a cell's editor and click the dropdown arrow to browse up to 200 saved entries.
+
+**Parsing Apex debug objects**
+
+Paste Salesforce Apex debug output or entire log lines directly into a cell:
+
+1. **Direct paste** — Paste a structured Apex object like `OverAllocatedTaskDisplay:[hasHighestOverallocation=null, overAllocatedResources=(OverAllocatedResourceDisplay:[...], ...), ...]`. Click the **{}** button to toggle pretty mode; the parser automatically converts it to JSON.
+
+2. **Extract from log lines** — Paste a full debug log line like:
+   ```
+   10:06:38.60 USER_DEBUG [68]|DEBUG|TEMP_LOG[63] SMAC_ImpactAnalysisBuilder> overAllocatedTasks:(OverAllocatedTaskDisplay:[...], ...)
+   ```
+   The parser scans for `(...)` blocks, extracts the Apex object(s), and presents them in a chooser if multiple candidates are found.
+
+3. **Right-click parse** — Select a cell value that contains an Apex object string (or nested JSON string), right-click, and choose **Convert string to JSON table**. The parser handles both JSON and Apex formats.
+
+**Multi-object selection**
+
+If a parenthesized Apex block contains multiple objects, a modal chooser appears so you can confirm which one to load. Each candidate shows a preview of the extracted data.
 
 ---
 
