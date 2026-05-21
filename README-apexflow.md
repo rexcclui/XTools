@@ -13,8 +13,9 @@ A browser-based tool for visualising Salesforce Apex, Java, and Lightning Web Co
 - Skips noise directories (`__tests__`, `node_modules`, `.git`, `dist`, `build`, `.sfdx`, etc.)
 
 ### Indexing
-- On folder open the tree is scanned once for **LWC bundles** — a `<base>.js` paired with a sibling `<base>.html` inside an `lwc/` folder (or anywhere under `force-app*`)
-- A parallel scan builds the **Apex / Java class index** (restricted to `force-app*` subtrees)
+- On folder open the tree is scanned once for **LWC bundles** — any folder whose name matches a `<dirname>.js` file inside it (a sibling `<dirname>.html` becomes the template). No `force-app/` or `lwc/` requirement; the same-name convention is enough
+- LWC indexing skips: `.git`, `.sf`, `.sfdx`, `node_modules`, `translation_source`, `__tests__`, `__examples__`, `docs`
+- A parallel scan builds the **Apex / Java class index** by file name; `*Test.cls` test classes are excluded, and anything under `docs`, `temp`, `node_modules`, `.sfdx`, `unit`, `.history`, `test` is skipped
 - Counts are cached in IndexedDB per directory handle so reopening a folder is instant
 - Badges in the file explorer header show `N LWC` / `N Apex` totals
 

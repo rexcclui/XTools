@@ -769,49 +769,62 @@
         return { kind: 'dir', name, path, children };
     }
 
-    // Walk the tree to identify LWC components. Restricted to subtrees of a
-    // `force-app*` folder, and the path must contain a `lwc` folder OR the
-    // directory must have a same-named .html sibling (the LWC bundle convention).
-    // __tests__ / __mocks__ are already pruned by buildHandleTree.
-    function indexLwcFromTree(node, parentPath = '', insideForceApp = false) {
-        if (!node || node.kind !== 'dir') return;
-        if (node.name === '__tests__' || node.name === '__mocks__') return;
-        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
-        const nowInside = insideForceApp || /^force-app/i.test(node.name);
+    // Indexing ignore lists — separate from buildHandleTree's tree-pruning list
+    // so the file explorer still shows these folders, we just don't auto-index
+    // their contents.
+    //
+    // LWC: same convention as the Certinia findComponentFolders helper — any
+    // directory containing `<dirname>.js` is treated as a component, regardless
+    // of being inside `force-app/lwc/`. Skip these directory names anywhere in
+    // the path (case-insensitive).
+    const LWC_INDEX_IGNORE = new Set([
+        '.git', '.sf', '.sfdx', 'node_modules', 'translation_source',
+        '__tests__', '__examples__', 'docs',
+    ]);
+    // Apex: skip *Test.cls test classes by name, and skip any .cls/.java that
+    // sits under one of these directory names (case-insensitive).
+    const APEX_INDEX_IGNORE = new Set([
+        'docs', 'temp', 'node_modules', '.sfdx', 'unit', '.history', 'test',
+    ]);
 
-        if (nowInside) {
-            const baseName = node.name;
-            const jsNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.js`);
-            if (jsNode) {
-                const htmlNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.html`);
-                const isLwcLikely = htmlNode || /\/lwc\//i.test(`/${fullPath}/`);
-                if (isLwcLikely) {
-                    feState.lwcIndex.set(baseName, {
-                        jsHandle: jsNode.handle,
-                        htmlHandle: htmlNode?.handle || null,
-                        folderPath: fullPath,
-                    });
-                }
-            }
+    // Walk every directory. If it contains a `<dirname>.js` it's an LWC bundle;
+    // a sibling `<dirname>.html` (when present) is the template. No `force-app/`
+    // or `/lwc/` restriction — purely the same-name folder convention.
+    function indexLwcFromTree(node, parentPath = '') {
+        if (!node || node.kind !== 'dir') return;
+        if (LWC_INDEX_IGNORE.has(node.name.toLowerCase())) return;
+        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+
+        const baseName = node.name;
+        const jsNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.js`);
+        if (jsNode) {
+            const htmlNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.html`);
+            feState.lwcIndex.set(baseName, {
+                jsHandle: jsNode.handle,
+                htmlHandle: htmlNode?.handle || null,
+                folderPath: fullPath,
+            });
         }
 
-        node.children.forEach(c => indexLwcFromTree(c, fullPath, nowInside));
+        node.children.forEach(c => indexLwcFromTree(c, fullPath));
     }
 
-    // Index Apex / Java classes by their class name → { name, handle } so right-click
-    // "Load Class" can resolve any referenced Apex. Restricted to subtrees of a
-    // `classes/` folder so unrelated .cls/.java elsewhere in the project aren't picked up.
-    function indexApexFromTree(node, insideClasses = false) {
+    // Index Apex / Java classes by their class name → { name, handle } so
+    // right-click "Load Class" can resolve any referenced Apex. Skip test
+    // classes (`*Test.cls`) and anything nested under an APEX_INDEX_IGNORE
+    // folder.
+    function indexApexFromTree(node, ancestorIgnored = false) {
         if (!node) return;
         if (node.kind === 'file') {
-            if (!insideClasses) return;
+            if (ancestorIgnored) return;
             const m = node.name.match(/^(.+)\.(cls|java)$/i);
-            if (m) feState.apexIndex.set(m[1], { name: node.name, handle: node.handle });
+            if (!m) return;
+            if (/Test\.cls$/i.test(node.name)) return;
+            feState.apexIndex.set(m[1], { name: node.name, handle: node.handle });
             return;
         }
-        if (node.name === '__tests__' || node.name === '__mocks__') return;
-        const nowInside = insideClasses || node.name === 'classes';
-        node.children.forEach(c => indexApexFromTree(c, nowInside));
+        const nowIgnored = ancestorIgnored || APEX_INDEX_IGNORE.has(node.name.toLowerCase());
+        node.children.forEach(c => indexApexFromTree(c, nowIgnored));
     }
 
     // Find a file node in feState.tree by absolute path (root-name-prefixed).
