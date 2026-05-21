@@ -421,6 +421,11 @@
     let collapsedMethods = new Set(); // Active methods whose subnodes are hidden
     let collapsedNodes = new Set();   // Node ids (any depth) whose children are collapsed
     let currentRenderedEdgeStyles = [];
+    // Source/target (already-safeId) of every edge written into the Mermaid
+    // definition, in declaration order. Mermaid 11 dropped the `LS-…`/`LE-…`
+    // edge classes we used to identify edges by, so after render we stamp
+    // data-source/data-target onto each path + label using this list.
+    let currentEdgeMeta = [];
     // Per-parent edge hides — entries are "<fromSafeId>|<toSafeId>". These collapse
     // a specific edge in place via CSS (no re-render), so the diagram stays put and
     // other parents that reference the same target keep their edge.
@@ -1575,40 +1580,40 @@
         if (!svgEl || !currentRenderedEdgeStyles.length) return;
 
         const edgeUsageCount = new Map();
-        const allRenderedEdges = Array.from(svgEl.querySelectorAll('.edgePath'));
-        const fallbackVisibleEdges = allRenderedEdges.slice(-currentRenderedEdgeStyles.length);
+        const allRenderedPaths = collectRenderedEdgePaths(svgEl);
+        const pathsByKey = new Map();
+        allRenderedPaths.forEach(p => {
+            const k = `${p.getAttribute('data-source') || ''}->${p.getAttribute('data-target') || ''}`;
+            if (!pathsByKey.has(k)) pathsByKey.set(k, []);
+            pathsByKey.get(k).push(p);
+        });
+        const fallbackVisiblePaths = allRenderedPaths.slice(-currentRenderedEdgeStyles.length);
 
         currentRenderedEdgeStyles.forEach((edge, styleIndex) => {
             const fromKey = normalizeEdgeKeyPart(edge.from);
             const toKey = normalizeEdgeKeyPart(edge.to);
-            const selector = `.edgePath.LS-${fromKey}.LE-${toKey}`;
-            const matchingEdges = Array.from(svgEl.querySelectorAll(selector));
-
             const edgeKey = `${fromKey}->${toKey}`;
+            const matchingPaths = pathsByKey.get(edgeKey) || [];
             const matchIndex = edgeUsageCount.get(edgeKey) || 0;
-            let edgeEl = matchingEdges[Math.min(matchIndex, Math.max(0, matchingEdges.length - 1))];
-            if (!edgeEl) {
-                edgeEl = fallbackVisibleEdges[styleIndex] || null;
-            }
+            let pathEl = matchingPaths[Math.min(matchIndex, Math.max(0, matchingPaths.length - 1))];
+            if (!pathEl) pathEl = fallbackVisiblePaths[styleIndex] || null;
             edgeUsageCount.set(edgeKey, matchIndex + 1);
-            if (!edgeEl) return;
+            if (!pathEl) return;
 
-            const pathEl = edgeEl.querySelector('path.path') || edgeEl.querySelector('path');
-            if (pathEl) {
-                pathEl.style.stroke = edge.color;
-                pathEl.style.strokeWidth = edge.width;
-                pathEl.style.fill = 'none';
-                pathEl.style.strokeDasharray = edge.dasharray || 'none';
-            }
+            pathEl.style.stroke = edge.color;
+            pathEl.style.strokeWidth = edge.width;
+            pathEl.style.fill = 'none';
+            pathEl.style.strokeDasharray = edge.dasharray || 'none';
 
-            const markerPaths = Array.from(svgEl.querySelectorAll('marker path'));
-            markerPaths.forEach(markerEl => {
-                const markerId = markerEl.closest('marker')?.id || '';
-                if (edgeEl.innerHTML.includes(markerId)) {
+            const markerEnd = pathEl.getAttribute('marker-end') || '';
+            const markerIdMatch = markerEnd.match(/#([\w-]+)/);
+            if (markerIdMatch) {
+                const markerEl = svgEl.querySelector(`marker#${CSS.escape(markerIdMatch[1])} path`);
+                if (markerEl) {
                     markerEl.style.stroke = edge.color;
                     markerEl.style.fill = edge.color;
                 }
-            });
+            }
         });
     }
 
@@ -1616,6 +1621,49 @@
 
     function buildEdgeKey(parent, child) {
         return `${safeId(parent)}|${safeId(child)}`;
+    }
+
+    // Collect every rendered edge path + matching label in document (= declaration)
+    // order. Handles Mermaid v8/9 (`.edgePath > path`) and v11 (`g.edgePaths > path`).
+    function collectRenderedEdgePaths(svgEl) {
+        const seen = new Set();
+        const out = [];
+        // Mermaid 11 layout — paths directly under <g class="edgePaths">.
+        svgEl.querySelectorAll('g.edgePaths > path').forEach(p => {
+            if (!seen.has(p)) { seen.add(p); out.push(p); }
+        });
+        // Older Mermaid — paths wrapped in <g class="edgePath">.
+        svgEl.querySelectorAll('g.edgePath > path').forEach(p => {
+            if (!seen.has(p)) { seen.add(p); out.push(p); }
+        });
+        return out;
+    }
+
+    // Mermaid 11 dropped the `LS-<src>`/`LE-<tgt>` edge classes that we used to
+    // identify which edge connects which nodes, which silently broke Hide / Show
+    // Children, edge right-click, and per-edge styling. Stamp our own
+    // data-source / data-target on each rendered edge (and its label) using the
+    // ordered `currentEdgeMeta` list, then all downstream code can look up edges
+    // by data attribute regardless of Mermaid version.
+    function stampEdgeMetadata(svgEl) {
+        if (!svgEl || !currentEdgeMeta.length) return;
+        const paths = collectRenderedEdgePaths(svgEl);
+        const labels = Array.from(svgEl.querySelectorAll('g.edgeLabel'));
+        paths.forEach((p, i) => {
+            const meta = currentEdgeMeta[i];
+            if (!meta) return;
+            p.setAttribute('data-source', meta.source);
+            p.setAttribute('data-target', meta.target);
+            const container = p.closest('g.edgePath') || p;
+            if (container !== p) {
+                container.setAttribute('data-source', meta.source);
+                container.setAttribute('data-target', meta.target);
+            }
+            if (labels[i]) {
+                labels[i].setAttribute('data-source', meta.source);
+                labels[i].setAttribute('data-target', meta.target);
+            }
+        });
     }
 
     // Reflect hiddenChildEdges onto the current SVG by toggling display in place
@@ -1627,28 +1675,19 @@
         const svgEl = document.querySelector('#mermaid-area svg');
         if (!svgEl) return;
 
-        // Mermaid 10+ with ELK no longer puts `.edgePath` on edge containers.
-        // The LS-/LE- classes are still there, just attached to a different element
-        // (e.g. `g.edge`). Match by class substring so we catch both layouts.
-        const edges = Array.from(svgEl.querySelectorAll('[class*="LS-"][class*="LE-"]'));
-        const labels = Array.from(svgEl.querySelectorAll('.edgeLabel'));
+        // Edges are identified by data-source/data-target stamped at render time
+        // (see stampEdgeMetadata) so this works on any Mermaid version.
+        const edgePaths = collectRenderedEdgePaths(svgEl);
+        const labels = Array.from(svgEl.querySelectorAll('g.edgeLabel'));
         const nodes = Array.from(svgEl.querySelectorAll('.node'));
 
         // Reset everything to visible first.
-        edges.forEach((el, i) => {
+        edgePaths.forEach((el, i) => {
             el.style.display = '';
             if (labels[i]) labels[i].style.display = '';
         });
         nodes.forEach(el => { el.style.display = ''; });
         if (!hiddenChildEdges.size) return;
-
-        const endpoints = el => {
-            const cls = Array.from(el.classList);
-            return {
-                ls: cls.find(c => c.startsWith('LS-'))?.slice(3),
-                le: cls.find(c => c.startsWith('LE-'))?.slice(3),
-            };
-        };
 
         // Node ids may be `flowchart-<id>-N` or `graphDiv-flowchart-<id>-N` depending
         // on the Mermaid render id — just match the suffix.
@@ -1659,8 +1698,9 @@
 
         // 1. Hide the specific parent→child edges.
         const hiddenTargets = new Set();
-        edges.forEach((el, i) => {
-            const { ls, le } = endpoints(el);
+        edgePaths.forEach((el, i) => {
+            const ls = el.getAttribute('data-source');
+            const le = el.getAttribute('data-target');
             if (!ls || !le) return;
             if (hiddenChildEdges.has(`${ls}|${le}`)) {
                 el.style.display = 'none';
@@ -1676,9 +1716,9 @@
         });
 
         // 3. Cascade: edges leaving a hidden child go nowhere — hide them too.
-        edges.forEach((el, i) => {
+        edgePaths.forEach((el, i) => {
             if (el.style.display === 'none') return;
-            const { ls } = endpoints(el);
+            const ls = el.getAttribute('data-source');
             if (ls && hiddenTargets.has(ls)) {
                 el.style.display = 'none';
                 if (labels[i]) labels[i].style.display = 'none';
@@ -1721,6 +1761,7 @@
         let linkCounter = 0;
         let styleDirectives = [];
         currentRenderedEdgeStyles = [];
+        currentEdgeMeta = [];
         let edgeLabelFull = [];
 
         // Components referenced as visual children through <c-...> template tags,
@@ -1817,6 +1858,7 @@
                     const label = cleanLabel(isTruncated ? items[0] + ', ' + items[1] + '…' : items.join(', '));
                     if (isTruncated) edgeLabelFull.push(items.join(', '));
                     def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
+                    currentEdgeMeta.push({ source: safeId(cName), target: safeId(target) });
                     // Color the link by the target's namespace prefix (e.g. pselib_, ffui_).
                     const catColor = categoryColor(target);
                     if (catColor) {
@@ -1943,6 +1985,7 @@
 
                 allFlowEdges.forEach(edge => {
                     def += `  ${edge.from} -- "${edge.label}" --> ${edge.to}\n`;
+                    currentEdgeMeta.push({ source: edge.from, target: edge.to });
                     const sw = edge.depth === 1 ? '3px' : '2px';
                     const dash = edge.depth > 1 ? ',stroke-dasharray:6 3' : '';
                     styleDirectives.push(`linkStyle ${linkCounter} stroke:${edge.color},stroke-width:${sw},fill:none${dash}`);
@@ -1981,6 +2024,9 @@
             if (svgEl) {
                 svgEl.removeAttribute('height'); svgEl.removeAttribute('width');
                 svgEl.style.width = "100%"; svgEl.style.height = "100%";
+                // Stamp data-source/data-target on every edge first — both edge
+                // styling and edge events rely on it under Mermaid 11.
+                stampEdgeMetadata(svgEl);
                 applyRenderedEdgeStyles(svgEl);
                 attachEdgeLabelTooltips(svgEl, edgeLabelFull);
                 panZoomInstance = svgPanZoom(svgEl, {
@@ -2625,26 +2671,22 @@
     }
 
     function attachEdgeEvents(svgEl) {
-        svgEl.querySelectorAll('.edgePath').forEach(edgeEl => {
-            const origPath = edgeEl.querySelector('path');
-            if (!origPath) return;
+        // Use the data-source/data-target attributes stamped by stampEdgeMetadata
+        // so this works on Mermaid 11 (which dropped the LS-/LE- edge classes
+        // we used to rely on for endpoint lookup).
+        collectRenderedEdgePaths(svgEl).forEach(origPath => {
+            const sourceId = origPath.getAttribute('data-source');
+            const targetId = origPath.getAttribute('data-target');
+            if (!sourceId || !targetId) return;
+            const sourceName = Object.keys(registry).find(k => safeId(k) === sourceId);
+            const targetName = Object.keys(registry).find(k => safeId(k) === targetId);
+            if (!sourceName || !targetName) return;
 
             // Add a wide transparent overlay path for easier hit-testing
             const hitPath = origPath.cloneNode(false);
             hitPath.style.cssText = 'stroke:transparent;stroke-width:20px;fill:none;cursor:pointer;';
             hitPath.classList.add('edge-hit-path');
-            edgeEl.appendChild(hitPath);
-
-            // Resolve source/target from Mermaid CSS classes (LS-safeId, LE-safeId)
-            const cls = Array.from(edgeEl.classList);
-            const lsCls = cls.find(c => c.startsWith('LS-'));
-            const leCls = cls.find(c => c.startsWith('LE-'));
-            if (!lsCls || !leCls) return;
-            const sourceId = lsCls.slice(3);
-            const targetId = leCls.slice(3);
-            const sourceName = Object.keys(registry).find(k => safeId(k) === sourceId);
-            const targetName = Object.keys(registry).find(k => safeId(k) === targetId);
-            if (!sourceName || !targetName) return;
+            origPath.parentNode.appendChild(hitPath);
 
             [hitPath, origPath].forEach(el => {
                 el.addEventListener('contextmenu', e => {
