@@ -2288,7 +2288,11 @@
     }
 
     function aggregateFlows(content, vMap, sourceName) {
-        if (registry[sourceName]?.kind === 'lwc') return aggregateFlowsLwc(registry[sourceName]);
+        // Auto-loaded relative imports are registered as `lwcChild`; they still
+        // need the LWC-aware parser, otherwise the Apex direct-call regex picks
+        // up JS noise and Hide/Show Children wires the wrong edge keys.
+        const srcKind = registry[sourceName]?.kind;
+        if (srcKind === 'lwc' || srcKind === 'lwcChild') return aggregateFlowsLwc(registry[sourceName]);
         const aggregated = {};
         const direct = /([\w.]+)\.(\w+)\s*\(/g;
 
@@ -2414,7 +2418,8 @@
     }
 
     function collectOrderedCalls(rawContent, vMap, sourceName) {
-        if (registry[sourceName]?.kind === 'lwc') return collectOrderedCallsLwc(registry[sourceName], rawContent);
+        const srcKind = registry[sourceName]?.kind;
+        if (srcKind === 'lwc' || srcKind === 'lwcChild') return collectOrderedCallsLwc(registry[sourceName], rawContent);
         // Parse only from the opening brace of the method body — skip the signature
         // so the method name itself doesn't match as a bare call
         const braceIdx = rawContent.indexOf('{');

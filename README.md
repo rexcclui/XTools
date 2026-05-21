@@ -95,33 +95,40 @@ If a parenthesized Apex block contains multiple objects, a modal chooser appears
 
 ---
 
-### Apex / Java Class Diagram (`apexflow.html`)
+### Apex / Java / LWC Class Diagram (`apexflow.html`)
 
-A call-flow visualizer for Salesforce Apex (`.cls`) and Java (`.java`) files. Drop source files anywhere on the page to generate interactive Mermaid.js class relationship diagrams and drill into per-method call trees.
+A call-flow visualizer for Salesforce Apex (`.cls`), Java (`.java`), and Lightning Web Components (`.js` + `.html`). Open a whole project folder, or drop individual files, to generate interactive Mermaid.js class relationship diagrams and drill into per-method / per-import call trees.
 
 **Features**
 
-- **Whole-page drop zone** — Drag one or more `.cls` or `.java` files anywhere onto the page; a green overlay confirms the drop target
-- **Mixed-language support** — Apex and Java files can be loaded together; cross-language dependencies appear in the same diagram
-- **Architecture map** — Automatically generates a system-level diagram showing dependencies between all loaded classes, interfaces, enums, and records
-- **Analyze Flow mode** — Select a class and choose individual methods to visualize their call chains (up to 3 levels deep)
-- **Collapsible nodes** — Click any entry or depth-1 node to collapse/expand its children; toggle icons (⊕/⊖) indicate state
-- **Color-coded edges** — Each method's call path uses a distinct color; dashed lines indicate nested (depth-2) calls
-- **Loop detection** — Calls inside loops are labeled with a letter suffix (e.g. `1N`, `2N`)
-- **Right-click context menu** — On any diagram node: hide/show child nodes, open an Analyze Flow, or view the method's source code
-- **Draggable code panel** — Right-click a node to open a resizable, draggable syntax-highlighted code snippet panel
-- **Pan & zoom** — SVG diagram supports pan and zoom via `svg-pan-zoom`
+- **Whole-page drop zone** — Drag `.cls`, `.java`, `.js`, or `.html` files anywhere onto the page; a green overlay confirms the drop target
+- **Folder open with File System Access API** — Pick a whole project folder once; the directory handle is persisted in IndexedDB so it reopens on the next visit without re-picking
+- **LWC + Apex + Java in one map** — Mixed-language support; cross-language dependencies (e.g. an LWC's `@salesforce/apex/Foo` import) appear in the same diagram
+- **Background indexing** — On folder open the tree is scanned once for LWC bundles (`<base>.js` + `<base>.html` inside `lwc/`) and Apex classes (`force-app` subtree); badges in the file explorer show the totals
+- **Auto-load relative imports** — Opening an LWC also parses the JS files it imports via `./` / `../`. Children are namespaced as `<parentLwc>.<baseName>` so a local `ConfigProvider` never collides with a same-named Apex class
+- **HTML `<c-…>` references** — LWC HTML templates are scanned for child component tags and rendered as edges
+- **Architecture map** — System-level diagram showing dependencies between all loaded classes, components, interfaces, enums, and records. Node colors distinguish Apex / LWC / LWC-child / HTML-only nodes
+- **Analyze Flow mode** — Select a class and choose individual methods to visualize their recursive call chains (up to 6 levels deep)
+- **Subgraph grouping** — Methods of the same class are clustered in per-class Mermaid subgraphs, deduplicated across paths
+- **Collapsible nodes** — Right-click any entry or depth node to collapse/expand its children; `⊕`/`⊖` indicators show state
+- **Per-edge Hide / Show Children** — Right-click any node in overview mode to hide just its outgoing edges (and the destination nodes they reach) without a full re-render — pan/zoom is preserved. Separate "Hide JS / Apex / HTML Children" buckets let you peel off one layer at a time
+- **Ghost nodes** — Classes referenced but not yet loaded show with a dashed border and a `?` prefix; right-click → **Load Class** to load them from the file tree or via the file picker
+- **Color-coded edges** — Each method's call path uses a distinct color; dashed lines indicate nested calls; loop calls are labeled with a letter suffix (e.g. `1N`, `2N`)
+- **Right-click context menu** — On nodes: Analyze Flow, Load Class, Hide / Show Children, View Code (method body), View Source (full file in a modal). On edges: shows the full method-call list
+- **Draggable / centered source modal** — View the complete `.cls` / `.java` source, or concatenated `.js` + `.html` for an LWC, in a Prism-highlighted modal with the folder path in the title bar
+- **Pan & zoom** — `svg-pan-zoom` with smooth mouse-wheel zoom and drag-pan
 - **Copy Mermaid** — Copy the current diagram's Mermaid definition to clipboard
+- **File history panel** — Recently opened files appear in a popover next to the history icon for quick re-load
 - **Hide/show classes** — Toggle individual classes out of the architecture diagram without removing them
-- **Collapsible sidebar** — Toggle the sidebar to maximize diagram space
+- **Collapsible sidebar** — Toggle the sidebar to maximize diagram space; the diagram auto-resizes after the CSS transition
 
 **Usage**
 
-1. Drag one or more `.cls` or `.java` files anywhere onto the page.
-2. The **System Architecture Map** renders automatically, showing inter-class dependencies.
-3. Click a class card to highlight it in the diagram. Click **Analyze Flow** to drill into its methods.
+1. Click the folder icon to open a project root (recommended) or drag individual `.cls` / `.java` / `.js` / `.html` files onto the page.
+2. Use the file explorer to load components and classes; LWC bundles automatically pull in their direct relative imports.
+3. The **System Architecture Map** renders automatically. Click a class card to highlight it; click **Analyze Flow** to drill into its methods.
 4. In Analyze Flow mode, toggle methods on/off in the sidebar to compose the call-flow diagram.
-5. Click nodes to collapse/expand their children. Right-click for more options.
+5. Right-click nodes for per-node actions (Hide Children, View Source, Load Class, etc.). Right-click edges to see the full call list.
 
 ---
 
