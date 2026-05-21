@@ -281,7 +281,7 @@ function cs(id){if(!G.cells[id])G.cells[id]={text:'',title:'',pretty:false,parse
 
 /* ══ PRETTY SOURCE ══ */
 function prettySrc(val,ind,path,cid){
-  const sp='  '.repeat(ind),sp1='  '.repeat(ind+1),pid=`data-p="${escA(path)}"`;
+  const sp='  '.repeat(ind),sp1='  '.repeat(ind+1),pid=`data-p="${escA(path)}" data-cid="${escA(cid)}"`;
   if(val===null)return`<span class="jnu" ${pid}>null</span>`;
   if(typeof val==='boolean')return`<span class="jb" ${pid}>${val}</span>`;
   if(typeof val==='number')return`<span class="jn" ${pid}>${val}</span>`;
@@ -297,7 +297,7 @@ function prettySrc(val,ind,path,cid){
     if(!keys.length)return`<span class="jbr" ${pid}>{}</span>`;
     const open=_exp[path]===true||(_exp[path]!==false&&ind<3);
     if(!open)return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" data-open="0" onclick="togPrettyX(this,event)">+ ${keys.length}</button> <span class="jbr" ${pid}>{...}</span>`;
-    return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" data-open="1" onclick="togPrettyX(this,event)">−</button> <span class="jbr" ${pid}>{</span>\n${keys.map(k=>`${sp1}<span class="jk" data-p="${escA(path+'.'+k)}">"${escH(k)}"</span><span class="jbr">: </span>${prettySrc(val[k],ind+1,path+'.'+k,cid)}`).join('<span class="jbr">,</span>\n')}\n${sp}<span class="jbr">}</span>`;
+    return`<button class="nx" data-p="${escA(path)}" data-cid="${escA(cid)}" data-open="1" onclick="togPrettyX(this,event)">−</button> <span class="jbr" ${pid}>{</span>\n${keys.map(k=>`${sp1}<span class="jk" data-p="${escA(path+'.'+k)}" data-cid="${escA(cid)}">"${escH(k)}"</span><span class="jbr">: </span>${prettySrc(val[k],ind+1,path+'.'+k,cid)}`).join('<span class="jbr">,</span>\n')}\n${sp}<span class="jbr">}</span>`;
   }
   return`<span ${pid}>${escH(String(val))}</span>`;
 }
@@ -365,11 +365,10 @@ function renderGrid(){
   for(let r=0;r<G.rows;r++){
     const rw=document.createElement('div');rw.className='row-wrap'+(G.cR.has(r)?' rcoll':'');
     const rc=document.createElement('div');rc.className='row-controls';
-    const rb=document.createElement('div');rb.className='row-tog';rb.textContent=G.cR.has(r)?'▶':`▼ r${r+1}`;rb.onclick=(rr=>()=>togCR(rr))(r);
     const mb=document.createElement('div');mb.className='max-btn';mb.innerHTML=G.maxRow===r?'⤡':'⤢';mb.onclick=(rr=>()=>togMax(rr))(r);
     const dh=document.createElement('div');dh.className='row-drag-handle';dh.title='Drag to reorder';dh.innerHTML='⠿';dh.draggable=true;setupRowDrag(dh,r);
     const db=document.createElement('div');db.className='del-row-btn';db.title='Remove row';db.innerHTML='🗑';db.onclick=(rr=>()=>removeRow(rr))(r);if(G.rows<=1)db.style.display='none';
-    rc.appendChild(dh);rc.appendChild(rb);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
+    rc.appendChild(dh);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
     const gr=document.createElement('div');gr.className='grid-row'+(G.cR.has(r)?' rcoll':'');gr.id='row-'+r;
     rw.appendChild(gr);
     ra.appendChild(rw); // append wrapper before adding cells so getElementById works
@@ -394,6 +393,7 @@ function cellHTML(id,r,c,s){
   return`<div class="drop-ov"><div class="drop-msg">⬇ Drop JSON file</div></div>
   <div class="cell-bar">
     <span style="font-size:10px;color:var(--tx3)">${r+1},${c+1}</span>
+    <button class="ib row-exp-btn" title="${G.cR.has(r)?'Expand row':'Collapse row'}" onclick="togCR(${r})">${G.cR.has(r)?'▶':'▼'}</button>
     <button id="btn-pr-${id}" class="ib${pr?' on':''}" title="${pr?'Back to raw editor':'Format + render table'}" onclick="togPretty('${id}')">{}</button>
     <button class="ib" title="Copy cell JSON" onclick="copyCell('${id}')">⎘</button>
     <button class="ib dx" title="Clear cell" onclick="clearCell('${id}')">✕</button>
@@ -605,11 +605,10 @@ function patchGrid(oldRows,oldCols){
       const res=document.createElement('div');res.className='row-resizer';res.onmousedown=e=>startRowResize(e,r-1);ra.appendChild(res);
       const rw=document.createElement('div');rw.className='row-wrap'+(G.cR.has(r)?' rcoll':'');
       const rc=document.createElement('div');rc.className='row-controls';
-      const rb=document.createElement('div');rb.className='row-tog';rb.textContent=`▼ r${r+1}`;rb.onclick=(rr=>()=>togCR(rr))(r);
       const mb=document.createElement('div');mb.className='max-btn';mb.innerHTML='⤢';mb.onclick=(rr=>()=>togMax(rr))(r);
       const dh=document.createElement('div');dh.className='row-drag-handle';dh.title='Drag to reorder';dh.innerHTML='⠿';dh.draggable=true;setupRowDrag(dh,r);
       const db=document.createElement('div');db.className='del-row-btn';db.title='Remove row';db.innerHTML='🗑';db.onclick=(rr=>()=>removeRow(rr))(r);
-      rc.appendChild(dh);rc.appendChild(rb);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
+      rc.appendChild(dh);rc.appendChild(mb);rc.appendChild(db);rw.appendChild(rc);
       const gr=document.createElement('div');gr.className='grid-row';gr.id='row-'+r;
       for(let c=0;c<G.cols;c++)addCellToRow(gr,r,c);
       rw.appendChild(gr);ra.appendChild(rw);
@@ -900,7 +899,11 @@ function togCR(r){
   const gr=document.getElementById('row-'+r);if(!gr)return;
   gr.className='grid-row'+(G.cR.has(r)?' rcoll':'');
   const wrap=gr.closest('.row-wrap');if(wrap)wrap.className='row-wrap'+(G.cR.has(r)?' rcoll':'');
-  const btn=wrap?.querySelector('.row-tog');if(btn)btn.textContent=G.cR.has(r)?'▶':`▼ r${r+1}`;
+  const isCollapsed=G.cR.has(r);
+  document.querySelectorAll(`#row-${r} .row-exp-btn`).forEach(btn=>{
+    btn.textContent=isCollapsed?'▶':'▼';
+    btn.title=isCollapsed?'Expand row':'Collapse row';
+  });
   applyRowLayout();
   saveAppState();
 }

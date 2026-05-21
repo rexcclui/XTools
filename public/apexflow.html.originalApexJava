@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Apex / Java / LWC Class Diagram</title>
+    <title>Apex / Java Class Diagram</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iIzFlMjkzYiIvPjxyZWN0IHg9IjkiIHk9IjQiIHdpZHRoPSIxNCIgaGVpZ2h0PSI3IiByeD0iMiIgZmlsbD0iIzYwYTVmYSIvPjxsaW5lIHgxPSIxNiIgeTE9IjExIiB4Mj0iMTYiIHkyPSIxNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwb2x5Z29uIHBvaW50cz0iMTYsMTQgMjEsMjAgMTYsMjYgMTEsMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzgxOGNmOCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48bGluZSB4MT0iMTYiIHkxPSIyNiIgeDI9IjE2IiB5Mj0iMjkiIHN0cm9rZT0iIzk0YTNiOCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48L3N2Zz4="/>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
@@ -55,13 +55,9 @@
         #fe-folder-path { padding: 4px 10px 6px; display: none; flex-direction: column; gap: 3px; }
         #fe-folder-path-label { font-size: 10px; color: #64748b; display: flex; align-items: center; gap: 5px; }
         #fe-folder-path-label i { color: #f59e0b; }
-        #fe-folder-path-label > span:first-of-type { flex: 1; }
-        #fe-lwc-count { display: none; padding: 1px 6px; background: rgba(16,185,129,0.12); color: var(--primary); border: 1px solid rgba(16,185,129,0.4); border-radius: 10px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
-        #fe-lwc-count.visible { display: inline-block; }
-        #fe-apex-count { display: none; padding: 1px 6px; background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); border-radius: 10px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
-        #fe-apex-count.visible { display: inline-block; }
-        #fe-reopen-btn, #history-btn, #fe-reindex-btn { padding: 2px 7px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: #64748b; cursor: pointer; white-space: nowrap; }
-        #fe-reopen-btn:hover, #history-btn:hover, #fe-reindex-btn:hover { border-color: var(--primary); color: var(--primary); }
+        #fe-folder-path-label span { flex: 1; }
+        #fe-reopen-btn, #history-btn { padding: 2px 7px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: #64748b; cursor: pointer; white-space: nowrap; }
+        #fe-reopen-btn:hover, #history-btn:hover { border-color: var(--primary); color: var(--primary); }
         #fe-folder-name { width: 100%; padding: 4px 7px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; color: #94a3b8; font-size: 11px; font-family: monospace; outline: none; }
         #fe-folder-name::placeholder { color: #475569; font-style: italic; }
         #fe-folder-name:focus { border-color: var(--primary); color: var(--text-main); }
@@ -208,10 +204,6 @@
         #code-tooltip pre,
         #code-tooltip code { font-size: 0.9rem; }
 
-        #loading-indicator { display: none; align-items: center; gap: 7px; padding: 5px 11px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.5); border-radius: 14px; color: var(--primary); font-size: 11px; font-weight: 500; white-space: nowrap; max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
-        #loading-indicator.visible { display: inline-flex; }
-        #loading-indicator .loading-text { overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
-
         .btn { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-sidebar); color: var(--text-main); cursor: pointer; font-size: 11px; font-weight: 600; }
         .btn-primary { background: var(--primary); color: white; border: none; }
         
@@ -288,7 +280,7 @@
     </style>
 </head>
 <body>
-<div id="drop-overlay">Drop .cls / .java / .js / .html files anywhere</div>
+<div id="drop-overlay">Drop .cls / .java files anywhere</div>
 
 <div id="code-tooltip">
     <div id="code-tooltip-header">
@@ -306,13 +298,9 @@
 <div id="node-context-menu">
     <div class="ctx-item" id="ctx-toggle-nodes"><i class="fa-solid fa-eye-slash"></i><span id="ctx-toggle-label">Hide Nodes</span></div>
     <div class="ctx-item" id="ctx-hide-children" style="display:none"><i class="fa-solid fa-circle-nodes"></i><span id="ctx-hide-children-label">Hide Children</span></div>
-    <div class="ctx-item" id="ctx-hide-js-children" style="display:none"><i class="fa-solid fa-code"></i><span id="ctx-hide-js-label">Hide JS Children</span></div>
-    <div class="ctx-item" id="ctx-hide-apex-children" style="display:none"><i class="fa-solid fa-database"></i><span id="ctx-hide-apex-label">Hide Apex Children</span></div>
-    <div class="ctx-item" id="ctx-hide-html-children" style="display:none"><i class="fa-solid fa-globe"></i><span id="ctx-hide-html-label">Hide HTML Children</span></div>
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
-    <div class="ctx-item" id="ctx-view-source" style="display:none"><i class="fa-solid fa-file-lines"></i><span>Source</span></div>
 </div>
 
 <div id="edge-context-menu">
@@ -332,26 +320,23 @@
     <div id="chp-list"></div>
 </div>
 
-<input id="ctx-file-picker" type="file" accept=".cls,.java,.js,.html" style="display:none">
+<input id="ctx-file-picker" type="file" accept=".cls,.java" style="display:none">
 
 <button class="btn-toggle" onclick="toggleSidebar()" title="Toggle Sidebar"><i class="fa-solid fa-bars"></i></button>
 
 <div id="sidebar">
-    <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex / Java / LWC Class Diagram</h2></div>
+    <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex / Java Class Diagram</h2></div>
     <div id="file-explorer">
         <div id="file-explorer-header">
             <span>File Explorer</span>
             <button id="fe-open-btn"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
-            <input id="fe-fallback" type="file" accept=".cls,.java,.js,.html" webkitdirectory multiple>
+            <input id="fe-fallback" type="file" accept=".cls,.java" webkitdirectory multiple>
         </div>
         <div id="fe-folder-path">
             <div id="fe-folder-path-label">
                 <i class="fa-solid fa-folder"></i>
                 <span>Folder path</span>
-                <span id="fe-lwc-count" title="Indexed LWC components"></span>
-                <span id="fe-apex-count" title="Indexed Apex / Java classes"></span>
                 <button id="fe-reopen-btn" title="Re-open this folder">↺ Reopen</button>
-                <button id="fe-reindex-btn" title="Re-index folder (clears the cached index)">⟲ Re-index</button>
                 <button id="history-btn" title="File history"><i class="fa-solid fa-clock-rotate-left"></i></button>
             </div>
             <input id="fe-folder-name" type="text" spellcheck="false" placeholder="Paste full path here, e.g. /home/user/project/src" autocomplete="off">
@@ -374,13 +359,7 @@
 
 <div id="viewport">
     <div class="toolbar">
-        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
-            <h3 id="view-title" style="margin: 0 0 0 50px; font-size: 0.9rem; color: var(--text-dim);">Ready</h3>
-            <div id="loading-indicator">
-                <i class="fa-solid fa-spinner fa-spin"></i>
-                <span class="loading-text">Loading…</span>
-            </div>
-        </div>
+        <h3 id="view-title" style="margin-left: 50px; font-size: 0.9rem; color: var(--text-dim);">Ready</h3>
         <div style="display: flex; gap: 10px;">
             <button class="btn" id="copy-mermaid-btn" onclick="copyCurrentMermaid()" title="Copy Mermaid code">
                 <i class="fa-regular fa-copy"></i>
@@ -421,10 +400,6 @@
     let collapsedMethods = new Set(); // Active methods whose subnodes are hidden
     let collapsedNodes = new Set();   // Node ids (any depth) whose children are collapsed
     let currentRenderedEdgeStyles = [];
-    // Per-parent edge hides — entries are "<fromSafeId>|<toSafeId>". These collapse
-    // a specific edge in place via CSS (no re-render), so the diagram stays put and
-    // other parents that reference the same target keep their edge.
-    let hiddenChildEdges = new Set();
     let tooltipDragState = { isDragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 };
     let tooltipResizeState = { isResizing: false, startX: 0, startY: 0, startWidth: 0, startHeight: 0 };
     let tooltipInteractionGuardUntil = 0;
@@ -471,95 +446,37 @@
             return;
         }
 
-        const files = Array.from(e.dataTransfer.files).filter(f => {
-            const n = f.name.toLowerCase();
-            return n.endsWith('.cls') || n.endsWith('.java') || n.endsWith('.js') || n.endsWith('.html');
-        });
+        const files = Array.from(e.dataTransfer.files)
+            .filter(f => f.name.toLowerCase().endsWith('.cls') || f.name.toLowerCase().endsWith('.java'));
 
         if (files.length === 0) return;
 
-        const fileByName = new Map();
-        files.forEach(f => fileByName.set(f.name, f));
-        const processed = new Set();
-
         for (const file of files) {
-            if (processed.has(file.name)) continue;
-            const lower = file.name.toLowerCase();
-            if (lower.endsWith('.js')) {
-                const base = file.name.replace(/\.js$/i, '');
-                const sibling = fileByName.get(`${base}.html`);
-                const jsText = await file.text();
-                const htmlText = sibling ? await sibling.text() : '';
-                parseLwc(base, jsText, htmlText);
-                processed.add(file.name);
-                if (sibling) processed.add(sibling.name);
-            } else if (lower.endsWith('.html')) {
-                const base = file.name.replace(/\.html$/i, '');
-                const sibling = fileByName.get(`${base}.js`);
-                const htmlText = await file.text();
-                const jsText = sibling ? await sibling.text() : '';
-                parseLwc(base, jsText, htmlText);
-                processed.add(file.name);
-                if (sibling) processed.add(sibling.name);
-            } else {
-                const text = await file.text();
-                parseApex(text);
-                processed.add(file.name);
-            }
+            const text = await file.text();
+            parseApex(text);
         }
 
         render();
     });
 
     // ── FILE EXPLORER ──────────────────────────────────────────────────────────
-    const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null, lwcIndex: new Map(), apexIndex: new Map() };
-    const LWC_SKIP_DIRS = new Set(['__tests__', '__mocks__', 'node_modules', '.git', '.sfdx', '.sf', 'dist', 'build', 'target', 'out', '.next', '.cache', '.vscode']);
+    const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null };
 
     // ── IndexedDB persistence for the directory handle ─────────────────────────
-    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory', IDB_TREE_STORE = 'treeCache';
+    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory';
     const MAX_FILE_HIST = 30;
 
     function idbOpen() {
         return new Promise((res, rej) => {
-            const req = indexedDB.open(IDB_NAME, 3); // v3 adds treeCache store
+            const req = indexedDB.open(IDB_NAME, 2); // version 2 adds fileHistory store
             req.onupgradeneeded = e => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains(IDB_DIR_STORE)) db.createObjectStore(IDB_DIR_STORE);
                 if (!db.objectStoreNames.contains(IDB_HIST_STORE)) db.createObjectStore(IDB_HIST_STORE, { keyPath: 'name' });
-                if (!db.objectStoreNames.contains(IDB_TREE_STORE)) db.createObjectStore(IDB_TREE_STORE);
             };
             req.onsuccess = e => res(e.target.result);
             req.onerror = e => rej(e.target.error);
         });
-    }
-
-    // Persist tree + indices keyed by folder name so reopening the same folder
-    // doesn't have to walk the entire file system again. FileSystemHandle is
-    // structured-clonable, so the in-memory shape can be saved as-is.
-    async function idbSaveTreeCache(key, payload) {
-        try {
-            const db = await idbOpen();
-            const tx = db.transaction(IDB_TREE_STORE, 'readwrite');
-            tx.objectStore(IDB_TREE_STORE).put(payload, key);
-        } catch (e) { console.warn('idb tree cache save failed', e); }
-    }
-
-    async function idbLoadTreeCache(key) {
-        try {
-            const db = await idbOpen();
-            return await new Promise((res, rej) => {
-                const req = db.transaction(IDB_TREE_STORE, 'readonly').objectStore(IDB_TREE_STORE).get(key);
-                req.onsuccess = e => res(e.target.result || null);
-                req.onerror = e => rej(e.target.error);
-            });
-        } catch (e) { return null; }
-    }
-
-    async function idbClearTreeCache(key) {
-        try {
-            const db = await idbOpen();
-            db.transaction(IDB_TREE_STORE, 'readwrite').objectStore(IDB_TREE_STORE).delete(key);
-        } catch (e) { /* ignore */ }
     }
 
     async function idbSaveHandle(handle) {
@@ -650,56 +567,16 @@
     // ── Open / reopen folder ───────────────────────────────────────────────────
     function isSourceFile(name) {
         const n = name.toLowerCase();
-        return n.endsWith('.cls') || n.endsWith('.java') || n.endsWith('.js') || n.endsWith('.html');
+        return n.endsWith('.cls') || n.endsWith('.java');
     }
 
-    async function loadDirHandle(dirHandle, isReopen = false, forceReindex = false) {
+    async function loadDirHandle(dirHandle, isReopen = false) {
         feState.dirHandle = dirHandle;
-        feState.lwcIndex = new Map();
-        feState.apexIndex = new Map();
-
-        const cacheKey = dirHandle.name;
-        const cached = (!forceReindex) ? await idbLoadTreeCache(cacheKey) : null;
-
-        if (cached?.tree && cached?.lwcIndex && cached?.apexIndex) {
-            await showLoadingStatus(`Restoring index for "${dirHandle.name}"…`);
-            feState.tree = cached.tree;
-            feState.lwcIndex = new Map(cached.lwcIndex);
-            feState.apexIndex = new Map(cached.apexIndex);
-            hideLoadingStatus();
-        } else {
-            await showLoadingStatus(`Indexing "${dirHandle.name}"…`);
-            try {
-                feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
-                if (feState.tree) {
-                    await showLoadingStatus('Indexing LWC components…');
-                    indexLwcFromTree(feState.tree);
-                    await showLoadingStatus('Indexing Apex classes…');
-                    indexApexFromTree(feState.tree);
-                    // Persist for next session — fire-and-forget so we don't block.
-                    idbSaveTreeCache(cacheKey, {
-                        ts: Date.now(),
-                        tree: feState.tree,
-                        lwcIndex: [...feState.lwcIndex.entries()],
-                        apexIndex: [...feState.apexIndex.entries()],
-                    });
-                }
-            } finally {
-                hideLoadingStatus();
-            }
-        }
-
+        feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
         if (!isReopen) localStorage.removeItem(LS_PATH_KEY);
         showFolderPath(dirHandle.name, !isReopen);
-        updateIndexBadges();
         renderFileTree();
         await idbSaveHandle(dirHandle);
-    }
-
-    async function reindexFolder() {
-        if (!feState.dirHandle) return;
-        await idbClearTreeCache(feState.dirHandle.name);
-        await loadDirHandle(feState.dirHandle, true, true);
     }
 
     async function openFolder() {
@@ -731,177 +608,21 @@
         document.getElementById('fe-empty').textContent = `Click ↺ Reopen to reload "${handle.name}"`;
     });
 
-    // Walk a directory handle into our in-memory tree. Siblings are processed in
-    // parallel so a project of thousands of folders doesn't serialise into a
-    // minute-long stall, and dot-prefixed dirs (.git, .idea, .gradle, .husky, …)
-    // are skipped automatically alongside the explicit LWC_SKIP_DIRS list.
-    async function buildHandleTree(handle, name, ctx, parentPath = '') {
-        const path = parentPath ? `${parentPath}/${name}` : name;
+    async function buildHandleTree(handle, name) {
         if (handle.kind === 'file') {
-            return isSourceFile(name) ? { kind: 'file', name, handle, path } : null;
+            return isSourceFile(name) ? { kind: 'file', name, handle } : null;
         }
-        if (LWC_SKIP_DIRS.has(name) || name.startsWith('.')) return null;
-
-        ctx = ctx || { dirs: 0, lastReport: 0 };
-        ctx.dirs++;
-        if (ctx.dirs - ctx.lastReport >= 250) {
-            ctx.lastReport = ctx.dirs;
-            // Don't block on UI updates; let them paint when the browser can.
-            showLoadingStatus(`Scanned ${ctx.dirs.toLocaleString()} folders…`);
+        const children = [];
+        for await (const [childName, childHandle] of handle.entries()) {
+            const node = await buildHandleTree(childHandle, childName);
+            if (node) children.push(node);
         }
-
-        // Snapshot entries first so the recursion can fan out via Promise.all.
-        const entries = [];
-        for await (const entry of handle.entries()) entries.push(entry);
-
-        const childNodes = await Promise.all(entries.map(([n, h]) => buildHandleTree(h, n, ctx, path)));
-        const children = childNodes.filter(c => c);
         if (!children.length) return null;
         children.sort((a, b) => {
             if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
             return a.name.localeCompare(b.name);
         });
-        return { kind: 'dir', name, path, children };
-    }
-
-    // Walk the tree to identify LWC components. Restricted to subtrees of a
-    // `force-app*` folder, and the path must contain a `lwc` folder OR the
-    // directory must have a same-named .html sibling (the LWC bundle convention).
-    // __tests__ / __mocks__ are already pruned by buildHandleTree.
-    function indexLwcFromTree(node, parentPath = '', insideForceApp = false) {
-        if (!node || node.kind !== 'dir') return;
-        if (node.name === '__tests__' || node.name === '__mocks__') return;
-        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
-        const nowInside = insideForceApp || /^force-app/i.test(node.name);
-
-        if (nowInside) {
-            const baseName = node.name;
-            const jsNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.js`);
-            if (jsNode) {
-                const htmlNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.html`);
-                const isLwcLikely = htmlNode || /\/lwc\//i.test(`/${fullPath}/`);
-                if (isLwcLikely) {
-                    feState.lwcIndex.set(baseName, {
-                        jsHandle: jsNode.handle,
-                        htmlHandle: htmlNode?.handle || null,
-                        folderPath: fullPath,
-                    });
-                }
-            }
-        }
-
-        node.children.forEach(c => indexLwcFromTree(c, fullPath, nowInside));
-    }
-
-    // Index Apex / Java classes by their class name → { name, handle } so right-click
-    // "Load Class" can resolve any referenced Apex. Restricted to subtrees of a
-    // `classes/` folder so unrelated .cls/.java elsewhere in the project aren't picked up.
-    function indexApexFromTree(node, insideClasses = false) {
-        if (!node) return;
-        if (node.kind === 'file') {
-            if (!insideClasses) return;
-            const m = node.name.match(/^(.+)\.(cls|java)$/i);
-            if (m) feState.apexIndex.set(m[1], { name: node.name, handle: node.handle });
-            return;
-        }
-        if (node.name === '__tests__' || node.name === '__mocks__') return;
-        const nowInside = insideClasses || node.name === 'classes';
-        node.children.forEach(c => indexApexFromTree(c, nowInside));
-    }
-
-    // Find a file node in feState.tree by absolute path (root-name-prefixed).
-    function findFileNodeByPath(folderPath, fileName) {
-        if (!feState.tree || !folderPath) return null;
-        const parts = folderPath.split('/').filter(Boolean);
-        if (parts[0] !== feState.tree.name) return null;
-        let cur = feState.tree;
-        for (let i = 1; i < parts.length; i++) {
-            if (!cur || cur.kind !== 'dir') return null;
-            cur = cur.children.find(c => c.name === parts[i]);
-        }
-        if (!cur || cur.kind !== 'dir') return null;
-        return cur.children.find(c => c.kind === 'file' && c.name === fileName) || null;
-    }
-
-    // Auto-load direct './' / '../' JS imports referenced by a component.
-    // Direct only — recursing into each child's own imports turns one click into
-    // dozens of file reads + a huge Mermaid graph (the user can drill in manually).
-    // Each child is registered under "<parentLwc>.<baseName>" so its bare name can't
-    // collide with same-named Apex classes (e.g. an Apex ConfigProvider).
-    // File reads run in parallel — one slow disk read used to block the next.
-    async function loadLwcRelImports(jsContent, parentFolderPath, parentLwc) {
-        if (!jsContent || !parentFolderPath || !parentLwc || !feState.tree) return;
-
-        // Match both `import ... from './x'` and `export ... from './x'`.
-        const relRefRegex = /(?:import|export)\s+(?:\{[^}]+\}|\*(?:\s+as\s+\w+)?|\w+(?:\s*,\s*\{[^}]+\})?)\s+from\s+['"](\.\.?\/[^'"]+)['"]/g;
-        const relPaths = new Set();
-        let m;
-        while ((m = relRefRegex.exec(jsContent)) !== null) relPaths.add(m[1]);
-
-        const tasks = [];
-        for (const relPath of relPaths) {
-            const segs = relPath.split('/');
-            const lastSeg = segs.pop();
-            const fileName = /\.(js|mjs|ts)$/i.test(lastSeg) ? lastSeg : `${lastSeg}.js`;
-            const baseFileName = fileName.replace(/\.(js|mjs|ts)$/i, '');
-            const targetKey = `${parentLwc}.${baseFileName}`;
-            if (registry[targetKey]) continue;
-
-            const baseParts = parentFolderPath.split('/').filter(Boolean);
-            for (const p of segs) {
-                if (p === '.' || p === '') continue;
-                if (p === '..') baseParts.pop();
-                else baseParts.push(p);
-            }
-            const resolvedDir = baseParts.join('/');
-            const fileNode = findFileNodeByPath(resolvedDir, fileName);
-            if (!fileNode) continue;
-
-            tasks.push((async () => {
-                try {
-                    const file = await fileNode.handle.getFile();
-                    const text = await file.text();
-                    return { targetKey, text, resolvedDir, fileName };
-                } catch (e) {
-                    console.warn('Auto-load relative import failed', relPath, e);
-                    return null;
-                }
-            })());
-        }
-
-        if (!tasks.length) return;
-        await showLoadingStatus(`Loading ${tasks.length} relative file${tasks.length > 1 ? 's' : ''}…`);
-        const results = await Promise.all(tasks);
-        for (const r of results) {
-            if (!r) continue;
-            parseLwc(r.targetKey, r.text, '', r.resolvedDir, 'lwcChild', parentLwc);
-            feState.loadedNames.add(r.fileName);
-        }
-    }
-
-    async function showLoadingStatus(msg) {
-        const el = document.getElementById('loading-indicator');
-        if (!el) return;
-        el.querySelector('.loading-text').textContent = msg;
-        el.classList.add('visible');
-        // Yield so the new message paints before sync work continues.
-        await new Promise(r => setTimeout(r, 0));
-    }
-
-    function hideLoadingStatus() {
-        const el = document.getElementById('loading-indicator');
-        if (el) el.classList.remove('visible');
-    }
-
-    function updateIndexBadges() {
-        const setBadge = (id, n, label) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            if (n > 0) { el.textContent = `${n} ${label}`; el.classList.add('visible'); }
-            else { el.textContent = ''; el.classList.remove('visible'); }
-        };
-        setBadge('fe-lwc-count', feState.lwcIndex?.size || 0, 'LWC');
-        setBadge('fe-apex-count', feState.apexIndex?.size || 0, 'Apex');
+        return { kind: 'dir', name, children };
     }
 
     function flatFiles(node, out = []) {
@@ -989,60 +710,15 @@
     }
 
     async function loadFileNode(fileNode, rowEl) {
-        const iconEl = rowEl?.querySelector('.fe-file-icon');
-        if (iconEl) iconEl.className = 'fa-solid fa-spinner fa-spin fe-file-icon';
-        // Yield so the spinner actually paints before the (potentially slow) Mermaid render kicks in.
-        await new Promise(r => setTimeout(r, 0));
-
         try {
-            const name = fileNode.name;
-            const lower = name.toLowerCase();
-
-            // LWC: a same-named .js or .html inside an lwc/ folder loads both files as one component.
-            if (lower.endsWith('.js') || lower.endsWith('.html')) {
-                const base = name.replace(/\.(js|html)$/i, '');
-                const lwc = feState.lwcIndex.get(base);
-                await showLoadingStatus(`Loading ${base}…`);
-                if (lwc) {
-                    // Read JS + HTML concurrently — both come from the same handle API
-                    // and the round-trips dominate over the parse cost.
-                    const [jsText, htmlText] = await Promise.all([
-                        lwc.jsHandle ? lwc.jsHandle.getFile().then(f => f.text()) : Promise.resolve(''),
-                        lwc.htmlHandle ? lwc.htmlHandle.getFile().then(f => f.text()) : Promise.resolve(''),
-                    ]);
-                    parseLwc(base, jsText, htmlText, lwc.folderPath);
-                    feState.loadedNames.add(`${base}.js`);
-                    if (lwc.htmlHandle) feState.loadedNames.add(`${base}.html`);
-                    // Pull in ./relative-path JS files referenced from this component.
-                    await loadLwcRelImports(jsText, lwc.folderPath, base);
-                } else {
-                    // Plain .js/.html outside lwc/ — parse what we have on its own.
-                    const text = await (await fileNode.handle.getFile()).text();
-                    if (lower.endsWith('.js')) parseLwc(base, text, '');
-                    else parseLwc(base, '', text);
-                    feState.loadedNames.add(name);
-                }
-                if (rowEl) rowEl.classList.add('loaded');
-                await showLoadingStatus('Rendering diagram…');
-                await render();
-                await idbSaveFileHistory(name, fileNode.handle);
-            } else {
-                await showLoadingStatus(`Loading ${name}…`);
-                const file = await fileNode.handle.getFile();
-                const text = await file.text();
-                parseApex(text, fileNode.path || null);
-                feState.loadedNames.add(name);
-                if (rowEl) rowEl.classList.add('loaded');
-                await showLoadingStatus('Rendering diagram…');
-                await render();
-                await idbSaveFileHistory(name, fileNode.handle);
-            }
-        } catch (e) {
-            console.error('Failed to load', fileNode.name, e);
-        } finally {
-            if (iconEl) iconEl.className = 'fa-solid fa-file-code fe-file-icon';
-            hideLoadingStatus();
-        }
+            const file = await fileNode.handle.getFile();
+            const text = await file.text();
+            parseApex(text);
+            feState.loadedNames.add(fileNode.name);
+            if (rowEl) { rowEl.classList.add('loaded'); rowEl.querySelector('.fe-file-icon').className = 'fa-solid fa-file-code fe-file-icon'; }
+            render();
+            await idbSaveFileHistory(fileNode.name, fileNode.handle);
+        } catch (e) { console.error('Failed to load', fileNode.name, e); }
     }
 
     // Firefox fallback: webkitdirectory input
@@ -1071,17 +747,11 @@
             dirMap[dirPath].children.push({ kind: 'file', name: fileName, handle: { getFile: async () => f } });
         });
         feState.tree = root;
-        feState.lwcIndex = new Map();
-        feState.apexIndex = new Map();
-        indexLwcFromTree(feState.tree);
-        indexApexFromTree(feState.tree);
-        updateIndexBadges();
         renderFileTree();
     });
 
     document.getElementById('fe-open-btn').addEventListener('click', openFolder);
     document.getElementById('fe-reopen-btn').addEventListener('click', reopenFolder);
-    document.getElementById('fe-reindex-btn').addEventListener('click', reindexFolder);
     let feSearchCursor = -1;
 
     function feGetSearchRows() {
@@ -1150,26 +820,9 @@
                 try {
                     const perm = await h.handle.requestPermission({ mode: 'read' });
                     if (perm !== 'granted') return;
-                    const lower = h.name.toLowerCase();
-                    if (lower.endsWith('.js') || lower.endsWith('.html')) {
-                        const base = h.name.replace(/\.(js|html)$/i, '');
-                        const lwc = feState.lwcIndex?.get(base);
-                        let jsText = '', htmlText = '';
-                        if (lwc) {
-                            if (lwc.jsHandle) jsText = await (await lwc.jsHandle.getFile()).text();
-                            if (lwc.htmlHandle) htmlText = await (await lwc.htmlHandle.getFile()).text();
-                        } else {
-                            const text = await (await h.handle.getFile()).text();
-                            if (lower.endsWith('.js')) jsText = text;
-                            else htmlText = text;
-                        }
-                        parseLwc(base, jsText, htmlText, lwc?.folderPath);
-                        if (lwc?.folderPath) await loadLwcRelImports(jsText, lwc.folderPath, base);
-                    } else {
-                        const file = await h.handle.getFile();
-                        const text = await file.text();
-                        parseApex(text);
-                    }
+                    const file = await h.handle.getFile();
+                    const text = await file.text();
+                    parseApex(text);
                     feState.loadedNames.add(h.name);
                     render();
                     renderFileTree();
@@ -1215,53 +868,16 @@
         return Object.keys(flows).filter(t => registry[t] && t !== className);
     }
 
-    // Bucket a node's direct children (loaded + ghost) by kind from the perspective
-    // of the calling node — used by the right-click Hide JS / Apex / HTML actions.
-    // When a child has signals for both kinds (or for neither) we defer to the
-    // *source* kind: an Apex controller's unknown callees are Apex, not JS.
-    function getChildrenByKind(className) {
-        const entry = registry[className];
-        if (!entry) return { js: [], apex: [], html: [] };
-        const sourceKind = entry.kind;
-        const flows = aggregateFlows(entry.raw, entry.varMap, className);
-        const targets = Object.keys(flows).filter(t => t !== className);
-        const htmlTargets = new Set((entry.htmlRefs || []).map(r => r.target));
-
-        const apexSig = t => registry[t]?.kind === 'apex' || feState.apexIndex?.has(t);
-        const lwcSig  = t => registry[t]?.kind === 'lwc' || registry[t]?.kind === 'lwcChild' || feState.lwcIndex?.has(t);
-
-        const js = [], apex = [], html = [];
-        targets.forEach(t => {
-            if (htmlTargets.has(t)) return html.push(t);
-            const a = apexSig(t), l = lwcSig(t);
-            if (a && !l) return apex.push(t);
-            if (l && !a) return js.push(t);
-            if (sourceKind === 'apex') apex.push(t);
-            else js.push(t);
-        });
-        return { js, apex, html };
-    }
-
     function ghostClassFromNode(node) {
         const label = node.querySelector('.nodeLabel') || node.querySelector('text');
         const text = (label?.textContent || '').trim();
         if (!text.startsWith('?')) return null;
-        let name = text.replace(/^\?\s*/, '').trim();
-        name = name.replace(/^(js|html|apex):\s*/i, '');
+        const name = text.replace(/^\?\s*/, '').trim();
         return name && !registry[name] && !innerClassNames.has(name) ? name : null;
     }
 
     function findFileInTree(className) {
         if (!feState.tree) return null;
-        // LWC: synthesize a file node pointing at the component's .js handle.
-        if (feState.lwcIndex?.has(className)) {
-            const lwc = feState.lwcIndex.get(className);
-            return { name: `${className}.js`, handle: lwc.jsHandle };
-        }
-        // Apex / Java: look up by class name from the pre-built index.
-        if (feState.apexIndex?.has(className)) {
-            return feState.apexIndex.get(className);
-        }
         const targets = [`${className}.cls`, `${className}.java`].map(s => s.toLowerCase());
         return flatFiles(feState.tree).find(f => targets.includes(f.name.toLowerCase())) || null;
     }
@@ -1278,15 +894,8 @@
         picker.onchange = async () => {
             const file = picker.files[0];
             if (!file) return;
-            const lower = file.name.toLowerCase();
             const text = await file.text();
-            if (lower.endsWith('.js')) {
-                parseLwc(file.name.replace(/\.js$/i, ''), text, '');
-            } else if (lower.endsWith('.html')) {
-                parseLwc(file.name.replace(/\.html$/i, ''), '', text);
-            } else {
-                parseApex(text);
-            }
+            parseApex(text);
             render();
             picker.value = '';
         };
@@ -1306,7 +915,7 @@
         }, 410);
     }
 
-    function parseApex(content, folderPath) {
+    function parseApex(content) {
         const classNameMatch = content.match(/(?:class|interface|enum|record)\s+(\w+)/i);
         if (!classNameMatch) return;
         const className = classNameMatch[1];
@@ -1333,7 +942,7 @@
             const nextMatch = content.slice(start + 1).search(/(?:public|private|protected|global)\s/);
             methods[mName] = nextMatch > -1 ? content.slice(start, start + nextMatch) : content.slice(start);
         }
-        registry[className] = { kind: 'apex', varMap, methods, raw: content, folderPath: folderPath || null };
+        registry[className] = { varMap, methods, raw: content };
         // Collect inner class declarations — any additional class/interface/enum keywords after the first
         const innerClassRegex = /\b(?:class|interface|enum)\s+(\w+)/g;
         let icm;
@@ -1342,199 +951,6 @@
             if (!firstSkipped) { firstSkipped = true; continue; } // skip the outer class itself
             innerClassNames.add(icm[1]);
         }
-    }
-
-    // Convert <c-foo-bar-baz> to the camelCase component file name fooBarBaz.
-    // Underscore is preserved so prefixes like pgm_ stay intact:
-    //   pgm_project-overview-toolbar -> pgm_projectOverviewToolbar
-    function kebabToCamelComponent(kebab) {
-        return kebab.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
-    }
-
-    function parseLwc(componentName, jsContent, htmlContent, folderPath, kind = 'lwc', parentLwc = null) {
-        jsContent = jsContent || '';
-        htmlContent = htmlContent || '';
-        // Qualify relative imports so an LWC's local './ConfigProvider' becomes
-        // <parentLwc>.ConfigProvider in the registry, separating it from any
-        // Apex class that happens to share the bare name.
-        const effectiveParent = parentLwc || (kind === 'lwc' ? componentName : null);
-        const entry = {
-            kind,
-            folderPath: folderPath || null,
-            parentLwc: effectiveParent,
-            raw: jsContent + '\n' + htmlContent,
-            jsContent,
-            htmlContent,
-            varMap: {},
-            methods: {},
-            imports: [],
-            htmlRefs: [],
-        };
-
-        // Helper: turn a module specifier into a target name + kind tag.
-        function classifySource(source) {
-            if (source.startsWith('c/')) return { target: source.slice(2), kind: 'lwc' };
-            if (source.startsWith('./') || source.startsWith('../')) {
-                const baseName = source.replace(/^(\.\.?\/)+/, '').split('/').pop().replace(/\.(js|mjs|ts)$/i, '');
-                const target = effectiveParent ? `${effectiveParent}.${baseName}` : baseName;
-                return { target, kind: 'rel' };
-            }
-            if (source.startsWith('@salesforce/apex/')) {
-                return { target: source.replace(/^@salesforce\/apex\//, '').split('.')[0], kind: 'apex' };
-            }
-            if (source.startsWith('lightning/')) return { target: source, kind: 'lightning' };
-            if (source.startsWith('@salesforce/')) return { target: source, kind: 'salesforce' };
-            return { target: source, kind: 'lib' };
-        }
-
-        // import { a, b as c } from 'x';
-        // import * as ns from 'x';
-        // import def from 'x';
-        // import def, { a, b } from 'x';
-        const importRegex = /import\s+(?:\{\s*([^}]+?)\s*\}|\*\s+as\s+(\w+)|(\w+)(?:\s*,\s*\{\s*([^}]+?)\s*\})?)\s+from\s+['"]([^'"]+)['"]/g;
-        let m;
-        while ((m = importRegex.exec(jsContent)) !== null) {
-            const named = m[1] || m[4];
-            const ns = m[2];
-            const def = m[3];
-            const source = m[5];
-            const { target, kind: importKind } = classifySource(source);
-
-            const members = [];
-            if (named) {
-                named.split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
-                    members.push(s.split(/\s+as\s+/)[0].trim());
-                });
-            }
-            if (def) members.push(def);
-            if (ns) members.push(`* as ${ns}`);
-
-            entry.imports.push({ target, members, kind: importKind, source });
-        }
-
-        // Re-exports also pull dependencies into this module:
-        //   export { CONSTANTS } from './constants';
-        //   export * from './schema';
-        //   export * as ns from './utils';
-        const reExportRegex = /export\s+(?:\{\s*([^}]+?)\s*\}|\*(?:\s+as\s+(\w+))?)\s+from\s+['"]([^'"]+)['"]/g;
-        let re;
-        while ((re = reExportRegex.exec(jsContent)) !== null) {
-            const named = re[1];
-            const ns = re[2];
-            const source = re[3];
-            const { target, kind: importKind } = classifySource(source);
-
-            const members = [];
-            if (named) {
-                named.split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
-                    // export { a as b } from 'x' — 'a' is the name pulled from x.
-                    members.push(s.split(/\s+as\s+/)[0].trim());
-                });
-            }
-            if (ns) members.push(`* as ${ns}`);
-            if (!named && !ns) members.push('*');
-
-            entry.imports.push({ target, members, kind: importKind, source });
-        }
-
-        // HTML <c-foo-bar> references
-        if (htmlContent) {
-            const seen = new Set();
-            const htmlRefRegex = /<c-([\w-]+)/gi;
-            let h;
-            while ((h = htmlRefRegex.exec(htmlContent)) !== null) {
-                const kebab = h[1];
-                const camel = kebabToCamelComponent(kebab);
-                if (seen.has(camel)) continue;
-                seen.add(camel);
-                entry.htmlRefs.push({ target: camel, kebab });
-            }
-        }
-
-        // Build method-like entries so the existing method picker / view-code path works.
-        // Each unique imported member becomes a "method" whose body shows the import line
-        // plus any lines from the JS that reference the member (for context in View Code).
-        const jsLines = jsContent ? jsContent.split('\n') : [];
-        entry.imports.forEach(imp => {
-            imp.members.forEach(member => {
-                if (entry.methods[member]) return; // first import wins on collisions
-                const importLine = `import { ${member} } from '${imp.source}';`;
-                const safeMember = member.replace(/[^\w]/g, '');
-                if (safeMember && jsLines.length) {
-                    const re = new RegExp(`\\b${safeMember}\\b`);
-                    const usages = jsLines.filter(l => re.test(l));
-                    entry.methods[member] = usages.length ? usages.join('\n') : importLine;
-                } else {
-                    entry.methods[member] = importLine;
-                }
-            });
-        });
-
-        if (entry.htmlRefs.length) {
-            const tplLines = htmlContent.split('\n').filter(l => /<c-/.test(l));
-            entry.methods['html'] = tplLines.length ? tplLines.join('\n') : htmlContent;
-        }
-
-        registry[componentName] = entry;
-    }
-
-    function aggregateFlowsLwc(entry) {
-        const aggregated = {};
-        entry.imports.forEach(imp => {
-            // Only render edges for in-project relationships: other LWCs, sibling files, Apex controllers.
-            if (imp.kind !== 'lwc' && imp.kind !== 'rel' && imp.kind !== 'apex') return;
-            const target = imp.target;
-            if (!aggregated[target]) aggregated[target] = [];
-            imp.members.forEach(member => {
-                if (!aggregated[target].includes(member)) aggregated[target].push(member);
-            });
-        });
-        entry.htmlRefs.forEach(ref => {
-            if (!aggregated[ref.target]) aggregated[ref.target] = [];
-            if (!aggregated[ref.target].includes('html')) aggregated[ref.target].unshift('html');
-        });
-        return aggregated;
-    }
-
-    function collectOrderedCallsLwc(entry, methodBody) {
-        const calls = [];
-        const seen = new Set();
-        let seq = 1;
-
-        // Look for an import line in the body to identify the linked target + member.
-        const importMatch = methodBody && methodBody.match(/import\s+(?:\{\s*([^}]+?)\s*\}|\*\s+as\s+(\w+)|(\w+))\s+from\s+['"]([^'"]+)['"]/);
-        if (importMatch) {
-            const source = importMatch[4];
-            let target = null;
-            if (source.startsWith('c/')) target = source.slice(2);
-            else if (source.startsWith('./') || source.startsWith('../')) {
-                target = source.replace(/^(\.\.?\/)+/, '').split('/').pop().replace(/\.(js|mjs|ts)$/i, '');
-            } else if (source.startsWith('@salesforce/apex/')) {
-                target = source.replace(/^@salesforce\/apex\//, '').split('.')[0];
-            }
-            const namedFirst = importMatch[1] ? importMatch[1].split(',')[0].trim().split(/\s+as\s+/)[0] : null;
-            const member = namedFirst || importMatch[3] || (importMatch[2] ? `* as ${importMatch[2]}` : null);
-            if (target && member) {
-                const key = `${target}.${member}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    calls.push({ target, method: member, sequenceLabel: String(seq++) });
-                }
-            }
-        }
-
-        // Pick up <c-...> references when the body contains template lines.
-        const htmlRefRegex = /<c-([\w-]+)/gi;
-        let h;
-        while ((h = htmlRefRegex.exec(methodBody || '')) !== null) {
-            const camel = kebabToCamelComponent(h[1]);
-            const key = `${camel}.html`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            calls.push({ target: camel, method: 'html', sequenceLabel: String(seq++) });
-        }
-
-        return calls;
     }
 
     function cleanLabel(text) {
@@ -1614,87 +1030,6 @@
 
     function safeId(n) { return n ? n.replace(/[^\w]/g, '_') : "unknown"; }
 
-    function buildEdgeKey(parent, child) {
-        return `${safeId(parent)}|${safeId(child)}`;
-    }
-
-    // Reflect hiddenChildEdges onto the current SVG by toggling display in place
-    // (no Mermaid re-render). When we hide an edge from a parent to a child we
-    // also hide the child *node* itself — otherwise the chart still shows the
-    // child sitting there and it looks like nothing happened. The outgoing edges
-    // of a hidden child are then cascade-hidden so the diagram stays clean.
-    function applyHiddenChildEdges() {
-        const svgEl = document.querySelector('#mermaid-area svg');
-        if (!svgEl) return;
-
-        // Mermaid 10+ with ELK no longer puts `.edgePath` on edge containers.
-        // The LS-/LE- classes are still there, just attached to a different element
-        // (e.g. `g.edge`). Match by class substring so we catch both layouts.
-        const edges = Array.from(svgEl.querySelectorAll('[class*="LS-"][class*="LE-"]'));
-        const labels = Array.from(svgEl.querySelectorAll('.edgeLabel'));
-        const nodes = Array.from(svgEl.querySelectorAll('.node'));
-
-        // Reset everything to visible first.
-        edges.forEach((el, i) => {
-            el.style.display = '';
-            if (labels[i]) labels[i].style.display = '';
-        });
-        nodes.forEach(el => { el.style.display = ''; });
-        if (!hiddenChildEdges.size) return;
-
-        const endpoints = el => {
-            const cls = Array.from(el.classList);
-            return {
-                ls: cls.find(c => c.startsWith('LS-'))?.slice(3),
-                le: cls.find(c => c.startsWith('LE-'))?.slice(3),
-            };
-        };
-
-        // Node ids may be `flowchart-<id>-N` or `graphDiv-flowchart-<id>-N` depending
-        // on the Mermaid render id — just match the suffix.
-        const findNodeForTarget = id => nodes.find(n => {
-            const m = (n.id || '').match(/flowchart-(.+)-\d+$/);
-            return m && m[1] === id;
-        });
-
-        // 1. Hide the specific parent→child edges.
-        const hiddenTargets = new Set();
-        edges.forEach((el, i) => {
-            const { ls, le } = endpoints(el);
-            if (!ls || !le) return;
-            if (hiddenChildEdges.has(`${ls}|${le}`)) {
-                el.style.display = 'none';
-                if (labels[i]) labels[i].style.display = 'none';
-                hiddenTargets.add(le);
-            }
-        });
-
-        // 2. Hide the child nodes themselves.
-        hiddenTargets.forEach(id => {
-            const targetNode = findNodeForTarget(id);
-            if (targetNode) targetNode.style.display = 'none';
-        });
-
-        // 3. Cascade: edges leaving a hidden child go nowhere — hide them too.
-        edges.forEach((el, i) => {
-            if (el.style.display === 'none') return;
-            const { ls } = endpoints(el);
-            if (ls && hiddenTargets.has(ls)) {
-                el.style.display = 'none';
-                if (labels[i]) labels[i].style.display = 'none';
-            }
-        });
-    }
-
-    function toggleChildEdges(parent, children, hide) {
-        children.forEach(c => {
-            const key = buildEdgeKey(parent, c);
-            if (hide) hiddenChildEdges.add(key);
-            else hiddenChildEdges.delete(key);
-        });
-        applyHiddenChildEdges();
-    }
-
     async function render() {
         const list = document.getElementById('registry-list');
         list.innerHTML = "";
@@ -1723,86 +1058,6 @@
         currentRenderedEdgeStyles = [];
         let edgeLabelFull = [];
 
-        // Components referenced as visual children through <c-...> template tags,
-        // names referenced as JS imports from any LWC, and names called from any
-        // Apex source. These three signals are how we disambiguate a node's kind
-        // when its name shows up in more than one index (e.g. an Apex class and an
-        // LWC happening to share a name).
-        const htmlChildTargets = new Set();
-        const jsImportTargets = new Set();
-        const apexCallerNames = new Set();
-        Object.entries(registry).forEach(([name, e]) => {
-            if (!e) return;
-            if (e.kind === 'apex') {
-                const flows = aggregateFlows(e.raw, e.varMap, name);
-                Object.keys(flows).forEach(t => apexCallerNames.add(t));
-                return;
-            }
-            if (Array.isArray(e.htmlRefs)) e.htmlRefs.forEach(r => htmlChildTargets.add(r.target));
-            if (Array.isArray(e.imports)) e.imports.forEach(imp => jsImportTargets.add(imp.target));
-        });
-
-        // Decide whether a node should render as apex / lwc / lwcChild / html.
-        // Signal priority:
-        //   1. explicit kind on a loaded registry entry
-        //   2. clean wins from `apex` or `lwc` index alone
-        //   3. who actually references the name (apexCalledOnly vs lwcCalledOnly)
-        //   4. fall back to whichever index has it; final tie → lwc
-        function inferKind(name) {
-            const entry = registry[name];
-            if (entry?.kind === 'apex') return 'apex';
-            if (entry?.kind === 'lwcChild') return 'lwcChild';
-            if (entry?.kind === 'lwc') return 'lwc';
-
-            const inLwc = feState.lwcIndex?.has(name);
-            const inApex = feState.apexIndex?.has(name);
-            if (inApex && !inLwc) return 'apex';
-            if (inLwc && !inApex) return 'lwc';
-
-            const apexCalled = apexCallerNames.has(name);
-            const lwcCalled = jsImportTargets.has(name);
-            if (apexCalled && !lwcCalled) return 'apex';
-            if (lwcCalled && !apexCalled) return 'lwc';
-
-            if (inLwc) return 'lwc';
-            if (inApex) return 'apex';
-            if (htmlChildTargets.has(name) && !jsImportTargets.has(name)) return 'html';
-            return 'lwc';
-        }
-
-        function styleForName(name) {
-            const k = inferKind(name);
-            if (k === 'apex')     return 'fill:#3b2c1e,stroke:#f59e0b,stroke-width:2px,color:#fde68a';
-            if (k === 'lwcChild') return 'fill:#2e1b4d,stroke:#a78bfa,stroke-width:2px,color:#ede9fe';
-            if (k === 'html')     return 'fill:#0e3a4a,stroke:#06b6d4,stroke-width:2px,color:#cffafe';
-            if (k === 'lwc')      return 'fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#dbeafe';
-            return null;
-        }
-
-        function prefixForName(name) {
-            const k = inferKind(name);
-            if (k === 'apex') return 'apex: ';
-            if (k === 'html') return 'html: ';
-            return 'js: ';
-        }
-
-        // Strip the "<parentLwc>." qualifier on auto-loaded children for display.
-        function bareName(name) {
-            const idx = String(name || '').lastIndexOf('.');
-            return idx > 0 ? name.slice(idx + 1) : name;
-        }
-
-        // Hash a namespace prefix (text before the first underscore) to a stable color.
-        const CATEGORY_PALETTE = ['#ec4899', '#a78bfa', '#06b6d4', '#22c55e', '#f59e0b', '#3b82f6', '#f43f5e', '#14b8a6', '#facc15', '#8b5cf6'];
-        function categoryColor(name) {
-            const m = bareName(name).match(/^([A-Za-z]+)_/);
-            if (!m) return null;
-            const cat = m[1].toLowerCase();
-            let hash = 0;
-            for (let i = 0; i < cat.length; i++) hash = (hash * 31 + cat.charCodeAt(i)) & 0xffff;
-            return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
-        }
-
         if (!focusedClass) {
             document.getElementById('view-title').innerText = "System Architecture Map";
             document.getElementById('reset-btn').style.display = "none";
@@ -1817,17 +1072,9 @@
                     const label = cleanLabel(isTruncated ? items[0] + ', ' + items[1] + '…' : items.join(', '));
                     if (isTruncated) edgeLabelFull.push(items.join(', '));
                     def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
-                    // Color the link by the target's namespace prefix (e.g. pselib_, ffui_).
-                    const catColor = categoryColor(target);
-                    if (catColor) {
-                        styleDirectives.push(`linkStyle ${linkCounter} stroke:${catColor},stroke-width:2px`);
-                    }
-                    linkCounter++;
                     if (!registry[target] && !innerClassNames.has(target)) ghostNodes.add(target);
                 });
-                def += `  ${safeId(cName)}["${prefixForName(cName)}${bareName(cName)}"]\n`;
-                const style = styleForName(cName);
-                if (style) def += `  style ${safeId(cName)} ${style}\n`;
+                def += `  ${safeId(cName)}["${cName}"]\n`;
             });
         } else {
             document.getElementById('view-title').innerText = `Flow Analysis: ${focusedClass}`;
@@ -1925,15 +1172,12 @@
                     });
                     Object.entries(byClass).forEach(([cls, clsEntries]) => {
                         const sgId = `${sgPrefix}_${safeId(cls)}`;
-                        const labelBody = `${prefixForName(cls)}${bareName(cls)}`;
-                        const sgLabel = registry[cls] ? labelBody : `? ${labelBody}`;
+                        const sgLabel = registry[cls] ? cls : `? ${cls}`;
                         def += `  subgraph ${sgId} ["${sgLabel}"]\n    direction TB\n`;
                         clsEntries.forEach(e => {
                             def += `    ${e.node.id}["${e.node.displayLabel || cleanLabel(e.node.label)}"]\n`;
                         });
                         def += `  end\n`;
-                        const style = styleForName(cls);
-                        if (style) def += `  style ${sgId} ${style}\n`;
                     });
                 }
 
@@ -1952,15 +1196,8 @@
         }
 
         ghostNodes.forEach(ghost => {
-            def += `  ${safeId(ghost)}[["? ${prefixForName(ghost)}${bareName(ghost)}"]]\n`;
-            const k = inferKind(ghost);
-            if (k === 'apex') {
-                def += `  style ${safeId(ghost)} stroke-dasharray: 5 5, fill: #3b2c1e, stroke: #f59e0b\n`;
-            } else if (k === 'html') {
-                def += `  style ${safeId(ghost)} stroke-dasharray: 5 5, fill: #0e3a4a, stroke: #06b6d4\n`;
-            } else {
-                def += `  style ${safeId(ghost)} stroke-dasharray: 5 5, fill: #1e293b, stroke: #10b981\n`;
-            }
+            def += `  ${safeId(ghost)}[["? ${ghost}"]]\n`;
+            def += `  style ${safeId(ghost)} stroke-dasharray: 5 5, fill: #1e293b, stroke: #10b981\n`;
         });
 
         if (styleDirectives.length) {
@@ -2004,8 +1241,6 @@
                 attachEdgeEvents(svgEl);
                 attachClusterEvents(svgEl);
                 if (selectedClassName) applyDiagramHighlight(selectedClassName);
-                // Re-apply per-parent edge hides so they survive a full re-render.
-                applyHiddenChildEdges();
             }
         } catch (err) { console.error(err); }
     }
@@ -2083,12 +1318,6 @@
         if (node) node.classList.add('node-focused');
     }
 
-    // Labels in the diagram are prefixed with `js: `, `html: ` or `apex: `.
-    // Strip the prefix when comparing label text to registry keys.
-    function stripNodeTypePrefix(s) {
-        return String(s || '').replace(/^(js|html|apex):\s*/i, '');
-    }
-
     function getDiagramNodeByClassName(name) {
         const wanted = (name || '').trim();
         if (!wanted) return null;
@@ -2098,97 +1327,24 @@
         // Prefer exact label text match to avoid partial id collisions.
         const byLabel = nodes.find(node => {
             const label = node.querySelector('.nodeLabel') || node.querySelector('text');
-            const txt = stripNodeTypePrefix((label?.textContent || '').trim());
-            return txt === wanted;
+            return label && (label.textContent || '').trim() === wanted;
         });
         if (byLabel) return byLabel;
 
-        // Fallback to id pattern — id may be `flowchart-<safeId>-N` or
-        // `<renderId>-flowchart-<safeId>-N` depending on Mermaid version.
-        const wantedId = safeId(wanted);
-        return nodes.find(n => {
-            const m = (n.id || '').match(/flowchart-(.+)-\d+$/);
-            return m && m[1] === wantedId;
-        }) || null;
+        // Fallback to id pattern used by Mermaid.
+        return document.querySelector(`[id^="flowchart-${safeId(wanted)}-"]`);
     }
 
     function getClassNameFromNode(node) {
         if (!node) return null;
 
         const label = node.querySelector('.nodeLabel') || node.querySelector('text');
-        const labelText = stripNodeTypePrefix((label?.textContent || '').trim());
+        const labelText = label ? (label.textContent || '').trim() : '';
         if (labelText && registry[labelText]) return labelText;
 
-        // Mermaid node ids may be `flowchart-<safeId>-<seq>` or have a render-id
-        // prefix like `graphDiv-flowchart-<safeId>-<seq>`. Match anywhere by
-        // anchoring only at the end — exact safeId equality keeps an Apex
-        // `ConfigProvider` from being confused with an lwcChild whose qualified
-        // key is `pgm_projectOverview.ConfigProvider`.
-        const idMatch = (node.id || '').match(/flowchart-(.+)-\d+$/);
-        if (idMatch) {
-            const idCore = idMatch[1];
-            const exact = Object.keys(registry).find(name => safeId(name) === idCore);
-            if (exact) return exact;
-            // Method-level nodes (`flowchart-<class>___<method>-N`) fall back to a
-            // substring match for the class portion. Class-level nodes don't —
-            // otherwise a ghost `MyController` would shadow a loaded `Controller`.
-            if (idCore.includes('___')) {
-                const lower = (node.id || '').toLowerCase();
-                return Object.keys(registry).find(name => lower.includes(safeId(name).toLowerCase())) || null;
-            }
-        }
-        return null;
-    }
-
-    // Open the loaded node's full source in the existing draggable code panel,
-    // sized large. For LWC components both .js and .html are concatenated. The
-    // source folder path is shown at the top of the title bar so it's easy to
-    // remember where the file lives.
-    function showSourceModal(name) {
-        const entry = registry[name];
-        if (!entry) return;
-        const tooltip = document.getElementById('code-tooltip');
-        const titleEl = document.getElementById('tooltip-title');
-        const codeEl = document.getElementById('tooltip-code');
-        const display = name.includes('.') ? name.split('.').slice(-1)[0] : name;
-
-        let body = '';
-        let lang = 'java';
-        if (entry.kind === 'apex') {
-            body = entry.raw || '';
-            lang = 'java';
-        } else {
-            const js = entry.jsContent || '';
-            const html = entry.htmlContent || '';
-            if (js && html) {
-                body = `// ─── ${display}.js ───\n${js}\n\n/* ─── ${display}.html ─── */\n${html}`;
-            } else {
-                body = js || html;
-            }
-            lang = 'javascript';
-        }
-
-        // Title: "Source: <name>" plus a muted folder path chip.
-        titleEl.textContent = '';
-        titleEl.appendChild(document.createTextNode(`Source: ${display}`));
-        if (entry.folderPath) {
-            const pathEl = document.createElement('span');
-            pathEl.style.cssText = 'margin-left:10px;font-weight:400;font-size:11px;color:#94a3b8;';
-            pathEl.textContent = `📂 ${entry.folderPath}`;
-            titleEl.appendChild(pathEl);
-        }
-        codeEl.className = `language-${lang}`;
-        codeEl.textContent = body;
-        if (window.Prism) try { Prism.highlightElement(codeEl); } catch (e) { /* highlight is best-effort */ }
-
-        // Default to a near-full-viewport size — user can still drag / resize.
-        tooltip.style.width = '90vw';
-        tooltip.style.height = '85vh';
-        tooltip.style.left = '5vw';
-        tooltip.style.top = '7vh';
-        tooltip.style.display = 'flex';
-        // Suppress the global "click anywhere closes the tooltip" guard briefly.
-        tooltipInteractionGuardUntil = Date.now() + 300;
+        const idText = (node.id || '').toLowerCase();
+        const match = Object.keys(registry).find(name => idText.includes(safeId(name).toLowerCase()));
+        return match || null;
     }
 
     function hideCodeTooltip() {
@@ -2288,7 +1444,6 @@
     }
 
     function aggregateFlows(content, vMap, sourceName) {
-        if (registry[sourceName]?.kind === 'lwc') return aggregateFlowsLwc(registry[sourceName]);
         const aggregated = {};
         const direct = /([\w.]+)\.(\w+)\s*\(/g;
 
@@ -2414,7 +1569,6 @@
     }
 
     function collectOrderedCalls(rawContent, vMap, sourceName) {
-        if (registry[sourceName]?.kind === 'lwc') return collectOrderedCallsLwc(registry[sourceName], rawContent);
         // Parse only from the opening brace of the method body — skip the signature
         // so the method name itself doesn't match as a bare call
         const braceIdx = rawContent.indexOf('{');
@@ -2679,11 +1833,7 @@
                 const menu = document.getElementById('node-context-menu');
                 document.getElementById('ctx-toggle-nodes').style.display = 'none';
                 document.getElementById('ctx-hide-children').style.display = 'none';
-                document.getElementById('ctx-hide-js-children').style.display = 'none';
-                document.getElementById('ctx-hide-apex-children').style.display = 'none';
-                document.getElementById('ctx-hide-html-children').style.display = 'none';
                 document.getElementById('ctx-view-code').style.display = 'none';
-                document.getElementById('ctx-view-source').style.display = 'none';
                 const loadEl = document.getElementById('ctx-load-class');
                 loadEl.style.display = 'flex';
                 loadEl.querySelector('span').textContent = `Load "${labelName}"`;
@@ -2732,12 +1882,6 @@
         const menu = document.getElementById('node-context-menu');
         const { className, methodName } = resolveNodeIdentity(node);
 
-        // Reset every hide-children item up front; the relevant ones are re-enabled
-        // below. This prevents a stale "Hide Children" button (with an onclick closed
-        // over a different node) from carrying across right-click sessions.
-        ['ctx-hide-children', 'ctx-hide-js-children', 'ctx-hide-apex-children', 'ctx-hide-html-children']
-            .forEach(id => { const el = document.getElementById(id); if (el) { el.style.display = 'none'; el.onclick = null; } });
-
         // Determine toggle state for Hide/Show
         let canToggle = false;
         if (focusedClass) {
@@ -2765,7 +1909,6 @@
             } else {
                 document.getElementById('ctx-toggle-nodes').style.display = 'none';
             }
-            // Hide-children items are reset at the top of this function — nothing to do here.
         } else {
             // Outside analyze flow: toggle = open analyze flow
             document.getElementById('ctx-toggle-label').textContent = 'Analyze Flow';
@@ -2780,38 +1923,24 @@
             // Hide / Show Children — only for loaded classes in overview
             const cn = getClassNameFromNode(node);
             const hideChildEl = document.getElementById('ctx-hide-children');
-            const hideJsEl = document.getElementById('ctx-hide-js-children');
-            const hideApexEl = document.getElementById('ctx-hide-apex-children');
-            const hideHtmlEl = document.getElementById('ctx-hide-html-children');
-
             if (cn && registry[cn]) {
-                // Per-kind buckets — only the buckets that actually have members get menu items.
-                // Hiding/showing toggles edges from THIS node only (per-parent), with no
-                // global re-render so pan / zoom are preserved.
-                const buckets = getChildrenByKind(cn);
-                const allChildren = [...buckets.js, ...buckets.apex, ...buckets.html];
-
-                const wire = (el, group, label) => {
-                    if (!group.length) { el.style.display = 'none'; return; }
-                    const anyHidden = group.some(c => hiddenChildEdges.has(buildEdgeKey(cn, c)));
-                    const action = anyHidden ? 'Show' : 'Hide';
-                    el.querySelector('span').textContent = `${action} ${label} Children`;
-                    el.style.display = 'flex';
-                    el.onclick = () => {
+                const children = getLoadedChildren(cn);
+                if (children.length) {
+                    const anyVisible = children.some(c => !hiddenClasses.has(c));
+                    document.getElementById('ctx-hide-children-label').textContent = anyVisible ? 'Hide Children' : 'Show Children';
+                    hideChildEl.querySelector('i').className = anyVisible ? 'fa-solid fa-circle-nodes' : 'fa-solid fa-circle-nodes';
+                    hideChildEl.style.display = 'flex';
+                    hideChildEl.onclick = () => {
                         hideNodeContextMenu();
-                        toggleChildEdges(cn, group, !anyHidden);
+                        if (anyVisible) children.forEach(c => hiddenClasses.add(c));
+                        else children.forEach(c => hiddenClasses.delete(c));
+                        render();
                     };
-                };
-                wire(hideChildEl, allChildren, 'All');
-                // Above writes label "Hide All Children" / "Show All Children"; preserve the
-                // historic "Hide Children" wording for the all-children item.
-                if (allChildren.length) {
-                    const anyHidden = allChildren.some(c => hiddenChildEdges.has(buildEdgeKey(cn, c)));
-                    document.getElementById('ctx-hide-children-label').textContent = anyHidden ? 'Show Children' : 'Hide Children';
+                } else {
+                    hideChildEl.style.display = 'none';
                 }
-                wire(hideJsEl, buckets.js, 'JS');
-                wire(hideApexEl, buckets.apex, 'Apex');
-                wire(hideHtmlEl, buckets.html, 'HTML');
+            } else {
+                hideChildEl.style.display = 'none';
             }
         }
 
@@ -2840,17 +1969,6 @@
             tooltip.style.top = Math.min(e.clientY + 12, window.innerHeight - 300) + 'px';
             tooltipInteractionGuardUntil = Date.now() + 300; // prevent immediate dismiss
         };
-
-        // Source option — only for loaded nodes. Opens the full file in the big modal.
-        const sourceTarget = className && registry[className]?.raw !== undefined ? className
-            : (getClassNameFromNode(node) && registry[getClassNameFromNode(node)]?.raw !== undefined ? getClassNameFromNode(node) : null);
-        const ctxViewSource = document.getElementById('ctx-view-source');
-        if (sourceTarget) {
-            ctxViewSource.style.display = 'flex';
-            ctxViewSource.onclick = () => { hideNodeContextMenu(); showSourceModal(sourceTarget); };
-        } else {
-            ctxViewSource.style.display = 'none';
-        }
 
         // Position and show
         menu.style.display = 'block';
@@ -2899,7 +2017,7 @@
             const lines = (registry[className].methods[m].match(/\n/g) || []).length;
             const pill = document.createElement('div');
             pill.className = 'method-pill' + (activeMethods.has(m) ? ' enabled' : '');
-            pill.innerHTML = `<span class="pill-dot"></span><span class="pill-name">${m}():${lines}</span>${calls.length > 0 ? `<span class="pill-badge">${calls.length} calls</span>` : ''}`;
+            pill.innerHTML = `<span class="pill-dot"></span><span class="pill-name">${m}()</span>${calls.length > 0 ? `<span class="pill-badge">${calls.length} calls</span>` : ''}<span class="pill-badge">${lines}L</span>`;
             pill.addEventListener('click', () => {
                 if (activeMethods.has(m)) { activeMethods.delete(m); pill.classList.remove('enabled'); }
                 else { activeMethods.add(m); pill.classList.add('enabled'); }

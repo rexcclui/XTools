@@ -66,6 +66,8 @@ const CSS = `
 .log-rendered:focus{box-shadow:inset 0 0 0 1px var(--ac)}
 .log-toolbar{padding:4px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:6px;align-items:center;flex-shrink:0}
 .ll{display:flex;align-items:center;gap:6px;padding:0 8px;border-left:2px solid transparent;cursor:pointer;height:18px;overflow:hidden;white-space:nowrap;box-sizing:border-box}
+.log-rendered.wrap-on .ll{height:auto;min-height:18px;overflow:visible;white-space:normal;align-items:flex-start;padding-top:1px;padding-bottom:1px}
+.log-rendered.wrap-on .ll-rest{white-space:pre-wrap;word-break:break-word}
 .ll:hover{background:rgba(255,255,255,.03)}
 .ll.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
 .ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
@@ -574,7 +576,7 @@ function initAnalyzer(rootEl, fetchSource) {
   const S = {
     tabs:[],activeId:null,
     highlights:HL_COLORS.map((c,i)=>({id:i+1,query:'',bg:c.bg,fg:c.fg,border:c.border})),
-    typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,showLogIndent:false,
+    typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,showLogIndent:false,wrapLogLines:false,
     nsFilter:null,hiddenNsLines:new Set(),hideKeywords:[],hiddenEventTypes:new Set(['HEAP_ALLOCATE','STATEMENT_EXECUTE']),treeSearch:'',
   };
   let tabSeq = 0;
@@ -728,6 +730,18 @@ function initAnalyzer(rootEl, fetchSource) {
     container.appendChild(spacer);
 
     function render(){
+      // Wrap mode: bypass virtualization so variable row heights render correctly.
+      if (S.wrapLogLines){
+        spacer.style.height='auto';
+        rowsEl.style.transform='none';
+        if (rendered.start===0&&rendered.end===visLines.length) return;
+        rendered={start:0,end:visLines.length};
+        const hls=getActiveHls();
+        const frag=document.createDocumentFragment();
+        for (let i=0;i<visLines.length;i++) frag.appendChild(buildLogRow(visLines[i],tab,hls,i));
+        rowsEl.innerHTML='';rowsEl.appendChild(frag);
+        return;
+      }
       const scrollTop=container.scrollTop;
       const viewH=container.clientHeight||600;
       spacer.style.height=(visLines.length*LOG_ROW_H)+'px';
@@ -743,6 +757,11 @@ function initAnalyzer(rootEl, fetchSource) {
     }
 
     function scrollToVisIdx(idx,center){
+      if (S.wrapLogLines){
+        const row=rowsEl.children[idx];
+        if (row) row.scrollIntoView({block:center?'center':'nearest'});
+        return;
+      }
       const rowTop=idx*LOG_ROW_H;
       const rowBot=rowTop+LOG_ROW_H;
       const viewTop=container.scrollTop;
@@ -926,7 +945,7 @@ function initAnalyzer(rootEl, fetchSource) {
   function renderLogView(tab){
     tab._cursorVisIdx=-1;
     const wrap=document.createElement('div');
-    wrap.className='log-rendered';
+    wrap.className='log-rendered'+(S.wrapLogLines?' wrap-on':'');
     wrap.id='logRendered_'+tab.id;
     wrap.tabIndex=0;
     wrap.setAttribute('aria-label','Log lines — use arrow keys to navigate');
@@ -1345,6 +1364,16 @@ function initAnalyzer(rootEl, fetchSource) {
       indentBtn.className='btn btn-sm'+(S.showLogIndent?' toggle-btn on':'');
       tab._logScroller?.refresh();
     });
+    const wrapBtn=document.createElement('button');
+    wrapBtn.className='btn btn-sm'+(S.wrapLogLines?' toggle-btn on':'');
+    wrapBtn.id='btn-logWrap';wrapBtn.title='Toggle line wrap';wrapBtn.textContent='↵ Wrap';
+    wrapBtn.addEventListener('click',()=>{
+      S.wrapLogLines=!S.wrapLogLines;
+      wrapBtn.className='btn btn-sm'+(S.wrapLogLines?' toggle-btn on':'');
+      const rendered=C.querySelector('#logRendered_'+tab.id);
+      if (rendered) rendered.classList.toggle('wrap-on',S.wrapLogLines);
+      tab._logScroller?.refresh();
+    });
     const editBtn=document.createElement('button');editBtn.className='btn btn-sm';
     editBtn.textContent='✎ Edit';editBtn.addEventListener('click',()=>editTab(tab.id));
     const logTagsModalBtn=document.createElement('button');logTagsModalBtn.className='btn btn-sm';
@@ -1356,7 +1385,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const nsLogPop=document.createElement('div');nsLogPop.className='ns-log-popup';
     nsLogWrap.appendChild(nsLogBtn);nsLogWrap.appendChild(nsLogPop);
     nsLogBtn.addEventListener('click',e=>{e.stopPropagation();nsLogPop.classList.toggle('open');if(nsLogPop.classList.contains('open')){renderNsLogPopup(tab,nsLogPop,nsLogBtn)}});
-    toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(indentBtn);toolbar.appendChild(editBtn);
+    toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(indentBtn);toolbar.appendChild(wrapBtn);toolbar.appendChild(editBtn);
     toolbar.appendChild(logTagsModalBtn);toolbar.appendChild(nsLogWrap);
     const {el}=renderLogView(tab);
     logPane.innerHTML='';
