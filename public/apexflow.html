@@ -211,6 +211,11 @@
         #loading-indicator { display: none; align-items: center; gap: 7px; padding: 5px 11px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.5); border-radius: 14px; color: var(--primary); font-size: 11px; font-weight: 500; white-space: nowrap; max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
         #loading-indicator.visible { display: inline-flex; }
         #loading-indicator .loading-text { overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+        #html-index-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--border); background: rgba(148,163,184,0.08); color: #94a3b8; font-size: 10px; font-weight: 600; white-space: nowrap; }
+        #html-index-status i { font-size: 9px; }
+        #html-index-status.ready { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.12); color: var(--primary); }
+        #html-index-status.building { border-color: rgba(245,158,11,0.45); background: rgba(245,158,11,0.12); color: #f59e0b; }
+        #html-index-status.idle { border-color: var(--border); background: rgba(148,163,184,0.08); color: #94a3b8; }
 
         .btn { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-sidebar); color: var(--text-main); cursor: pointer; font-size: 11px; font-weight: 600; }
         .btn-primary { background: var(--primary); color: white; border: none; }
@@ -285,6 +290,69 @@
             pointer-events: none;
         }
         #drop-overlay.show { display: flex; }
+
+        /* REFERENCE LOOKUP MODAL */
+        #reference-lookup-modal {
+            position: fixed; z-index: 1100; background: var(--bg-sidebar); border: 1px solid var(--border);
+            border-radius: 8px; display: none; flex-direction: column; overflow: hidden;
+            width: 500px; max-height: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #reference-lookup-modal.visible { display: flex; }
+        #reference-modal-header {
+            padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;
+            font-weight: 600; font-size: 12px; color: var(--text-main);
+        }
+        #reference-modal-close { background: none; border: none; color: #64748b; cursor: pointer; font-size: 16px; padding: 0; line-height: 1; }
+        #reference-modal-close:hover { color: var(--text-main); }
+        #reference-modal-debug {
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px;
+            color: #94a3b8;
+            background: rgba(15,23,42,0.4);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #reference-modal-list {
+            flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .reference-item {
+            display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; cursor: pointer;
+            border: 1px solid var(--border); background: var(--bg-main); transition: 0.15s; user-select: none;
+        }
+        .reference-item:hover { border-color: var(--primary); background: rgba(16,185,129,0.05); }
+        .reference-item input[type="checkbox"] { flex-shrink: 0; }
+        .reference-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .reference-item-name { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .reference-item-meta { font-size: 10px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .reference-item.loaded { border-color: rgba(16,185,129,0.5); }
+        .reference-modal-footer {
+            padding: 10px 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end;
+        }
+        .reference-modal-footer button { padding: 4px 12px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text-main); cursor: pointer; }
+        .reference-modal-footer button:hover { border-color: var(--primary); color: var(--primary); }
+        .reference-modal-footer .btn-primary { background: var(--primary); border-color: var(--primary); color: white; }
+
+        /* TABS FOR JS/HTML */
+        #code-tooltip-tabs {
+            display: none; flex-direction: row; border-bottom: 1px solid var(--border); gap: 0;
+        }
+        #code-tooltip-tabs.visible { display: flex; }
+        .code-tab {
+            flex: 1; padding: 8px 12px; border-bottom: 2px solid transparent; cursor: pointer; font-size: 12px;
+            font-weight: 500; color: #64748b; text-align: center; transition: 0.15s;
+        }
+        .code-tab:hover { color: var(--primary); }
+        .code-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        
+        /* FONT SIZE CONTROLS */
+        #tooltip-font-controls {
+            display: flex; gap: 6px; align-items: center; margin-left: auto;
+        }
+        .font-size-btn { padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--primary); cursor: pointer; }
+        .font-size-btn:hover { background: rgba(16,185,129,0.1); }
     </style>
 </head>
 <body>
@@ -294,10 +362,15 @@
     <div id="code-tooltip-header">
         <span id="tooltip-title">Code Snippet</span>
         <div style="display:flex;gap:6px;align-items:center;">
+            <div id="tooltip-font-controls" style="display:none;">
+                <button class="font-size-btn" onclick="decreaseFontSize()" title="Decrease font size">−</button>
+                <button class="font-size-btn" onclick="increaseFontSize()" title="Increase font size">+</button>
+            </div>
             <button id="tooltip-copy-btn" onclick="copyTooltipCode()"><i class="fa-regular fa-copy"></i> Copy</button>
             <button id="tooltip-close-btn" onclick="hideCodeTooltip()" title="Close">✕</button>
         </div>
     </div>
+    <div id="code-tooltip-tabs" style="padding: 0 8px;"></div>
     <div id="code-tooltip-body">
         <pre><code class="language-java" id="tooltip-code"></code></pre>
     </div>
@@ -311,6 +384,7 @@
     <div class="ctx-item" id="ctx-hide-html-children" style="display:none"><i class="fa-solid fa-globe"></i><span id="ctx-hide-html-label">Hide HTML Children</span></div>
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
+    <div class="ctx-item" id="ctx-lookup-reference" style="display:none"><i class="fa-solid fa-magnifying-glass"></i><span>Lookup Reference</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
     <div class="ctx-item" id="ctx-view-source" style="display:none"><i class="fa-solid fa-file-lines"></i><span>Source</span></div>
 </div>
@@ -322,6 +396,19 @@
         <span class="edge-ctx-cls" id="edge-ctx-target"></span>
     </div>
     <div id="edge-ctx-body"><ul id="edge-ctx-list"></ul></div>
+</div>
+
+<div id="reference-lookup-modal">
+    <div id="reference-modal-header">
+        <span>Found References</span>
+        <button id="reference-modal-close" onclick="closeReferenceLookup()">✕</button>
+    </div>
+    <div id="reference-modal-debug">lookup: idle</div>
+    <div id="reference-modal-list"></div>
+    <div class="reference-modal-footer">
+        <button onclick="closeReferenceLookup()">Cancel</button>
+        <button class="btn-primary" onclick="loadSelectedReferences()">Load Selected</button>
+    </div>
 </div>
 
 <div id="class-history-panel">
@@ -376,6 +463,10 @@
     <div class="toolbar">
         <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
             <h3 id="view-title" style="margin: 0 0 0 50px; font-size: 0.9rem; color: var(--text-dim);">Ready</h3>
+            <div id="html-index-status" class="idle" title="HTML reference cache status">
+                <i class="fa-regular fa-clock"></i>
+                <span>HTML Ref Cache: Idle</span>
+            </div>
             <div id="loading-indicator">
                 <i class="fa-solid fa-spinner fa-spin"></i>
                 <span class="loading-text">Loading…</span>
@@ -433,6 +524,59 @@
     let tooltipDragState = { isDragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 };
     let tooltipResizeState = { isResizing: false, startX: 0, startY: 0, startWidth: 0, startHeight: 0 };
     let tooltipInteractionGuardUntil = 0;
+    let tooltipFontSize = 14; // Default font size in pixels
+    let currentTooltipMode = 'code'; // 'code', 'js', or 'html'
+    let referenceLookupData = { componentName: null, references: [] };
+    let htmlReferenceIndex = new Map();
+    let htmlReferenceIndexBuildPromise = null;
+    let htmlReferenceIndexVersion = 0;
+    let htmlReferenceMissCache = new Set();
+    let htmlReferenceCacheKey = null;
+
+    function setHtmlIndexStatus(state, text) {
+        const el = document.getElementById('html-index-status');
+        if (!el) return;
+        el.classList.remove('idle', 'building', 'ready');
+        el.classList.add(state);
+        const icon = el.querySelector('i');
+        const label = el.querySelector('span');
+        if (icon) {
+            icon.className = state === 'ready'
+                ? 'fa-solid fa-circle-check'
+                : state === 'building'
+                    ? 'fa-solid fa-spinner fa-spin'
+                    : 'fa-regular fa-clock';
+        }
+        if (label) label.textContent = text;
+    }
+
+    function invalidateHtmlReferenceIndex() {
+        htmlReferenceIndex = new Map();
+        htmlReferenceIndexBuildPromise = null;
+        htmlReferenceMissCache = new Set();
+        htmlReferenceIndexVersion++;
+        setHtmlIndexStatus('idle', 'HTML Ref Cache: Idle');
+    }
+
+    async function persistHtmlReferenceIndex() {
+        if (!htmlReferenceCacheKey) return;
+        const payload = {
+            ts: Date.now(),
+            schemaVersion: 2,
+            lwcCount: feState.lwcIndex?.size || 0,
+            index: [...htmlReferenceIndex.entries()],
+        };
+        lsSaveHtmlRefCache(htmlReferenceCacheKey, payload);
+        await idbSaveHtmlRefCache(htmlReferenceCacheKey, payload);
+    }
+
+    function warmupHtmlReferenceIndex() {
+        if (!feState.lwcIndex?.size) return;
+        setHtmlIndexStatus('building', 'HTML Ref Cache: Building…');
+        setTimeout(() => {
+            ensureHtmlReferenceIndex().catch(e => console.warn('HTML reference index warmup failed', e));
+        }, 50);
+    }
 
     const SYSTEM_TYPES = new Set([
         // Apex
@@ -455,6 +599,12 @@
     const PATH_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e', '#14b8a6'];
 
     const dropOverlay = document.getElementById('drop-overlay');
+
+    // Load saved font size preference
+    const savedFontSize = localStorage.getItem('tooltipFontSize');
+    if (savedFontSize) {
+        tooltipFontSize = parseInt(savedFontSize, 10);
+    }
 
     document.addEventListener('dragover', e => {
         e.preventDefault();
@@ -519,19 +669,21 @@
     // ── FILE EXPLORER ──────────────────────────────────────────────────────────
     const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null, lwcIndex: new Map(), apexIndex: new Map() };
     const LWC_SKIP_DIRS = new Set(['__tests__', '__mocks__', 'node_modules', '.git', '.sfdx', '.sf', 'dist', 'build', 'target', 'out', '.next', '.cache', '.vscode']);
+    const AUTO_LOAD_REL_IMPORTS = false;
 
     // ── IndexedDB persistence for the directory handle ─────────────────────────
-    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory', IDB_TREE_STORE = 'treeCache';
+    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory', IDB_TREE_STORE = 'treeCache', IDB_REF_STORE = 'htmlRefCache';
     const MAX_FILE_HIST = 30;
 
     function idbOpen() {
         return new Promise((res, rej) => {
-            const req = indexedDB.open(IDB_NAME, 3); // v3 adds treeCache store
+            const req = indexedDB.open(IDB_NAME, 4); // v4 adds htmlRefCache store
             req.onupgradeneeded = e => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains(IDB_DIR_STORE)) db.createObjectStore(IDB_DIR_STORE);
                 if (!db.objectStoreNames.contains(IDB_HIST_STORE)) db.createObjectStore(IDB_HIST_STORE, { keyPath: 'name' });
                 if (!db.objectStoreNames.contains(IDB_TREE_STORE)) db.createObjectStore(IDB_TREE_STORE);
+                if (!db.objectStoreNames.contains(IDB_REF_STORE)) db.createObjectStore(IDB_REF_STORE);
             };
             req.onsuccess = e => res(e.target.result);
             req.onerror = e => rej(e.target.error);
@@ -564,6 +716,32 @@
         try {
             const db = await idbOpen();
             db.transaction(IDB_TREE_STORE, 'readwrite').objectStore(IDB_TREE_STORE).delete(key);
+        } catch (e) { /* ignore */ }
+    }
+
+    async function idbSaveHtmlRefCache(key, payload) {
+        try {
+            const db = await idbOpen();
+            const tx = db.transaction(IDB_REF_STORE, 'readwrite');
+            tx.objectStore(IDB_REF_STORE).put(payload, key);
+        } catch (e) { console.warn('idb html ref cache save failed', e); }
+    }
+
+    async function idbLoadHtmlRefCache(key) {
+        try {
+            const db = await idbOpen();
+            return await new Promise((res, rej) => {
+                const req = db.transaction(IDB_REF_STORE, 'readonly').objectStore(IDB_REF_STORE).get(key);
+                req.onsuccess = e => res(e.target.result || null);
+                req.onerror = e => rej(e.target.error);
+            });
+        } catch (e) { return null; }
+    }
+
+    async function idbClearHtmlRefCache(key) {
+        try {
+            const db = await idbOpen();
+            db.transaction(IDB_REF_STORE, 'readwrite').objectStore(IDB_REF_STORE).delete(key);
         } catch (e) { /* ignore */ }
     }
 
@@ -625,6 +803,39 @@
 
     // ── Folder path display ────────────────────────────────────────────────────
     const LS_PATH_KEY = 'apexflow-folder-path';
+    const LS_HTML_REF_PREFIX = 'apexflow-htmlref-v1:';
+
+    function getHtmlRefLsKey(cacheKey) {
+        return `${LS_HTML_REF_PREFIX}${cacheKey}`;
+    }
+
+    function lsSaveHtmlRefCache(cacheKey, payload) {
+        try {
+            const key = getHtmlRefLsKey(cacheKey);
+            localStorage.setItem(key, JSON.stringify(payload));
+            return true;
+        } catch (e) {
+            console.warn('localStorage html ref cache save failed', e);
+            return false;
+        }
+    }
+
+    function lsLoadHtmlRefCache(cacheKey) {
+        try {
+            const key = getHtmlRefLsKey(cacheKey);
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function lsClearHtmlRefCache(cacheKey) {
+        try {
+            localStorage.removeItem(getHtmlRefLsKey(cacheKey));
+        } catch (e) { /* ignore */ }
+    }
 
     function showFolderPath(folderName, autoFocus = false) {
         const bar = document.getElementById('fe-folder-path');
@@ -662,8 +873,10 @@
         feState.dirHandle = dirHandle;
         feState.lwcIndex = new Map();
         feState.apexIndex = new Map();
+        invalidateHtmlReferenceIndex();
 
         const cacheKey = dirHandle.name;
+        htmlReferenceCacheKey = cacheKey;
         const cached = (!forceReindex) ? await idbLoadTreeCache(cacheKey) : null;
 
         if (cached?.tree && cached?.lwcIndex && cached?.apexIndex) {
@@ -698,12 +911,42 @@
         showFolderPath(dirHandle.name, !isReopen);
         updateIndexBadges();
         renderFileTree();
+
+        // Reuse persisted HTML reference index if it matches the current LWC set size.
+        const refCached = (!forceReindex)
+            ? (lsLoadHtmlRefCache(cacheKey) || await idbLoadHtmlRefCache(cacheKey))
+            : null;
+        if (refCached?.index && refCached.lwcCount === (feState.lwcIndex?.size || 0)) {
+            const normalized = new Map();
+            (refCached.index || []).forEach(([k, v]) => {
+                const key = normalizeComponentRefKey(k);
+                if (!key) return;
+                const arr = Array.isArray(v) ? v : [];
+                const prev = normalized.get(key) || [];
+                arr.forEach(item => {
+                    if (!item?.componentName) return;
+                    if (!prev.some(p => p.componentName === item.componentName)) {
+                        prev.push({ componentName: item.componentName, snippet: item.snippet || '' });
+                    }
+                });
+                normalized.set(key, prev);
+            });
+            htmlReferenceIndex = normalized;
+            // Miss cache is intentionally session-only; persisted misses can become stale.
+            htmlReferenceMissCache = new Set();
+            setHtmlIndexStatus('ready', `HTML Ref Cache: Ready (${htmlReferenceIndex.size})`);
+        } else {
+            warmupHtmlReferenceIndex();
+        }
+
         await idbSaveHandle(dirHandle);
     }
 
     async function reindexFolder() {
         if (!feState.dirHandle) return;
         await idbClearTreeCache(feState.dirHandle.name);
+        await idbClearHtmlRefCache(feState.dirHandle.name);
+        lsClearHtmlRefCache(feState.dirHandle.name);
         await loadDirHandle(feState.dirHandle, true, true);
     }
 
@@ -769,49 +1012,124 @@
         return { kind: 'dir', name, path, children };
     }
 
-    // Walk the tree to identify LWC components. Restricted to subtrees of a
-    // `force-app*` folder, and the path must contain a `lwc` folder OR the
-    // directory must have a same-named .html sibling (the LWC bundle convention).
-    // __tests__ / __mocks__ are already pruned by buildHandleTree.
-    function indexLwcFromTree(node, parentPath = '', insideForceApp = false) {
-        if (!node || node.kind !== 'dir') return;
-        if (node.name === '__tests__' || node.name === '__mocks__') return;
-        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
-        const nowInside = insideForceApp || /^force-app/i.test(node.name);
+    async function collectHtmlFilesFromDirHandle(dirHandle, parentPath = '') {
+        const out = [];
+        if (!dirHandle || dirHandle.kind !== 'directory') return out;
 
-        if (nowInside) {
-            const baseName = node.name;
-            const jsNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.js`);
-            if (jsNode) {
-                const htmlNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.html`);
-                const isLwcLikely = htmlNode || /\/lwc\//i.test(`/${fullPath}/`);
-                if (isLwcLikely) {
-                    feState.lwcIndex.set(baseName, {
-                        jsHandle: jsNode.handle,
-                        htmlHandle: htmlNode?.handle || null,
-                        folderPath: fullPath,
-                    });
+        async function walk(handle, curPath) {
+            for await (const [name, entry] of handle.entries()) {
+                const nextPath = curPath ? `${curPath}/${name}` : name;
+                if (entry.kind === 'file') {
+                    if (name.toLowerCase().endsWith('.html')) {
+                        out.push({ name, handle: entry, path: nextPath });
+                    }
+                    continue;
                 }
+                if (LWC_SKIP_DIRS.has(name) || name.startsWith('.')) continue;
+                await walk(entry, nextPath);
             }
         }
 
-        node.children.forEach(c => indexLwcFromTree(c, fullPath, nowInside));
+        await walk(dirHandle, parentPath || dirHandle.name || '');
+        return out;
     }
 
-    // Index Apex / Java classes by their class name → { name, handle } so right-click
-    // "Load Class" can resolve any referenced Apex. Restricted to subtrees of a
-    // `classes/` folder so unrelated .cls/.java elsewhere in the project aren't picked up.
-    function indexApexFromTree(node, insideClasses = false) {
+    function withTimeout(promise, ms, label) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error(`${label || 'operation'} timeout after ${ms}ms`)), ms);
+            Promise.resolve(promise)
+                .then(v => { clearTimeout(timer); resolve(v); })
+                .catch(err => { clearTimeout(timer); reject(err); });
+        });
+    }
+
+    async function collectHtmlFilesFromDirHandle(dirHandle, parentPath = '') {
+        const out = [];
+        if (!dirHandle || dirHandle.kind !== 'directory') return out;
+
+        async function walk(handle, curPath) {
+            for await (const [name, entry] of handle.entries()) {
+                const nextPath = curPath ? `${curPath}/${name}` : name;
+                if (entry.kind === 'file') {
+                    if (name.toLowerCase().endsWith('.html')) {
+                        out.push({ name, handle: entry, path: nextPath });
+                    }
+                    continue;
+                }
+                if (LWC_SKIP_DIRS.has(name) || name.startsWith('.')) continue;
+                await walk(entry, nextPath);
+            }
+        }
+
+        await walk(dirHandle, parentPath || dirHandle.name || '');
+        return out;
+    }
+
+    function withTimeout(promise, ms, label) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error(`${label || 'operation'} timeout after ${ms}ms`)), ms);
+            Promise.resolve(promise)
+                .then(v => { clearTimeout(timer); resolve(v); })
+                .catch(err => { clearTimeout(timer); reject(err); });
+        });
+    }
+
+    // Indexing ignore lists — separate from buildHandleTree's tree-pruning list
+    // so the file explorer still shows these folders, we just don't auto-index
+    // their contents.
+    //
+    // LWC: same convention as the Certinia findComponentFolders helper — any
+    // directory containing `<dirname>.js` is treated as a component, regardless
+    // of being inside `force-app/lwc/`. Skip these directory names anywhere in
+    // the path (case-insensitive).
+    const LWC_INDEX_IGNORE = new Set([
+        '.git', '.sf', '.sfdx', 'node_modules', 'translation_source',
+        '__tests__', '__examples__', 'docs',
+    ]);
+    // Apex: skip *Test.cls test classes by name, and skip any .cls/.java that
+    // sits under one of these directory names (case-insensitive).
+    const APEX_INDEX_IGNORE = new Set([
+        'docs', 'temp', 'node_modules', '.sfdx', 'unit', '.history', 'test',
+    ]);
+
+    // Walk every directory. If it contains a `<dirname>.js` it's an LWC bundle;
+    // a sibling `<dirname>.html` (when present) is the template. No `force-app/`
+    // or `/lwc/` restriction — purely the same-name folder convention.
+    function indexLwcFromTree(node, parentPath = '') {
+        if (!node || node.kind !== 'dir') return;
+        if (LWC_INDEX_IGNORE.has(node.name.toLowerCase())) return;
+        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+
+        const baseName = node.name;
+        const jsNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.js`);
+        if (jsNode) {
+            const htmlNode = node.children.find(c => c.kind === 'file' && c.name === `${baseName}.html`);
+            feState.lwcIndex.set(baseName, {
+                jsHandle: jsNode.handle,
+                htmlHandle: htmlNode?.handle || null,
+                folderPath: fullPath,
+            });
+        }
+
+        node.children.forEach(c => indexLwcFromTree(c, fullPath));
+    }
+
+    // Index Apex / Java classes by their class name → { name, handle } so
+    // right-click "Load Class" can resolve any referenced Apex. Skip test
+    // classes (`*Test.cls`) and anything nested under an APEX_INDEX_IGNORE
+    // folder.
+    function indexApexFromTree(node, ancestorIgnored = false) {
         if (!node) return;
         if (node.kind === 'file') {
-            if (!insideClasses) return;
+            if (ancestorIgnored) return;
             const m = node.name.match(/^(.+)\.(cls|java)$/i);
-            if (m) feState.apexIndex.set(m[1], { name: node.name, handle: node.handle });
+            if (!m) return;
+            if (/Test\.cls$/i.test(node.name)) return;
+            feState.apexIndex.set(m[1], { name: node.name, handle: node.handle });
             return;
         }
-        if (node.name === '__tests__' || node.name === '__mocks__') return;
-        const nowInside = insideClasses || node.name === 'classes';
-        node.children.forEach(c => indexApexFromTree(c, nowInside));
+        const nowIgnored = ancestorIgnored || APEX_INDEX_IGNORE.has(node.name.toLowerCase());
+        node.children.forEach(c => indexApexFromTree(c, nowIgnored));
     }
 
     // Find a file node in feState.tree by absolute path (root-name-prefixed).
@@ -834,7 +1152,9 @@
     // Each child is registered under "<parentLwc>.<baseName>" so its bare name can't
     // collide with same-named Apex classes (e.g. an Apex ConfigProvider).
     // File reads run in parallel — one slow disk read used to block the next.
-    async function loadLwcRelImports(jsContent, parentFolderPath, parentLwc) {
+    async function loadLwcRelImports(jsContent, parentFolderPath, parentLwc, options = {}) {
+        const { showProgress = true } = options;
+        if (!AUTO_LOAD_REL_IMPORTS) return;
         if (!jsContent || !parentFolderPath || !parentLwc || !feState.tree) return;
 
         // Match both `import ... from './x'` and `export ... from './x'`.
@@ -864,8 +1184,8 @@
 
             tasks.push((async () => {
                 try {
-                    const file = await fileNode.handle.getFile();
-                    const text = await file.text();
+                    const file = await withTimeout(fileNode.handle.getFile(), 3500, `getFile(${fileName})`);
+                    const text = await withTimeout(file.text(), 3500, `readText(${fileName})`);
                     return { targetKey, text, resolvedDir, fileName };
                 } catch (e) {
                     console.warn('Auto-load relative import failed', relPath, e);
@@ -875,9 +1195,11 @@
         }
 
         if (!tasks.length) return;
-        await showLoadingStatus(`Loading ${tasks.length} relative file${tasks.length > 1 ? 's' : ''}…`);
-        const results = await Promise.all(tasks);
-        for (const r of results) {
+        if (showProgress) await showLoadingStatus(`Loading ${tasks.length} relative file${tasks.length > 1 ? 's' : ''}…`);
+        const settled = await Promise.allSettled(tasks.map(t => withTimeout(t, 5000, 'relative import task')));
+        for (const s of settled) {
+            if (s.status !== 'fulfilled') continue;
+            const r = s.value;
             if (!r) continue;
             parseLwc(r.targetKey, r.text, '', r.resolvedDir, 'lwcChild', parentLwc);
             feState.loadedNames.add(r.fileName);
@@ -1018,14 +1340,34 @@
                     parseLwc(base, jsText, htmlText, lwc.folderPath);
                     feState.loadedNames.add(`${base}.js`);
                     if (lwc.htmlHandle) feState.loadedNames.add(`${base}.html`);
-                    // Pull in ./relative-path JS files referenced from this component.
-                    await loadLwcRelImports(jsText, lwc.folderPath, base);
+                    // Pull in ./relative-path JS files in background so primary load
+                    // and node interactions are never blocked by slow file reads.
+                    loadLwcRelImports(jsText, lwc.folderPath, base, { showProgress: false })
+                        .then(() => render())
+                        .catch(err => console.warn('Background relative import load failed', err));
                 } else {
-                    // Plain .js/.html outside lwc/ — parse what we have on its own.
-                    const text = await (await fileNode.handle.getFile()).text();
-                    if (lower.endsWith('.js')) parseLwc(base, text, '');
-                    else parseLwc(base, '', text);
-                    feState.loadedNames.add(name);
+                    // Plain .js/.html outside lwc/: still try to pair sibling .js/.html so
+                    // Source view can show JS/HTML tabs when both files exist.
+                    const pathParts = (fileNode.path || '').split('/').filter(Boolean);
+                    const folderPath = pathParts.slice(0, -1).join('/');
+                    const siblingName = lower.endsWith('.js') ? `${base}.html` : `${base}.js`;
+                    const siblingNode = findFileNodeByPath(folderPath, siblingName);
+
+                    let jsText = '';
+                    let htmlText = '';
+                    if (lower.endsWith('.js')) jsText = await (await fileNode.handle.getFile()).text();
+                    else htmlText = await (await fileNode.handle.getFile()).text();
+
+                    if (siblingNode) {
+                        const siblingText = await (await siblingNode.handle.getFile()).text();
+                        if (lower.endsWith('.js')) htmlText = siblingText;
+                        else jsText = siblingText;
+                        feState.loadedNames.add(siblingName);
+                    }
+
+                    parseLwc(base, jsText, htmlText, folderPath || null);
+                    feState.loadedNames.add(`${base}.js`);
+                    if (htmlText) feState.loadedNames.add(`${base}.html`);
                 }
                 if (rowEl) rowEl.classList.add('loaded');
                 await showLoadingStatus('Rendering diagram…');
@@ -1078,6 +1420,7 @@
         feState.tree = root;
         feState.lwcIndex = new Map();
         feState.apexIndex = new Map();
+        invalidateHtmlReferenceIndex();
         indexLwcFromTree(feState.tree);
         indexApexFromTree(feState.tree);
         updateIndexBadges();
@@ -2135,6 +2478,21 @@
         return String(s || '').replace(/^(js|html|apex):\s*/i, '');
     }
 
+    // Global helper for qualified names like parent.Component -> Component.
+    function bareComponentName(name) {
+        const text = String(name || '');
+        const idx = text.lastIndexOf('.');
+        return idx > 0 ? text.slice(idx + 1) : text;
+    }
+
+    function getNodeLabelInfo(node) {
+        const labelEl = node?.querySelector('.nodeLabel') || node?.querySelector('text');
+        const raw = (labelEl?.textContent || '').trim();
+        const m = raw.match(/^(js|html|apex):\s*(.+)$/i);
+        if (m) return { type: m[1].toLowerCase(), name: (m[2] || '').trim(), raw };
+        return { type: null, name: stripNodeTypePrefix(raw), raw };
+    }
+
     function getDiagramNodeByClassName(name) {
         const wanted = (name || '').trim();
         if (!wanted) return null;
@@ -2196,22 +2554,46 @@
         const tooltip = document.getElementById('code-tooltip');
         const titleEl = document.getElementById('tooltip-title');
         const codeEl = document.getElementById('tooltip-code');
+        const tabsContainer = document.getElementById('code-tooltip-tabs');
+        const fontControls = document.getElementById('tooltip-font-controls');
         const display = name.includes('.') ? name.split('.').slice(-1)[0] : name;
 
         let body = '';
         let lang = 'java';
+        const isLwc = entry.kind === 'lwc' || entry.kind === 'lwcChild';
+        const hasJs = isLwc && (entry.jsContent || '');
+        const hasHtml = isLwc && (entry.htmlContent || '');
+
         if (entry.kind === 'apex') {
             body = entry.raw || '';
             lang = 'java';
+            tabsContainer.classList.remove('visible');
+            fontControls.style.display = 'flex';
+        } else if (hasJs && hasHtml) {
+            // LWC with both JS and HTML — show tabs
+            tabsContainer.classList.add('visible');
+            tabsContainer.innerHTML = `
+                <div class="code-tab active" data-tab="js">JS</div>
+                <div class="code-tab" data-tab="html">HTML</div>
+            `;
+            tabsContainer.querySelectorAll('.code-tab').forEach(tab => {
+                tab.addEventListener('click', () => switchSourceTab(tab.dataset.tab));
+            });
+            body = entry.jsContent || '';
+            currentTooltipMode = 'js';
+            fontControls.style.display = 'flex';
+        } else if (hasJs) {
+            body = entry.jsContent || '';
+            tabsContainer.classList.remove('visible');
+            fontControls.style.display = 'flex';
+        } else if (hasHtml) {
+            body = entry.htmlContent || '';
+            tabsContainer.classList.remove('visible');
+            fontControls.style.display = 'flex';
         } else {
-            const js = entry.jsContent || '';
-            const html = entry.htmlContent || '';
-            if (js && html) {
-                body = `// ─── ${display}.js ───\n${js}\n\n/* ─── ${display}.html ─── */\n${html}`;
-            } else {
-                body = js || html;
-            }
-            lang = 'javascript';
+            body = entry.raw || '';
+            tabsContainer.classList.remove('visible');
+            fontControls.style.display = 'flex';
         }
 
         // Title: "Source: <name>" plus a muted folder path chip.
@@ -2225,7 +2607,12 @@
         }
         codeEl.className = `language-${lang}`;
         codeEl.textContent = body;
+        codeEl.style.fontSize = tooltipFontSize + 'px';
         if (window.Prism) try { Prism.highlightElement(codeEl); } catch (e) { /* highlight is best-effort */ }
+
+        // Store entry data for switching tabs
+        codeEl.dataset.jsContent = entry.jsContent || '';
+        codeEl.dataset.htmlContent = entry.htmlContent || '';
 
         // Default to a near-full-viewport size — user can still drag / resize.
         tooltip.style.width = '90vw';
@@ -2235,6 +2622,468 @@
         tooltip.style.display = 'flex';
         // Suppress the global "click anywhere closes the tooltip" guard briefly.
         tooltipInteractionGuardUntil = Date.now() + 300;
+    }
+
+    function switchSourceTab(tabName) {
+        const tabs = document.querySelectorAll('.code-tab');
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+        
+        const codeEl = document.getElementById('tooltip-code');
+        const jsContent = codeEl.dataset.jsContent || '';
+        const htmlContent = codeEl.dataset.htmlContent || '';
+        
+        let content = '';
+        let lang = 'javascript';
+        if (tabName === 'js') {
+            content = jsContent;
+            currentTooltipMode = 'js';
+        } else if (tabName === 'html') {
+            content = htmlContent;
+            currentTooltipMode = 'html';
+            lang = 'html';
+        }
+        
+        codeEl.textContent = content;
+        codeEl.className = `language-${lang}`;
+        codeEl.style.fontSize = tooltipFontSize + 'px';
+        if (window.Prism) try { Prism.highlightElement(codeEl); } catch (e) { }
+    }
+
+    function increaseFontSize() {
+        if (tooltipFontSize < 28) {
+            tooltipFontSize += 2;
+            document.getElementById('tooltip-code').style.fontSize = tooltipFontSize + 'px';
+            localStorage.setItem('tooltipFontSize', tooltipFontSize);
+        }
+    }
+
+    function decreaseFontSize() {
+        if (tooltipFontSize > 10) {
+            tooltipFontSize -= 2;
+            document.getElementById('tooltip-code').style.fontSize = tooltipFontSize + 'px';
+            localStorage.setItem('tooltipFontSize', tooltipFontSize);
+        }
+    }
+
+    function lwcNameToKebab(name) {
+        return String(name || '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+    }
+
+    function normalizeComponentRefKey(name) {
+        return String(name || '').trim().toLowerCase();
+    }
+
+    function addReferenceToIndex(indexMap, targetComponent, sourceComponent, snippet) {
+        if (!targetComponent || !sourceComponent) return;
+        const key = normalizeComponentRefKey(targetComponent);
+        if (!key) return;
+        const list = indexMap.get(key) || [];
+        if (!list.some(r => r.componentName === sourceComponent)) {
+            list.push({ componentName: sourceComponent, snippet: snippet || '' });
+            indexMap.set(key, list);
+        }
+    }
+
+    function extractHtmlReferenceSnippets(htmlContent) {
+        const refs = [];
+        if (!htmlContent) return refs;
+        const lines = htmlContent.split('\n');
+        lines.forEach(rawLine => {
+            const line = rawLine.trim();
+            if (!line || !line.includes('<c-')) return;
+            const re = /<c-([\w-]+)/gi;
+            let m;
+            while ((m = re.exec(line)) !== null) {
+                refs.push({
+                    target: kebabToCamelComponent(m[1]),
+                    snippet: line,
+                });
+            }
+        });
+        return refs;
+    }
+
+    async function ensureHtmlReferenceIndex() {
+        if (htmlReferenceIndexBuildPromise) {
+            setHtmlIndexStatus('building', 'HTML Ref Cache: Building…');
+            await htmlReferenceIndexBuildPromise;
+            return;
+        }
+        const entries = feState.lwcIndex ? Array.from(feState.lwcIndex.entries()) : [];
+        if (!entries.length) {
+            htmlReferenceIndex = new Map();
+            setHtmlIndexStatus('idle', 'HTML Ref Cache: Idle');
+            return;
+        }
+
+        const buildVersion = htmlReferenceIndexVersion;
+        htmlReferenceIndexBuildPromise = (async () => {
+            const nextIndex = new Map();
+            const total = entries.length;
+            let cursor = 0;
+            let processed = 0;
+            const concurrency = Math.min(24, total);
+
+            setHtmlIndexStatus('building', `HTML Ref Cache: Building 0/${total}`);
+            await showLoadingStatus(`Task Progress: HTML ref scan 0/${total}`);
+
+            const worker = async () => {
+                while (true) {
+                    const idx = cursor++;
+                    if (idx >= total) return;
+                    const [componentName, lwc] = entries[idx];
+                    try {
+                        if (lwc?.htmlHandle) {
+                            const htmlText = await lwc.htmlHandle.getFile().then(f => f.text());
+                            const refs = extractHtmlReferenceSnippets(htmlText);
+                            refs.forEach(ref => addReferenceToIndex(nextIndex, ref.target, componentName, ref.snippet));
+                        }
+                    } catch (e) {
+                        console.warn('Failed indexing HTML reference', componentName, e);
+                    }
+
+                    processed++;
+                    if (processed === total || processed % 100 === 0) {
+                        setHtmlIndexStatus('building', `HTML Ref Cache: Building ${processed}/${total}`);
+                        await showLoadingStatus(`Task Progress: HTML ref scan ${processed}/${total}`);
+                    }
+                }
+            };
+
+            await Promise.all(Array.from({ length: concurrency }, () => worker()));
+            if (buildVersion === htmlReferenceIndexVersion) {
+                htmlReferenceIndex = nextIndex;
+                setHtmlIndexStatus('ready', `HTML Ref Cache: Ready (${htmlReferenceIndex.size})`);
+                persistHtmlReferenceIndex();
+            }
+        })();
+
+        try {
+            await htmlReferenceIndexBuildPromise;
+        } finally {
+            htmlReferenceIndexBuildPromise = null;
+        }
+    }
+
+    function extractFirstReferenceSnippet(htmlContent, tagNames) {
+        if (!htmlContent) return '';
+        const lines = htmlContent.split('\n');
+        const loweredTags = tagNames.map(t => `<c-${t}`.toLowerCase());
+        for (const raw of lines) {
+            const line = raw.trim();
+            if (!line) continue;
+            const low = line.toLowerCase();
+            if (loweredTags.some(tag => low.includes(tag))) return line;
+        }
+        return '';
+    }
+
+    async function findHtmlComponentReferences(jsComponentName, options = {}) {
+        const { allowIndexBuild = true } = options;
+        const references = [];
+        const seen = new Set();
+        const requestedName = String(jsComponentName || '').trim();
+        const bareRequestedName = bareComponentName(requestedName);
+        const candidateTargets = new Set([
+            normalizeComponentRefKey(requestedName),
+            normalizeComponentRefKey(bareRequestedName)
+        ]);
+        const candidateKeys = Array.from(candidateTargets).filter(Boolean);
+        const debug = {
+            requested: requestedName,
+            bare: bareRequestedName,
+            keys: candidateKeys,
+            tags: [],
+            cacheHits: 0,
+            registryScanned: 0,
+            indexedHtmlScanned: 0,
+            treeHtmlScanned: 0,
+            matches: 0,
+        };
+
+        // Fast path: if we already know these targets have no references in this
+        // folder/session, skip the expensive fallback scan.
+        const allMissed = candidateKeys.length > 0 && candidateKeys.every(k => {
+            const hasIndexedItems = (htmlReferenceIndex.get(k) || []).length > 0;
+            return htmlReferenceMissCache.has(k) && hasIndexedItems;
+        });
+
+        if (htmlReferenceIndex.size === 0) {
+            // Do not block right-click lookup by forcing a full index build.
+            // If allowed, kick off build in background for future lookups.
+            if (allowIndexBuild && !htmlReferenceIndexBuildPromise) {
+                ensureHtmlReferenceIndex().catch(e => console.warn('Background HTML reference index build failed', e));
+            }
+        }
+
+        const collectResult = (componentName, entryKind, snippet) => {
+            if (!componentName || seen.has(componentName)) return;
+            seen.add(componentName);
+            references.push({
+                componentName,
+                kind: entryKind,
+                selected: false,
+                loaded: !!registry[componentName],
+                snippet: snippet || '',
+            });
+        };
+
+        candidateTargets.forEach(target => {
+            if (!target) return;
+            const items = htmlReferenceIndex.get(target) || [];
+            debug.cacheHits += items.length;
+            items.forEach(item => collectResult(item.componentName, registry[item.componentName]?.kind || 'lwc', item.snippet));
+        });
+
+        const targetKebab = lwcNameToKebab(bareRequestedName);
+        const altKebab = targetKebab.replace(/_/g, '-');
+        const loweredTags = [`<c-${targetKebab}`, `<c-${altKebab}`];
+        const lowerRequested = bareRequestedName.toLowerCase();
+        const loweredTagVariants = [...new Set([
+            `<c-${targetKebab}`,
+            `<c-${altKebab}`,
+            `<c-${lowerRequested}`,
+            `<c:${lowerRequested}`,
+        ])];
+        debug.tags = loweredTagVariants;
+
+        // Include loaded-but-not-indexed sources too (for fallback and ad-hoc loaded files).
+        Object.entries(registry).forEach(([name, entry]) => {
+            if (!entry || !entry.htmlContent) return;
+            debug.registryScanned++;
+            const lines = entry.htmlContent.split('\n');
+            const hit = lines.find(l => {
+                const low = l.toLowerCase();
+                return loweredTagVariants.some(tag => low.includes(tag));
+            });
+            if (hit) collectResult(name, entry.kind, hit.trim());
+        });
+
+        // Safety net: if cache-based lookup misses, do a direct scan over indexed
+        // HTML files and backfill the in-memory index. This keeps lookup correct
+        // even when cache content is stale or a naming edge-case slips through.
+        if (references.length === 0 && !allMissed && feState.lwcIndex?.size) {
+            const entries = Array.from(feState.lwcIndex.entries());
+            const total = entries.length;
+            let cursor = 0;
+            const concurrency = Math.min(24, total);
+
+            const worker = async () => {
+                while (true) {
+                    const idx = cursor++;
+                    if (idx >= total) return;
+                    const [componentName, lwc] = entries[idx];
+                    if (!lwc?.htmlHandle) continue;
+                    debug.indexedHtmlScanned++;
+                    try {
+                        const htmlText = await lwc.htmlHandle.getFile().then(f => f.text());
+                        const lines = htmlText.split('\n');
+                        const hit = lines.find(l => {
+                            const low = l.toLowerCase();
+                            return loweredTagVariants.some(tag => low.includes(tag));
+                        });
+                        if (hit) {
+                            const snippet = hit.trim();
+                            collectResult(componentName, registry[componentName]?.kind || 'lwc', snippet);
+                            // Store under both requested + bare forms for future fast lookup.
+                            addReferenceToIndex(htmlReferenceIndex, requestedName, componentName, snippet);
+                            addReferenceToIndex(htmlReferenceIndex, bareRequestedName, componentName, snippet);
+                        }
+                    } catch (e) {
+                        console.warn('Fallback reference scan failed', componentName, e);
+                    }
+                }
+            };
+
+            await Promise.all(Array.from({ length: concurrency }, () => worker()));
+        }
+
+        // Final correctness fallback: scan all HTML files in the opened tree, not
+        // only LWC-indexed bundles. This catches non-standard layouts.
+        if (references.length === 0 && (feState.dirHandle || feState.tree)) {
+            let htmlNodes = [];
+            if (feState.dirHandle) {
+                try {
+                    htmlNodes = await collectHtmlFilesFromDirHandle(feState.dirHandle);
+                } catch (e) {
+                    console.warn('Live folder HTML scan fallback failed, using cached tree', e);
+                }
+            }
+            if (!htmlNodes.length && feState.tree) {
+                htmlNodes = flatFiles(feState.tree).filter(f => /\.html$/i.test(f.name || ''));
+            }
+            const total = htmlNodes.length;
+            let cursor = 0;
+            const concurrency = Math.min(20, total);
+            const worker = async () => {
+                while (true) {
+                    const idx = cursor++;
+                    if (idx >= total) return;
+                    const fileNode = htmlNodes[idx];
+                    debug.treeHtmlScanned++;
+                    try {
+                        const text = await fileNode.handle.getFile().then(f => f.text());
+                        const lines = text.split('\n');
+                        const hit = lines.find(l => {
+                            const low = l.toLowerCase();
+                            return loweredTagVariants.some(tag => low.includes(tag));
+                        });
+                        if (hit) {
+                            const compName = String(fileNode.name || '').replace(/\.html$/i, '');
+                            if (!seen.has(compName)) {
+                                collectResult(compName, registry[compName]?.kind || 'lwc', hit.trim());
+                                addReferenceToIndex(htmlReferenceIndex, requestedName, compName, hit.trim());
+                                addReferenceToIndex(htmlReferenceIndex, bareRequestedName, compName, hit.trim());
+                            }
+                        }
+                    } catch (e) {
+                        // ignore individual read failures
+                    }
+                }
+            };
+            if (total > 0) await Promise.all(Array.from({ length: concurrency }, () => worker()));
+        }
+
+        // Remember misses so repeated lookups for the same target don't trigger
+        // another full fallback scan.
+        if (references.length === 0) {
+            candidateKeys.forEach(k => htmlReferenceMissCache.add(k));
+            persistHtmlReferenceIndex();
+        } else {
+            // If we found results, clear stale miss markers for these keys.
+            candidateKeys.forEach(k => htmlReferenceMissCache.delete(k));
+            persistHtmlReferenceIndex();
+        }
+
+        debug.matches = references.length;
+
+        return { references, debug };
+    }
+
+    async function showReferenceLookup(jsComponentName) {
+        await showLoadingStatus(`Searching references for ${jsComponentName}…`);
+        let references = [];
+        let debug = null;
+        try {
+            // Right-click action should return matches immediately and must not
+            // trigger a full global index build on the critical path.
+            const result = await findHtmlComponentReferences(jsComponentName, { allowIndexBuild: false });
+            references = result.references || [];
+            debug = result.debug || null;
+        } finally {
+            hideLoadingStatus();
+        }
+        const debugEl = document.getElementById('reference-modal-debug');
+        const debugText = debug
+            ? `lookup: ${debug.requested} | tags=${debug.tags.join(',')} | cache=${debug.cacheHits} registry=${debug.registryScanned} indexed=${debug.indexedHtmlScanned} tree=${debug.treeHtmlScanned} matches=${debug.matches}`
+            : 'lookup: no debug data';
+        if (debugEl) debugEl.textContent = debugText;
+        window.__apexflowLookupDebug = debug || { message: 'no debug data' };
+        console.info('[LookupReference]', debug || {});
+        
+        if (references.length === 0) {
+            const modal = document.getElementById('reference-lookup-modal');
+            const list = document.getElementById('reference-modal-list');
+            if (list) {
+                list.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:#94a3b8;line-height:1.6">No references found.<br>${debugText.replace(/</g, '&lt;')}</div>`;
+            }
+            if (modal) {
+                modal.classList.add('visible');
+                const windowW = window.innerWidth;
+                const windowH = window.innerHeight;
+                modal.style.left = (windowW / 2 - 250) + 'px';
+                modal.style.top = (windowH / 2 - 250) + 'px';
+            }
+            alert(`No HTML components found that reference "${jsComponentName}"`);
+            return;
+        }
+
+        referenceLookupData.componentName = jsComponentName;
+        referenceLookupData.references = references;
+
+        const modal = document.getElementById('reference-lookup-modal');
+        const list = document.getElementById('reference-modal-list');
+        list.innerHTML = '';
+
+        references.forEach((ref, index) => {
+            const item = document.createElement('div');
+            item.className = 'reference-item' + (ref.loaded ? ' loaded' : '');
+            const icon = ref.kind === 'apex' ? 'fa-database' : ref.kind === 'html' ? 'fa-globe' : 'fa-code';
+            const safeSnippet = String(ref.snippet || '').replace(/</g, '&lt;');
+            item.innerHTML = `
+                <input type="checkbox" id="ref-${index}" onchange="toggleReferenceSelection(${index})">
+                <i class="fa-solid ${icon}" style="font-size:10px; flex-shrink:0;"></i>
+                <div class="reference-item-main">
+                    <span class="reference-item-name">${ref.componentName}</span>
+                    <span class="reference-item-meta">${ref.loaded ? 'Loaded' : 'Not loaded'} • ${safeSnippet}</span>
+                </div>
+            `;
+            item.addEventListener('click', (evt) => {
+                if (evt.target && evt.target.tagName === 'INPUT') return;
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                if (!checkbox) return;
+                checkbox.checked = !checkbox.checked;
+                toggleReferenceSelection(index);
+            });
+            list.appendChild(item);
+        });
+
+        modal.classList.add('visible');
+        const windowW = window.innerWidth;
+        const windowH = window.innerHeight;
+        modal.style.left = (windowW / 2 - 250) + 'px';
+        modal.style.top = (windowH / 2 - 250) + 'px';
+    }
+
+    function toggleReferenceSelection(index) {
+        referenceLookupData.references[index].selected = !referenceLookupData.references[index].selected;
+    }
+
+    async function loadLwcComponentByName(componentName) {
+        if (registry[componentName]) return true;
+        const lwc = feState.lwcIndex?.get(componentName);
+        if (!lwc || !lwc.jsHandle) return false;
+
+        const [jsText, htmlText] = await Promise.all([
+            lwc.jsHandle ? lwc.jsHandle.getFile().then(f => f.text()) : Promise.resolve(''),
+            lwc.htmlHandle ? lwc.htmlHandle.getFile().then(f => f.text()) : Promise.resolve(''),
+        ]);
+
+        parseLwc(componentName, jsText, htmlText, lwc.folderPath);
+        feState.loadedNames.add(`${componentName}.js`);
+        if (lwc.htmlHandle) feState.loadedNames.add(`${componentName}.html`);
+        await loadLwcRelImports(jsText, lwc.folderPath, componentName);
+        return true;
+    }
+
+    async function loadSelectedReferences() {
+        const selected = referenceLookupData.references.filter(r => r.selected);
+        if (selected.length === 0) {
+            alert('Please select at least one component to load');
+            return;
+        }
+
+        await showLoadingStatus(`Loading ${selected.length} referenced component${selected.length > 1 ? 's' : ''}…`);
+        try {
+            await Promise.all(selected.map(ref => loadLwcComponentByName(ref.componentName)));
+        } finally {
+            hideLoadingStatus();
+        }
+
+        selected.forEach(ref => {
+            if (!registry[ref.componentName] && !feState.loadedNames.has(ref.componentName)) {
+                feState.loadedNames.add(ref.componentName);
+            }
+        });
+
+        render();
+        renderFileTree();
+        closeReferenceLookup();
+    }
+
+    function closeReferenceLookup() {
+        document.getElementById('reference-lookup-modal').classList.remove('visible');
+        referenceLookupData = { componentName: null, references: [] };
     }
 
     function hideCodeTooltip() {
@@ -2772,12 +3621,27 @@
                 if (className) methodName = Object.keys(registry[className]?.methods || {}).find(m => safeId(m) === m2[2]);
             }
         }
+        // Also try to extract className from class-only nodes (no method part)
+        if (!className) {
+            const m3 = node.id.match(/flowchart-(.+)__class-\d/);
+            if (m3 && !m3[1].startsWith('l1__') && !m3[1].startsWith('l2__')) {
+                className = Object.keys(registry).find(k => safeId(k) === m3[1]);
+            }
+        }
+        if (!className) {
+            const m4 = node.id.match(/flowchart-l\d__(.+)__class-\d/);
+            if (m4) {
+                className = Object.keys(registry).find(k => safeId(k) === m4[1]);
+            }
+        }
         return { className, methodName };
     }
 
     function showNodeContextMenu(e, node) {
         const menu = document.getElementById('node-context-menu');
         const { className, methodName } = resolveNodeIdentity(node);
+        const resolvedClassName = className || getClassNameFromNode(node);
+        const labelInfo = getNodeLabelInfo(node);
 
         // Reset every hide-children item up front; the relevant ones are re-enabled
         // below. This prevents a stale "Hide Children" button (with an onclick closed
@@ -2873,6 +3737,33 @@
             loadEl.onclick = () => { hideNodeContextMenu(); loadClassByName(ghostName); };
         }
 
+        // Lookup Reference option — only for loaded JS/LWC components
+        const lookupRefEl = document.getElementById('ctx-lookup-reference');
+        const lookupTarget = resolvedClassName || labelInfo.name || className;
+        const lookupBase = bareComponentName(lookupTarget || '');
+        const isJsComponent = !!lookupTarget && (
+            labelInfo.type === 'js'
+            || registry[lookupTarget]?.kind === 'lwc'
+            || registry[lookupTarget]?.kind === 'lwcChild'
+            || registry[lookupBase]?.kind === 'lwc'
+            || registry[lookupBase]?.kind === 'lwcChild'
+            || feState.lwcIndex?.has(lookupTarget)
+            || feState.lwcIndex?.has(lookupBase)
+        );
+        lookupRefEl.style.display = isJsComponent ? 'flex' : 'none';
+        if (isJsComponent) {
+            lookupRefEl.querySelector('span').textContent = `Lookup Reference`;
+            lookupRefEl.onclick = async () => {
+                hideNodeContextMenu();
+                try {
+                    await showReferenceLookup(lookupTarget);
+                } catch (err) {
+                    console.error('Lookup Reference failed', err);
+                    alert(`Lookup failed for "${lookupTarget}". Open console and share the error.`);
+                }
+            };
+        }
+
         // View Code option — only if method body exists
         const hasCode = className && methodName && registry[className]?.methods?.[methodName];
         document.getElementById('ctx-view-code').style.display = hasCode ? 'flex' : 'none';
@@ -2889,8 +3780,7 @@
         };
 
         // Source option — only for loaded nodes. Opens the full file in the big modal.
-        const sourceTarget = className && registry[className]?.raw !== undefined ? className
-            : (getClassNameFromNode(node) && registry[getClassNameFromNode(node)]?.raw !== undefined ? getClassNameFromNode(node) : null);
+        const sourceTarget = resolvedClassName && registry[resolvedClassName]?.raw !== undefined ? resolvedClassName : null;
         const ctxViewSource = document.getElementById('ctx-view-source');
         if (sourceTarget) {
             ctxViewSource.style.display = 'flex';
