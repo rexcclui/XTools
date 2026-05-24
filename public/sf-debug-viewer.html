@@ -223,6 +223,17 @@ const CSS = `
 .sline-code{white-space:pre;color:#c9d1d9}
 .sc-kw{color:#ff7b72}.sc-str{color:#a5d6ff}.sc-cmt{color:#8b949e;font-style:italic}
 .sc-ann{color:#ffa657}.sc-num{color:#79c0ff}.sc-cls{color:#56d364}.sc-punc{color:#c9d1d9}
+.help-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.72);z-index:9100;display:none;align-items:center;justify-content:center;padding:24px}
+.help-overlay.open{display:flex}
+.help-panel{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:100%;max-width:800px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px #000d}
+.help-ph{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--bd);flex-shrink:0;background:#0d1117;border-radius:10px 10px 0 0}
+.help-ph h3{font-size:13px;font-weight:600;color:#e6edf3}
+.help-pbody{flex:1;overflow-y:auto;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.help-s{background:var(--b3);border:1px solid var(--bd);border-radius:8px;padding:9px 11px}
+.help-s h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ac);margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
+.help-r{display:flex;gap:7px;padding:2px 0;font-size:11px;align-items:flex-start}
+.help-k{font-family:'SF Mono','Fira Code',monospace;font-size:10px;background:var(--b2);border:1px solid var(--bd);border-radius:4px;padding:1px 5px;white-space:nowrap;color:#58a6ff;flex-shrink:0;min-width:64px;text-align:center}
+.help-d{color:var(--dm);flex:1;line-height:1.45}
 `;
 
 // ─── STATIC HTML ──────────────────────────────────────────────────────────────
@@ -247,6 +258,7 @@ const HTML = `
   <button class="btn btn-sm" id="btn-openSrc" title="Open Salesforce source project folder">📂 Source</button>
   <span id="srcFolderName" style="font-size:10px;color:var(--vd);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default"></span>
   <input id="srcFolderFallback" type="file" webkitdirectory multiple style="display:none">
+  <button class="btn btn-sm" id="btn-help" title="Features &amp; usage guide">? Help</button>
 </div>
 <div class="tab-bar" id="tabBar">
   <button class="tab-add" id="btn-addTab" title="New tab">＋</button>
@@ -298,6 +310,76 @@ const HTML = `
     <button class="btn btn-sm" id="btn-closeHist" style="margin-left:auto">✕</button>
   </div>
   <div class="hist-list" id="histList"></div>
+</div>
+<div class="help-overlay" id="helpModal">
+  <div class="help-panel">
+    <div class="help-ph">
+      <h3>SF Debug Viewer — Features &amp; Usage</h3>
+      <button class="btn btn-sm" id="btn-closeHelp">✕ Close</button>
+    </div>
+    <div class="help-pbody">
+      <div class="help-s">
+        <h4>Getting Started</h4>
+        <div class="help-r"><span class="help-k">Paste</span><span class="help-d">Paste a Salesforce debug log into the text area, then click Parse Log</span></div>
+        <div class="help-r"><span class="help-k">Drop file</span><span class="help-d">Drag a .log or .txt file onto the page to open it as a new tab automatically</span></div>
+        <div class="help-r"><span class="help-k">+ tab</span><span class="help-d">Click ＋ in the tab bar to open a blank tab for a new log</span></div>
+        <div class="help-r"><span class="help-k">Sample</span><span class="help-d">Click "Load Sample" to explore the UI with a built-in example log</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Navigating the Log</h4>
+        <div class="help-r"><span class="help-k">Click line</span><span class="help-d">Click any raw log line to highlight and jump to the matching call tree node</span></div>
+        <div class="help-r"><span class="help-k">Click node</span><span class="help-d">Click a tree node to scroll the raw log panel to that line</span></div>
+        <div class="help-r"><span class="help-k">↑ / ↓</span><span class="help-d">Arrow keys navigate lines when the log panel is focused; PageUp / PageDown jump by page</span></div>
+        <div class="help-r"><span class="help-k">Fold ▼▶</span><span class="help-d">Click the fold toggle on any log block to collapse or expand that call block</span></div>
+        <div class="help-r"><span class="help-k">Right-click</span><span class="help-d">Right-click a log line to jump to entry/exit, view source, or highlight a selection</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Call Tree Filtering</h4>
+        <div class="help-r"><span class="help-k">Type chips</span><span class="help-d">Click All / Methods / SOQL / DML / Debug / Exceptions to filter the tree by event category</span></div>
+        <div class="help-r"><span class="help-k">Dbg toggle</span><span class="help-d">Show or hide all USER_DEBUG entries</span></div>
+        <div class="help-r"><span class="help-k">Sys toggle</span><span class="help-d">Show or hide system method calls (SYSTEM_METHOD_ENTRY)</span></div>
+        <div class="help-r"><span class="help-k">Vars toggle</span><span class="help-d">Show or hide VARIABLE_ASSIGNMENT entries</span></div>
+        <div class="help-r"><span class="help-k">Timing</span><span class="help-d">Show timing gap labels between adjacent nodes</span></div>
+        <div class="help-r"><span class="help-k">NS ▾</span><span class="help-d">Filter the tree by Apex namespace prefix (e.g. hide managed package noise)</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Log Line Controls</h4>
+        <div class="help-r"><span class="help-k">Log Tags ▾</span><span class="help-d">Show or hide specific event types (e.g. HEAP_ALLOCATE, STATEMENT_EXECUTE) from the raw log</span></div>
+        <div class="help-r"><span class="help-k">Hide: kw</span><span class="help-d">Type a keyword and press + to suppress all log lines containing that text</span></div>
+        <div class="help-r"><span class="help-k">Wrap</span><span class="help-d">Toggle line wrapping in the raw log panel</span></div>
+        <div class="help-r"><span class="help-k">Block</span><span class="help-d">Right-click → "Show current block" to highlight all lines belonging to the enclosing call block</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Search &amp; Highlights</h4>
+        <div class="help-r"><span class="help-k">Global</span><span class="help-d">The header search box searches across all open log tabs; results drop down with tab context</span></div>
+        <div class="help-r"><span class="help-k">Tree filter</span><span class="help-d">The "Filter tree…" box narrows call tree nodes by method name, class, or signature</span></div>
+        <div class="help-r"><span class="help-k">H1–H4</span><span class="help-d">Four color-coded highlight slots: type a keyword into any slot to mark matching lines across both panels</span></div>
+        <div class="help-r"><span class="help-k">Right-click</span><span class="help-d">Select text in the log, right-click → "Highlight …" to assign it to the next free slot</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Source View</h4>
+        <div class="help-r"><span class="help-k">📂 Source</span><span class="help-d">Open a Salesforce project folder to enable source navigation</span></div>
+        <div class="help-r"><span class="help-k">⌗ icon</span><span class="help-d">Hover a log line or tree node and click ⌗ to open the Apex source file at the relevant line</span></div>
+        <div class="help-r"><span class="help-k">Right-click</span><span class="help-d">Right-click a log line → "View source: ClassName" for the same action</span></div>
+      </div>
+      <div class="help-s">
+        <h4>History &amp; Layout</h4>
+        <div class="help-r"><span class="help-k">📚 History</span><span class="help-d">Previously parsed logs are auto-saved to localStorage; click History to reload any past session</span></div>
+        <div class="help-r"><span class="help-k">Expand/Collapse</span><span class="help-d">Expand All / Collapse All flatten or fully expand the call tree at once</span></div>
+        <div class="help-r"><span class="help-k">⋮ divider</span><span class="help-d">Drag the vertical divider between the raw log and tree panels to resize them</span></div>
+        <div class="help-r"><span class="help-k">Stats bar</span><span class="help-d">Footer shows totals: methods, SOQL, DML, callouts, exceptions, and execution duration</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Tree Node Types</h4>
+        <div class="help-r"><span class="help-k">▸ method</span><span class="help-d">Blue — Apex method or constructor call</span></div>
+        <div class="help-r"><span class="help-k">⬡ soql</span><span class="help-d">Green — SOQL query with row count on completion</span></div>
+        <div class="help-r"><span class="help-k">💾 dml</span><span class="help-d">Amber — DML operation (insert, update, delete, etc.)</span></div>
+        <div class="help-r"><span class="help-k">↗ http</span><span class="help-d">Purple — HTTP callout with response status</span></div>
+        <div class="help-r"><span class="help-k">✖ exc</span><span class="help-d">Red — exception or fatal error</span></div>
+        <div class="help-r"><span class="help-k">· debug</span><span class="help-d">Grey — USER_DEBUG statement</span></div>
+      </div>
+    </div>
+  </div>
 </div>
 `;
 
@@ -918,7 +1000,7 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   document.addEventListener('click',e=>{if(_ctxMenu&&!_ctxMenu.contains(e.target))closeLogContextMenu()},true);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();closeSnippet();}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();closeSnippet();$('helpModal')?.classList.remove('open');}});
 
   function moveLogCursor(tab,newIdx){
     const vis=tab._visLines||[];
@@ -2110,6 +2192,10 @@ function initAnalyzer(rootEl, fetchSource) {
     e.preventDefault();
     showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'', row);
   });
+
+  $('btn-help').addEventListener('click',()=>$('helpModal').classList.add('open'));
+  $('btn-closeHelp').addEventListener('click',()=>$('helpModal').classList.remove('open'));
+  $('helpModal').addEventListener('click',e=>{if(e.target===$('helpModal'))$('helpModal').classList.remove('open');});
 
   renderHlSlots();
   addTab(null,'Log 1','');
