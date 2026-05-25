@@ -1,0 +1,20 @@
+<template>
+    <div class="order-summary">
+        <div class="summary-card">
+            <span class="card-label">Total Orders</span>
+            <span class="card-value">{totalOrders}</span>
+        </div>
+        <div class="summary-card">
+            <span class="card-label">Pending</span>
+            <span class="card-value">{pendingCount}</span>
+        </div>
+        <div class="summary-card">
+            <span class="card-label">Submitted</span>
+            <span class="card-value">{submittedCount}</span>
+        </div>
+        <div class="summary-card highlight">
+            <span class="card-label">Total Value</span>
+            <span class="card-value">{formattedTotalValue}</span>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,37 @@
+<template>
+    <div class="order-list">
+        <div class="list-toolbar">
+            <lightning-input
+                type="search"
+                label="Search Orders"
+                value={searchTerm}
+                onchange={handleSearch}>
+            </lightning-input>
+        </div>
+
+        <div class="list-header">
+            <span onclick={handleSortName}>Name</span>
+            <span onclick={handleSortStatus}>Status</span>
+            <span onclick={handleSortDate}>Date</span>
+            <span>Total</span>
+        </div>
+
+        <template if:true={hasOrders}>
+            <template for:each={sortedOrders} for:item="order">
+                <div key={order.Id}
+                     data-id={order.Id}
+                     class="order-row"
+                     onclick={handleRowClick}>
+                    <span>{order.Name}</span>
+                    <span>{order.Status__c}</span>
+                    <span>{order.CreatedDate}</span>
+                    <span>{order.Total_Amount__c}</span>
+                </div>
+            </template>
+        </template>
+
+        <template if:false={hasOrders}>
+            <p class="empty-state">No orders found.</p>
+        </template>
+    </div>
+</template>

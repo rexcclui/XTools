@@ -1,0 +1,29 @@
+<template>
+    <div class="order-detail">
+        <header class="detail-header">
+            <h2>Order Details</h2>
+            <span class="order-id">{orderId}</span>
+        </header>
+
+        <div class="detail-body">
+            <div class="price-summary">
+                <span class="price-label">Calculated Total</span>
+                <span class="price-value">{formattedPrice}</span>
+            </div>
+        </div>
+
+        <footer class="detail-actions">
+            <lightning-button
+                label="Submit Order"
+                variant="brand"
+                disabled={isSubmitDisabled}
+                onclick={handleSubmit}>
+            </lightning-button>
+            <lightning-button
+                label="Cancel Order"
+                variant="destructive"
+                onclick={handleCancel}>
+            </lightning-button>
+        </footer>
+    </div>
+</template>

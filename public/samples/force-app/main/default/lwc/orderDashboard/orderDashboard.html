@@ -1,0 +1,29 @@
+<template>
+    <div class="order-dashboard">
+
+        <!-- Summary strip across the top -->
+        <c-order-summary
+            account-id={accountId}
+            orders={orders}>
+        </c-order-summary>
+
+        <div class="dashboard-body">
+
+            <!-- Left panel: filterable, sortable order list -->
+            <c-order-list
+                orders={orders}
+                onorderselect={handleOrderSelect}>
+            </c-order-list>
+
+            <!-- Right panel: detail + actions for the selected order -->
+            <template if:true={hasSelectedOrder}>
+                <c-order-detail
+                    order-id={selectedOrderId}
+                    onsubmit={handleSubmit}
+                    oncancel={handleCancel}>
+                </c-order-detail>
+            </template>
+
+        </div>
+    </div>
+</template>
