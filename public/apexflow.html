@@ -298,6 +298,7 @@
         .hlp-row { display:flex;gap:8px;padding:2px 0;font-size:11px;align-items:flex-start; }
         .hlp-key { font-size:10px;background:var(--bg-sidebar);border:1px solid var(--border);border-radius:4px;padding:1px 5px;white-space:nowrap;color:#60a5fa;flex-shrink:0;min-width:72px;text-align:center; }
         .hlp-desc { color:#94a3b8;flex:1;line-height:1.45; }
+        .hlp-sec[style*="grid-column"] { background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.25); }
     </style>
 </head>
 <body>
@@ -3025,61 +3026,69 @@
       <button class="btn" onclick="document.getElementById('help-modal').classList.remove('open')">✕ Close</button>
     </div>
     <div class="hlp-body">
-      <div class="hlp-sec">
-        <h4>Loading Files</h4>
-        <div class="hlp-row"><span class="hlp-key">Open Folder</span><span class="hlp-desc">Click "Open Folder" to pick a project root; the handle is remembered across sessions via IndexedDB</span></div>
-        <div class="hlp-row"><span class="hlp-key">Drop files</span><span class="hlp-desc">Drag .cls, .java, .js, or .html files anywhere onto the page; a green overlay confirms the drop target</span></div>
-        <div class="hlp-row"><span class="hlp-key">File explorer</span><span class="hlp-desc">Browse the folder tree in the sidebar and click any file to load it into the diagram</span></div>
-        <div class="hlp-row"><span class="hlp-key">↺ Reopen</span><span class="hlp-desc">Reopen the last-used folder without re-picking it in the browser dialog</span></div>
-        <div class="hlp-row"><span class="hlp-key">⟲ Re-index</span><span class="hlp-desc">Force a fresh scan of the folder when files have changed since the last session</span></div>
-        <div class="hlp-row"><span class="hlp-key">🕐 History</span><span class="hlp-desc">Recently opened files appear in the history popover for quick reload</span></div>
+
+      <div class="hlp-sec" style="grid-column:1/-1">
+        <h4>What this tool does</h4>
+        <div style="font-size:12px;color:#94a3b8;line-height:1.6">
+          Visualise the <strong style="color:#f1f5f9">relationships between Apex classes, Java classes, LWC components, and HTML templates</strong> as an interactive diagram — with no server, no org connection, and no build step. Load files from your local project folder, then drill into any class to generate its <strong style="color:#f1f5f9">method call-flow diagram</strong>. Child components and classes are loaded <strong style="color:#f1f5f9">on demand</strong> so you only see what you need.
+        </div>
       </div>
+
       <div class="hlp-sec">
-        <h4>Architecture Map</h4>
-        <div class="hlp-row"><span class="hlp-key">Auto-render</span><span class="hlp-desc">Loading any file regenerates the system-level Mermaid.js dependency diagram automatically</span></div>
-        <div class="hlp-row"><span class="hlp-key">Node colors</span><span class="hlp-desc">Orange = Apex · Blue = LWC · Purple = LWC child · Green = HTML-only</span></div>
-        <div class="hlp-row"><span class="hlp-key">Ghost nodes</span><span class="hlp-desc">Dashed-border nodes with ? prefix are referenced but not yet loaded; right-click → Load Class</span></div>
-        <div class="hlp-row"><span class="hlp-key">Edge labels</span><span class="hlp-desc">Hover a truncated edge label to see the full method / import list as a tooltip</span></div>
-        <div class="hlp-row"><span class="hlp-key">Hide/Show</span><span class="hlp-desc">Toggle the eye icon on a class card or use the sidebar to remove it from the diagram</span></div>
-        <div class="hlp-row"><span class="hlp-key">Copy ⎘</span><span class="hlp-desc">Click Copy Mermaid to copy the current diagram definition to clipboard</span></div>
+        <h4>Relationship Diagram</h4>
+        <div class="hlp-row"><span class="hlp-key">Overview map</span><span class="hlp-desc">All loaded classes and components appear as a live dependency map — who calls whom, who imports what</span></div>
+        <div class="hlp-row"><span class="hlp-key">Cross-language</span><span class="hlp-desc">Apex controllers, LWC JavaScript, and HTML templates are shown together in a single unified diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">Node colors</span><span class="hlp-desc">Orange = Apex class · Blue = LWC component · Purple = LWC child module · Green = HTML-only template</span></div>
+        <div class="hlp-row"><span class="hlp-key">Edge labels</span><span class="hlp-desc">Edges show which methods are called or which members are imported; hover to see the full list</span></div>
+        <div class="hlp-row"><span class="hlp-key">Hide / Show</span><span class="hlp-desc">Toggle individual nodes out of the diagram from the sidebar without removing them from memory</span></div>
+        <div class="hlp-row"><span class="hlp-key">Copy Mermaid</span><span class="hlp-desc">Export the current diagram as a Mermaid definition to paste into any Markdown or docs tool</span></div>
       </div>
+
       <div class="hlp-sec">
-        <h4>Node Right-click Menu</h4>
-        <div class="hlp-row"><span class="hlp-key">Analyze Flow</span><span class="hlp-desc">Switch to a focused call-flow diagram for this class (up to 6 levels deep)</span></div>
-        <div class="hlp-row"><span class="hlp-key">Load Class</span><span class="hlp-desc">Load an unloaded ghost node from the file index or a file picker</span></div>
-        <div class="hlp-row"><span class="hlp-key">Hide Children</span><span class="hlp-desc">Hide or reveal this node's outgoing edges and destination nodes without a full re-render</span></div>
-        <div class="hlp-row"><span class="hlp-key">Hide JS/Apex/HTML</span><span class="hlp-desc">Peel off child edges by type — e.g. hide Apex callouts while keeping JS imports visible</span></div>
-        <div class="hlp-row"><span class="hlp-key">View Code</span><span class="hlp-desc">Open the method body in a draggable, resizable code panel with syntax highlighting</span></div>
-        <div class="hlp-row"><span class="hlp-key">View Source</span><span class="hlp-desc">Open the full file (or concatenated .js + .html for LWC) in a centered modal</span></div>
+        <h4>Dynamic Ad-hoc Child Loading</h4>
+        <div class="hlp-row"><span class="hlp-key">Ghost nodes</span><span class="hlp-desc">Classes or components referenced but not yet loaded appear with a dashed border and a ? prefix in the diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">Load on demand</span><span class="hlp-desc">Right-click any ghost node → Load Class to pull it in from the file index or a file picker — the diagram expands in place without a full re-render</span></div>
+        <div class="hlp-row"><span class="hlp-key">Auto rel. imports</span><span class="hlp-desc">Opening an LWC component automatically pulls in its ./relative JS imports as child nodes</span></div>
+        <div class="hlp-row"><span class="hlp-key">Hide Children</span><span class="hlp-desc">Right-click a node → Hide Children to collapse its outgoing edges; reveal them again at any time</span></div>
+        <div class="hlp-row"><span class="hlp-key">Hide by type</span><span class="hlp-desc">Selectively hide only JS, Apex, or HTML children of a node to focus on one layer of the dependency tree</span></div>
       </div>
+
       <div class="hlp-sec">
-        <h4>Analyze Flow Mode</h4>
-        <div class="hlp-row"><span class="hlp-key">Entry method</span><span class="hlp-desc">Select a class in the sidebar, then enable one or more entry methods using the pill toggles</span></div>
-        <div class="hlp-row"><span class="hlp-key">Call depth</span><span class="hlp-desc">Recursive call chains are traced up to 6 levels; nodes are grouped into per-class subgraphs</span></div>
-        <div class="hlp-row"><span class="hlp-key">Right-click node</span><span class="hlp-desc">Collapse or expand child subtrees; Load Class to expand ghost nodes in-place</span></div>
-        <div class="hlp-row"><span class="hlp-key">Back to Overview</span><span class="hlp-desc">Click "Back to Overview" to return to the full system architecture map</span></div>
+        <h4>Flow Logic — Analyze Flow</h4>
+        <div class="hlp-row"><span class="hlp-key">Entry point</span><span class="hlp-desc">Select any loaded class in the sidebar and pick one or more entry methods to start the flow diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">Call chain</span><span class="hlp-desc">The tool traces recursive method calls up to 6 levels deep and renders them as a focused call-flow diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">Subgraphs</span><span class="hlp-desc">Methods of the same class are grouped into labelled subgraphs so the class boundary is always visible</span></div>
+        <div class="hlp-row"><span class="hlp-key">Expand inline</span><span class="hlp-desc">Right-click a ghost node in the flow diagram → Load Class to expand its call tree in place without leaving the view</span></div>
+        <div class="hlp-row"><span class="hlp-key">Collapse nodes</span><span class="hlp-desc">Right-click any node → Hide / Show child nodes to reduce noise on deep call chains</span></div>
+        <div class="hlp-row"><span class="hlp-key">Back to map</span><span class="hlp-desc">Click "Back to Overview" to return to the full relationship diagram at any time</span></div>
       </div>
+
       <div class="hlp-sec">
-        <h4>Diagram Navigation</h4>
-        <div class="hlp-row"><span class="hlp-key">Scroll</span><span class="hlp-desc">Mouse wheel zooms in/out; click-and-drag pans the diagram</span></div>
-        <div class="hlp-row"><span class="hlp-key">Edge right-click</span><span class="hlp-desc">Right-click an edge to see the full list of method calls or imports on that relationship</span></div>
-        <div class="hlp-row"><span class="hlp-key">☰ sidebar</span><span class="hlp-desc">Click the hamburger button to collapse the sidebar and maximize diagram space; diagram auto-resizes</span></div>
+        <h4>Local Source Exploration</h4>
+        <div class="hlp-row"><span class="hlp-key">Open Folder</span><span class="hlp-desc">Pick any local project folder — the browser reads files directly; nothing is uploaded to a server</span></div>
+        <div class="hlp-row"><span class="hlp-key">Persistent handle</span><span class="hlp-desc">The folder handle is saved in IndexedDB so you can reopen it instantly on the next visit (↺ Reopen)</span></div>
+        <div class="hlp-row"><span class="hlp-key">Auto-index</span><span class="hlp-desc">On first open, LWC bundles and Apex classes are scanned and indexed so any referenced class can be loaded with one click</span></div>
+        <div class="hlp-row"><span class="hlp-key">File tree</span><span class="hlp-desc">Browse and search the full folder tree in the sidebar; ↑↓ to navigate, Enter to load</span></div>
+        <div class="hlp-row"><span class="hlp-key">View Source</span><span class="hlp-desc">Right-click any node → View Source to open the full file in a syntax-highlighted modal showing the local path</span></div>
+        <div class="hlp-row"><span class="hlp-key">View Code</span><span class="hlp-desc">Right-click a node → View Code to open just the method body in a draggable, resizable code panel</span></div>
       </div>
+
       <div class="hlp-sec">
-        <h4>LWC &amp; Apex Support</h4>
-        <div class="hlp-row"><span class="hlp-key">LWC bundles</span><span class="hlp-desc">Loading a .js file inside an lwc/ folder also loads its paired .html template automatically</span></div>
-        <div class="hlp-row"><span class="hlp-key">Rel. imports</span><span class="hlp-desc">./relative JS imports are parsed and added as child nodes (namespaced as parent.child)</span></div>
-        <div class="hlp-row"><span class="hlp-key">&lt;c-tag&gt;</span><span class="hlp-desc">HTML &lt;c-foo-bar&gt; component references are detected and shown as diagram edges</span></div>
-        <div class="hlp-row"><span class="hlp-key">@sf/apex</span><span class="hlp-desc">@salesforce/apex/ClassName imports connect LWC components to their Apex controllers</span></div>
-        <div class="hlp-row"><span class="hlp-key">Apex index</span><span class="hlp-desc">LWC count and Apex class count are shown as badges in the file explorer header after indexing</span></div>
+        <h4>LWC + Apex + HTML Together</h4>
+        <div class="hlp-row"><span class="hlp-key">LWC bundles</span><span class="hlp-desc">A .js component and its paired .html template are loaded as a single node; both are shown in the source view</span></div>
+        <div class="hlp-row"><span class="hlp-key">&lt;c-tag&gt; refs</span><span class="hlp-desc">HTML template &lt;c-foo-bar&gt; child component tags are detected and drawn as diagram edges automatically</span></div>
+        <div class="hlp-row"><span class="hlp-key">@sf/apex import</span><span class="hlp-desc">@salesforce/apex/ClassName imports create an edge from the LWC component to its Apex controller</span></div>
+        <div class="hlp-row"><span class="hlp-key">Drop files</span><span class="hlp-desc">Drag any mix of .cls, .java, .js, .html files onto the page to add them to the diagram instantly</span></div>
       </div>
+
       <div class="hlp-sec">
-        <h4>File Search &amp; Keyboard</h4>
-        <div class="hlp-row"><span class="hlp-key">Search files</span><span class="hlp-desc">Type in the "Search files…" box to filter the file tree; ↑↓ to navigate, Enter to load</span></div>
-        <div class="hlp-row"><span class="hlp-key">Drag file</span><span class="hlp-desc">Drag a file from the explorer to the diagram area to load it without clicking</span></div>
-        <div class="hlp-row"><span class="hlp-key">Esc</span><span class="hlp-desc">Close this help panel, the code viewer, or any open context menu</span></div>
-        <div class="hlp-row"><span class="hlp-key">Clear All</span><span class="hlp-desc">The "Clear All" button in the sidebar reloads the page and resets all loaded classes</span></div>
+        <h4>Diagram Interaction</h4>
+        <div class="hlp-row"><span class="hlp-key">Pan &amp; Zoom</span><span class="hlp-desc">Mouse wheel to zoom, click-drag to pan; diagram recenters after sidebar toggle</span></div>
+        <div class="hlp-row"><span class="hlp-key">Edge right-click</span><span class="hlp-desc">Right-click an edge to see the complete list of method calls or imports on that relationship</span></div>
+        <div class="hlp-row"><span class="hlp-key">☰ Sidebar</span><span class="hlp-desc">Collapse the sidebar to maximise diagram space; the canvas auto-resizes after the transition</span></div>
+        <div class="hlp-row"><span class="hlp-key">Esc</span><span class="hlp-desc">Close this panel, the code viewer, or any open context menu</span></div>
       </div>
+
     </div>
   </div>
 </div>
