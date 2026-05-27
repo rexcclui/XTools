@@ -58,10 +58,11 @@ This is a **static-HTML toolset deployed as Cloudflare Workers**. The tools them
 
 ## 4. API Keys / Secrets
 
-**None.**
+**None required.**
 
 - The three tools (`jsongrid.html`, `apexflow.html`, `sf-debug-viewer.html`) are fully client-side. They read pasted text, dropped files, or files picked via the File System Access API. Nothing is uploaded.
-- The Cloudflare Worker (`src/index.js`) only does a subdomain → filename redirect and an `env.ASSETS.fetch(request)` passthrough. No secrets, no env vars.
+- The Cloudflare Worker (`src/index.js`) does a subdomain → filename redirect, serves static assets, and exposes a `/api/visits` endpoint for the visit counter. The counter stores data in a **Workers KV** namespace (see §8.5) — no third-party service.
+- *(Optional)* `IP_SALT` — a secret used when hashing visitor IPs for the counter. If unset, a built-in default salt is used. To set your own per Worker: `npx wrangler secret put IP_SALT` (repeat with `--config wrangler.apexflow.jsonc` and `--config wrangler.apexdebug.jsonc`). Visitor IPs are never stored; only a salted SHA-256 hash is used to dedupe within a day.
 - `wrangler login` uses an interactive OAuth flow in your browser — you do **not** need to manage an API token manually (though you can create one if you prefer non-interactive CI deploys; see Cloudflare's docs on `CLOUDFLARE_API_TOKEN`).
 
 ---
@@ -71,6 +72,7 @@ This is a **static-HTML toolset deployed as Cloudflare Workers**. The tools them
 | Item | Cost |
 |---|---|
 | Cloudflare Workers (Free plan) | **$0** — 100,000 requests/day per account, included Static Assets, included `*.workers.dev` subdomain |
+| Cloudflare Workers KV (Free plan) | **$0** — for the visit counter: 100k reads/day, 1,000 writes/day, 1 GB storage. Each *new* unique daily visitor costs ~2 writes (~500 new visitors/day on free tier); repeat visitors are read-only. |
 | Cloudflare custom domain | **$0** to point an existing zone at a Worker |
 | Domain name (optional) | ~$10–15/year if you don't already own one |
 | Wrangler CLI | Free, open source |
@@ -158,7 +160,29 @@ To serve from your own domain (like the original `*.trendx.uk`):
 
 Cloudflare provisions the TLS certificate automatically. No DNS records to add manually when using "Add Custom Domain".
 
-### 8.5 Deploy
+### 8.5 Set up the visit counter (Workers KV)
+
+The `/api/visits` endpoint counts unique visitors per day and needs a KV namespace. **Deploy will fail until the placeholder id is replaced.**
+
+1. Create one namespace (shared by all three sites — counts are kept separate by site key):
+
+   ```bash
+   npx wrangler kv namespace create VISITS
+   ```
+
+2. Copy the printed `id` and paste it in place of `REPLACE_WITH_KV_NAMESPACE_ID` in **all three** config files — `wrangler.jsonc`, `wrangler.apexflow.jsonc`, `wrangler.apexdebug.jsonc`:
+
+   ```jsonc
+   "kv_namespaces": [
+     { "binding": "VISITS", "id": "<your-namespace-id>" }
+   ]
+   ```
+
+3. *(Optional)* Set a custom hashing salt as described in §4.
+
+The count is displayed inside each tool's **Help** panel ("👁 Visitors"). If KV is missing the endpoint simply returns `0` and the rest of the site works normally.
+
+### 8.6 Deploy
 
 Deploy all three at once:
 
@@ -176,7 +200,7 @@ npx wrangler deploy --config wrangler.apexdebug.jsonc  # apexdebug
 
 Each command uploads `src/index.js` plus the contents of `public/` as static assets.
 
-### 8.6 Local Worker preview (optional)
+### 8.7 Local Worker preview (optional)
 
 To emulate the Worker locally (subdomain routing + asset serving):
 
