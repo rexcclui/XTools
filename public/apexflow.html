@@ -291,6 +291,7 @@
         }
         #drop-overlay.show { display: flex; }
 
+<<<<<<< HEAD
         /* REFERENCE LOOKUP MODAL */
         #reference-lookup-modal {
             position: fixed; z-index: 1100; background: var(--bg-sidebar); border: 1px solid var(--border);
@@ -353,6 +354,20 @@
         }
         .font-size-btn { padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--primary); cursor: pointer; }
         .font-size-btn:hover { background: rgba(16,185,129,0.1); }
+=======
+        /* Help modal */
+        #help-modal { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;align-items:center;justify-content:center;padding:24px; }
+        #help-modal.open { display:flex; }
+        .hlp-box { background:var(--bg-sidebar);border:1px solid var(--border);border-radius:10px;width:100%;max-width:820px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.6); }
+        .hlp-hdr { display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(0,0,0,0.3);border-radius:10px 10px 0 0; }
+        .hlp-hdr h3 { font-size:13px;font-weight:700;color:var(--text-main);margin:0; }
+        .hlp-body { flex:1;overflow-y:auto;padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+        .hlp-sec { background:var(--bg-main);border:1px solid var(--border);border-radius:8px;padding:10px 12px; }
+        .hlp-sec h4 { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--primary);margin:0 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border); }
+        .hlp-row { display:flex;gap:8px;padding:2px 0;font-size:11px;align-items:flex-start; }
+        .hlp-key { font-size:10px;background:var(--bg-sidebar);border:1px solid var(--border);border-radius:4px;padding:1px 5px;white-space:nowrap;color:#60a5fa;flex-shrink:0;min-width:72px;text-align:center; }
+        .hlp-desc { color:#94a3b8;flex:1;line-height:1.45; }
+>>>>>>> f0045a35a429fe1bf04dde72029b06aa16583aab
     </style>
 </head>
 <body>
@@ -476,6 +491,7 @@
             <button class="btn" id="copy-mermaid-btn" onclick="copyCurrentMermaid()" title="Copy Mermaid code">
                 <i class="fa-regular fa-copy"></i>
             </button>
+            <button class="btn" onclick="document.getElementById('help-modal').classList.add('open')" title="Features &amp; usage guide">? Help</button>
             <button class="btn btn-primary" id="reset-btn" onclick="exitAnalyzeFlow()" style="display:none;">Back to Overview</button>
         </div>
     </div>
@@ -3893,5 +3909,80 @@
     }
 </script>
 <div id="edge-label-tooltip"></div>
+
+<div id="help-modal">
+  <div class="hlp-box">
+    <div class="hlp-hdr">
+      <h3>Apex / Java / LWC Class Diagram — Features &amp; Usage</h3>
+      <button class="btn" onclick="document.getElementById('help-modal').classList.remove('open')">✕ Close</button>
+    </div>
+    <div class="hlp-body">
+      <div class="hlp-sec">
+        <h4>Loading Files</h4>
+        <div class="hlp-row"><span class="hlp-key">Open Folder</span><span class="hlp-desc">Click "Open Folder" to pick a project root; the handle is remembered across sessions via IndexedDB</span></div>
+        <div class="hlp-row"><span class="hlp-key">Drop files</span><span class="hlp-desc">Drag .cls, .java, .js, or .html files anywhere onto the page; a green overlay confirms the drop target</span></div>
+        <div class="hlp-row"><span class="hlp-key">File explorer</span><span class="hlp-desc">Browse the folder tree in the sidebar and click any file to load it into the diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">↺ Reopen</span><span class="hlp-desc">Reopen the last-used folder without re-picking it in the browser dialog</span></div>
+        <div class="hlp-row"><span class="hlp-key">⟲ Re-index</span><span class="hlp-desc">Force a fresh scan of the folder when files have changed since the last session</span></div>
+        <div class="hlp-row"><span class="hlp-key">🕐 History</span><span class="hlp-desc">Recently opened files appear in the history popover for quick reload</span></div>
+      </div>
+      <div class="hlp-sec">
+        <h4>Architecture Map</h4>
+        <div class="hlp-row"><span class="hlp-key">Auto-render</span><span class="hlp-desc">Loading any file regenerates the system-level Mermaid.js dependency diagram automatically</span></div>
+        <div class="hlp-row"><span class="hlp-key">Node colors</span><span class="hlp-desc">Orange = Apex · Blue = LWC · Purple = LWC child · Green = HTML-only</span></div>
+        <div class="hlp-row"><span class="hlp-key">Ghost nodes</span><span class="hlp-desc">Dashed-border nodes with ? prefix are referenced but not yet loaded; right-click → Load Class</span></div>
+        <div class="hlp-row"><span class="hlp-key">Edge labels</span><span class="hlp-desc">Hover a truncated edge label to see the full method / import list as a tooltip</span></div>
+        <div class="hlp-row"><span class="hlp-key">Hide/Show</span><span class="hlp-desc">Toggle the eye icon on a class card or use the sidebar to remove it from the diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">Copy ⎘</span><span class="hlp-desc">Click Copy Mermaid to copy the current diagram definition to clipboard</span></div>
+      </div>
+      <div class="hlp-sec">
+        <h4>Node Right-click Menu</h4>
+        <div class="hlp-row"><span class="hlp-key">Analyze Flow</span><span class="hlp-desc">Switch to a focused call-flow diagram for this class (up to 6 levels deep)</span></div>
+        <div class="hlp-row"><span class="hlp-key">Load Class</span><span class="hlp-desc">Load an unloaded ghost node from the file index or a file picker</span></div>
+        <div class="hlp-row"><span class="hlp-key">Hide Children</span><span class="hlp-desc">Hide or reveal this node's outgoing edges and destination nodes without a full re-render</span></div>
+        <div class="hlp-row"><span class="hlp-key">Hide JS/Apex/HTML</span><span class="hlp-desc">Peel off child edges by type — e.g. hide Apex callouts while keeping JS imports visible</span></div>
+        <div class="hlp-row"><span class="hlp-key">View Code</span><span class="hlp-desc">Open the method body in a draggable, resizable code panel with syntax highlighting</span></div>
+        <div class="hlp-row"><span class="hlp-key">View Source</span><span class="hlp-desc">Open the full file (or concatenated .js + .html for LWC) in a centered modal</span></div>
+      </div>
+      <div class="hlp-sec">
+        <h4>Analyze Flow Mode</h4>
+        <div class="hlp-row"><span class="hlp-key">Entry method</span><span class="hlp-desc">Select a class in the sidebar, then enable one or more entry methods using the pill toggles</span></div>
+        <div class="hlp-row"><span class="hlp-key">Call depth</span><span class="hlp-desc">Recursive call chains are traced up to 6 levels; nodes are grouped into per-class subgraphs</span></div>
+        <div class="hlp-row"><span class="hlp-key">Right-click node</span><span class="hlp-desc">Collapse or expand child subtrees; Load Class to expand ghost nodes in-place</span></div>
+        <div class="hlp-row"><span class="hlp-key">Back to Overview</span><span class="hlp-desc">Click "Back to Overview" to return to the full system architecture map</span></div>
+      </div>
+      <div class="hlp-sec">
+        <h4>Diagram Navigation</h4>
+        <div class="hlp-row"><span class="hlp-key">Scroll</span><span class="hlp-desc">Mouse wheel zooms in/out; click-and-drag pans the diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">Edge right-click</span><span class="hlp-desc">Right-click an edge to see the full list of method calls or imports on that relationship</span></div>
+        <div class="hlp-row"><span class="hlp-key">☰ sidebar</span><span class="hlp-desc">Click the hamburger button to collapse the sidebar and maximize diagram space; diagram auto-resizes</span></div>
+      </div>
+      <div class="hlp-sec">
+        <h4>LWC &amp; Apex Support</h4>
+        <div class="hlp-row"><span class="hlp-key">LWC bundles</span><span class="hlp-desc">Loading a .js file inside an lwc/ folder also loads its paired .html template automatically</span></div>
+        <div class="hlp-row"><span class="hlp-key">Rel. imports</span><span class="hlp-desc">./relative JS imports are parsed and added as child nodes (namespaced as parent.child)</span></div>
+        <div class="hlp-row"><span class="hlp-key">&lt;c-tag&gt;</span><span class="hlp-desc">HTML &lt;c-foo-bar&gt; component references are detected and shown as diagram edges</span></div>
+        <div class="hlp-row"><span class="hlp-key">@sf/apex</span><span class="hlp-desc">@salesforce/apex/ClassName imports connect LWC components to their Apex controllers</span></div>
+        <div class="hlp-row"><span class="hlp-key">Apex index</span><span class="hlp-desc">LWC count and Apex class count are shown as badges in the file explorer header after indexing</span></div>
+      </div>
+      <div class="hlp-sec">
+        <h4>File Search &amp; Keyboard</h4>
+        <div class="hlp-row"><span class="hlp-key">Search files</span><span class="hlp-desc">Type in the "Search files…" box to filter the file tree; ↑↓ to navigate, Enter to load</span></div>
+        <div class="hlp-row"><span class="hlp-key">Drag file</span><span class="hlp-desc">Drag a file from the explorer to the diagram area to load it without clicking</span></div>
+        <div class="hlp-row"><span class="hlp-key">Esc</span><span class="hlp-desc">Close this help panel, the code viewer, or any open context menu</span></div>
+        <div class="hlp-row"><span class="hlp-key">Clear All</span><span class="hlp-desc">The "Clear All" button in the sidebar reloads the page and resets all loaded classes</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.getElementById('help-modal')?.classList.remove('open');
+  });
+  document.getElementById('help-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('help-modal')) document.getElementById('help-modal').classList.remove('open');
+  });
+</script>
 </body>
 </html>
