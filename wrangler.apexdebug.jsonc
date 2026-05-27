@@ -6,5 +6,8 @@
   "assets": {
     "directory": "public",
     "binding": "ASSETS"
-  }
+  },
+  "kv_namespaces": [
+    { "binding": "VISITS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+  ]
 }

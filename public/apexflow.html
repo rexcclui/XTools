@@ -3922,6 +3922,7 @@
       <div class="hlp-sec hlp-summary">
         <h4>At a Glance</h4>
         <p class="hlp-sum-desc">Visualize how your Apex, Java, and LWC source connects. Loading files auto-builds a system-level dependency map; from there you can drill into a single class's call flow, expand referenced "ghost" nodes on demand, and read the underlying code without leaving the diagram.</p>
+        <p class="hlp-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong></p>
         <div class="hlp-sum-flow">
           <span class="hlp-step">1. Open folder / drop files</span> →
           <span class="hlp-step">2. Read the architecture map</span> →
@@ -3995,6 +3996,10 @@
   document.getElementById('help-modal').addEventListener('click', e => {
     if (e.target === document.getElementById('help-modal')) document.getElementById('help-modal').classList.remove('open');
   });
+  fetch('/api/visits').then(r=>r.json()).then(d=>{
+    var el=document.getElementById('visit-count');
+    if(el&&typeof d.count==='number')el.textContent=d.count.toLocaleString();
+  }).catch(()=>{});
 </script>
 </body>
 </html>
