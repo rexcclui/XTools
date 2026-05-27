@@ -490,6 +490,7 @@ function evMeta(ev, rest) {
 }
 
 const PARSE_CHUNK = 8000; // lines per async tick
+const RAW_INLINE_LIMIT = 1024 * 1024; // 1 MB — above this, show a size hint in the input tab
 
 async function parseLogAsync(text, onProgress) {
   const rawLines=text.split('\n');
