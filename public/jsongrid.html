@@ -201,6 +201,10 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 .help-row{display:flex;gap:8px;padding:2px 0;font-size:11px;align-items:flex-start}
 .help-key{font-family:var(--mono);font-size:10px;background:var(--bg);border:0.5px solid var(--bd2);border-radius:4px;padding:1px 5px;white-space:nowrap;color:var(--accent-m);flex-shrink:0;min-width:64px;text-align:center}
 .help-desc{color:var(--tx2);flex:1;line-height:1.45}
+.help-summary{grid-column:1 / -1;border-color:var(--accent)}
+.help-sum-desc{font-size:12px;color:var(--tx);line-height:1.5;margin:0 0 8px}
+.help-sum-flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--tx2)}
+.help-sum-flow .help-step{background:var(--bg);border:0.5px solid var(--bd2);border-radius:4px;padding:2px 7px;color:var(--accent-m)}
 </style>
 </head>
 <body>
@@ -237,6 +241,16 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
       <button class="tbtn" onclick="closeHelp()">✕ Close</button>
     </div>
     <div class="help-body">
+      <div class="help-sec help-summary">
+        <h4>At a Glance</h4>
+        <p class="help-sum-desc">A multi-cell workspace for inspecting JSON. Paste or drop data into any cell, pretty-print it into a navigable table, then search, expand, and compare values across cells. Apex debug output is auto-converted to JSON, and every tab and cell is saved locally so your workspace persists.</p>
+        <div class="help-sum-flow">
+          <span class="help-step">1. Paste / drop JSON into a cell</span> →
+          <span class="help-step">2. Click {} to pretty-print</span> →
+          <span class="help-step">3. Navigate &amp; search</span> →
+          <span class="help-step">4. Select two values → Compare</span>
+        </div>
+      </div>
       <div class="help-sec">
         <h4>Grid &amp; Tabs</h4>
         <div class="help-row"><span class="help-key">Cols / Rows</span><span class="help-desc">Use + / − in the toolbar to set columns (1–5) and rows (1–8)</span></div>

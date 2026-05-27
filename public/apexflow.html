@@ -366,6 +366,10 @@
         .hlp-row { display:flex;gap:8px;padding:2px 0;font-size:11px;align-items:flex-start; }
         .hlp-key { font-size:10px;background:var(--bg-sidebar);border:1px solid var(--border);border-radius:4px;padding:1px 5px;white-space:nowrap;color:#60a5fa;flex-shrink:0;min-width:72px;text-align:center; }
         .hlp-desc { color:#94a3b8;flex:1;line-height:1.45; }
+        .hlp-summary { grid-column:1 / -1;border-color:var(--primary); }
+        .hlp-sum-desc { font-size:12px;color:var(--text-main);line-height:1.5;margin:0 0 8px; }
+        .hlp-sum-flow { display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:#94a3b8; }
+        .hlp-sum-flow .hlp-step { background:var(--bg-sidebar);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:#60a5fa; }
     </style>
 </head>
 <body>
@@ -3915,6 +3919,16 @@
       <button class="btn" onclick="document.getElementById('help-modal').classList.remove('open')">✕ Close</button>
     </div>
     <div class="hlp-body">
+      <div class="hlp-sec hlp-summary">
+        <h4>At a Glance</h4>
+        <p class="hlp-sum-desc">Visualize how your Apex, Java, and LWC source connects. Loading files auto-builds a system-level dependency map; from there you can drill into a single class's call flow, expand referenced "ghost" nodes on demand, and read the underlying code without leaving the diagram.</p>
+        <div class="hlp-sum-flow">
+          <span class="hlp-step">1. Open folder / drop files</span> →
+          <span class="hlp-step">2. Read the architecture map</span> →
+          <span class="hlp-step">3. Right-click a node → Analyze Flow</span> →
+          <span class="hlp-step">4. View Code / Source</span>
+        </div>
+      </div>
       <div class="hlp-sec">
         <h4>Loading Files</h4>
         <div class="hlp-row"><span class="hlp-key">Open Folder</span><span class="hlp-desc">Click "Open Folder" to pick a project root; the handle is remembered across sessions via IndexedDB</span></div>

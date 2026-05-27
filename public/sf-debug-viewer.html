@@ -234,6 +234,10 @@ const CSS = `
 .help-r{display:flex;gap:7px;padding:2px 0;font-size:11px;align-items:flex-start}
 .help-k{font-family:'SF Mono','Fira Code',monospace;font-size:10px;background:var(--b2);border:1px solid var(--bd);border-radius:4px;padding:1px 5px;white-space:nowrap;color:#58a6ff;flex-shrink:0;min-width:64px;text-align:center}
 .help-d{color:var(--dm);flex:1;line-height:1.45}
+.help-summary{grid-column:1 / -1;border-color:var(--ac)}
+.help-sum-desc{font-size:12px;color:var(--tx);line-height:1.5;margin:0 0 8px}
+.help-sum-flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--dm)}
+.help-sum-flow .help-step{background:var(--b2);border:1px solid var(--bd);border-radius:4px;padding:2px 7px;color:#58a6ff}
 `;
 
 // ─── STATIC HTML ──────────────────────────────────────────────────────────────
@@ -318,6 +322,16 @@ const HTML = `
       <button class="btn btn-sm" id="btn-closeHelp">✕ Close</button>
     </div>
     <div class="help-pbody">
+      <div class="help-s help-summary">
+        <h4>At a Glance</h4>
+        <p class="help-sum-desc">Turn a raw Salesforce debug log into an interactive call tree. The raw log and the tree stay in sync — click either side to jump to the other. Filter by event type, search across tabs, color-code lines, and (with a project folder open) jump straight to the Apex source.</p>
+        <div class="help-sum-flow">
+          <span class="help-step">1. Paste / drop a log → Parse</span> →
+          <span class="help-step">2. Explore the call tree</span> →
+          <span class="help-step">3. Filter &amp; search</span> →
+          <span class="help-step">4. Jump to source</span>
+        </div>
+      </div>
       <div class="help-s">
         <h4>Getting Started</h4>
         <div class="help-r"><span class="help-k">Paste</span><span class="help-d">Paste a Salesforce debug log into the text area, then click Parse Log</span></div>
