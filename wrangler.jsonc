@@ -11,11 +11,6 @@
 		{
 			"binding": "VISITS",
 			"id": "81c54a172328490484ef906f64ff2677"
-		},
-		{
-			"binding": "VISITS",
-			"id": "81c54a172328490484ef906f64ff2677",
-			"remote": true
 		}
 	]
 }
