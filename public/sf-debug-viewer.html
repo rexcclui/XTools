@@ -826,6 +826,59 @@ function initAnalyzer(rootEl, fetchSource) {
 
   function sep(menu){const d=document.createElement('div');d.className='log-ctx-sep';menu.appendChild(d)}
 
+  function rowFromNode(node){
+    let n=node;
+    while(n&&n!==document.body){
+      if(n.classList&&n.classList.contains('ll')) return n;
+      n=n.parentNode;
+    }
+    return null;
+  }
+
+  function getRowRawText(tab,rowEl){
+    if(!rowEl) return '';
+    const vis=tab._visLines||[];
+    const vi=parseInt(rowEl.dataset.visidx||'-1',10);
+    if(Number.isFinite(vi)&&vi>=0&&vis[vi]) return vis[vi].raw||'';
+    const ns=parseInt(rowEl.dataset.ns||'0',10);
+    const ll=vis.find(l=>l.ns===ns)||(tab.logLines||[]).find(l=>l.ns===ns);
+    return ll?.raw||rowEl.textContent||'';
+  }
+
+  function getSelectedRowsText(tab,rowEl){
+    const sel=window.getSelection?.();
+    if(!sel||sel.rangeCount===0) return '';
+    const a=rowFromNode(sel.anchorNode),b=rowFromNode(sel.focusNode);
+    if(!a||!b||a===b) return '';
+    const ai=parseInt(a.dataset.visidx||'-1',10),bi=parseInt(b.dataset.visidx||'-1',10);
+    if(!Number.isFinite(ai)||!Number.isFinite(bi)||ai<0||bi<0) return '';
+    const vis=tab._visLines||[];
+    const s=Math.min(ai,bi),e=Math.max(ai,bi);
+    if(!vis.length||s>=vis.length) return '';
+    const out=[];
+    for(let i=s;i<=e&&i<vis.length;i++) out.push(vis[i].raw||'');
+    return out.join('\n');
+  }
+
+  async function copyTextToClipboard(text){
+    const val=String(text||'');
+    if(!val) return false;
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(val);
+        return true;
+      }
+    }catch(_){/* fallback below */}
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=val;ta.style.position='fixed';ta.style.opacity='0';
+      document.body.appendChild(ta);ta.focus();ta.select();
+      const ok=document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    }catch(_){return false;}
+  }
+
   function showLogContextMenu(e,tab,ns,sel='',rowEl=null){
     closeLogContextMenu();
     const menu=document.createElement('div');menu.className='log-ctx-menu';_ctxMenu=menu;
@@ -886,6 +939,21 @@ function initAnalyzer(rootEl, fetchSource) {
         sep(menu);
       }
     }
+
+    // ── copy line / multiline ────────────────────────────────────────────
+    const lineText=getRowRawText(tab,rowEl);
+    const selectedRowsText=getSelectedRowsText(tab,rowEl);
+    const hasSelText=!!sel;
+    item('Copy this line','',async()=>{
+      const text=selectedRowsText||lineText;
+      await copyTextToClipboard(text);
+    });
+    if (selectedRowsText){
+      item('Copy selected lines','',async()=>{await copyTextToClipboard(selectedRowsText)});
+    } else if (hasSelText) {
+      item('Copy selected text','',async()=>{await copyTextToClipboard(sel)});
+    }
+    sep(menu);
 
     // ── highlight selection ───────────────────────────────────────────────
     if (sel){
