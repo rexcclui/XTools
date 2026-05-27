@@ -8,6 +8,6 @@
     "binding": "ASSETS"
   },
   "kv_namespaces": [
-    { "binding": "VISITS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+    { "binding": "VISITS", "id": "81c54a172328490484ef906f64ff2677" }
   ]
 }
