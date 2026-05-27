@@ -217,7 +217,9 @@ const CSS = `
 .snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:16px;cursor:pointer;padding:0 4px;line-height:1}
 .snippet-close:hover{color:#f85149}
 .snippet-body{overflow:auto;flex:1;padding:8px 0}
-.snippet-loading{padding:20px;text-align:center;color:#8b949e;font-size:11px}
+.snippet-loading{padding:26px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#8b949e;font-size:11px}
+.snippet-spinner{width:16px;height:16px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:snippetSpin .8s linear infinite}
+@keyframes snippetSpin{to{transform:rotate(360deg)}}
 .snippet-error{padding:12px 16px;color:#f85149;font-size:11px}
 .sline{display:flex;align-items:baseline;padding:1px 0}
 .sline.sline-target{background:#388bfd1a;border-left:2px solid #388bfd}
@@ -1031,20 +1033,29 @@ function initAnalyzer(rootEl, fetchSource) {
     if (ll?.ev){
       const m=evMeta(ll.ev,ll.rest);
       const lrTxt=m.lr?':'+m.lr.replace(/[\[\]]/g,''):'';
+      const hasSourceLoaded=_srcFileMap.size>0;
       if (m.cls){
-        item(`⌗ View source: ${m.cls}${lrTxt}`, '', ()=>{
-          closeLogContextMenu();
-          showSnippet(m.cls, m.lr||'', rowEl);
-        });
+        if (hasSourceLoaded){
+          item(`⌗ View source: ${m.cls}${lrTxt}`, '', ()=>{
+            closeLogContextMenu();
+            showSnippet(m.cls, m.lr||'', rowEl);
+          });
+        } else {
+          disabledItem(`⌗ View source: ${m.cls}${lrTxt}`, 'load source folder first');
+        }
         sep(menu);
       } else if (m.lr) {
         // event has a line ref but no class of its own — infer the enclosing class
         const chainCls=chain.length?[...chain].reverse().find(n=>n.cls)?.cls:'';
         if (chainCls){
-          item(`⌗ View source: ${chainCls}${lrTxt}`, '', ()=>{
-            closeLogContextMenu();
-            showSnippet(chainCls, m.lr||'', rowEl);
-          });
+          if (hasSourceLoaded){
+            item(`⌗ View source: ${chainCls}${lrTxt}`, '', ()=>{
+              closeLogContextMenu();
+              showSnippet(chainCls, m.lr||'', rowEl);
+            });
+          } else {
+            disabledItem(`⌗ View source: ${chainCls}${lrTxt}`, 'load source folder first');
+          }
         } else {
           disabledItem('⌗ View source', 'no Apex class for this line (anonymous/system code)');
         }
@@ -1990,6 +2001,7 @@ function initAnalyzer(rootEl, fetchSource) {
   // ── Source folder ──────────────────────────────────────────────────────────
   let _srcFileMap = new Map(); // simpleCls.toLowerCase() -> FileSystemFileHandle | {_rawFile}
   let _srcFolderName = '';
+  let _srcScanScope = 'force-app';
 
   async function walkDirForSrc(dh, underForceApp=false) {
     try {
@@ -2004,13 +2016,32 @@ function initAnalyzer(rootEl, fetchSource) {
     } catch(_){}
   }
 
+  async function walkDirForAllApex(dh) {
+    try {
+      for await (const [name, h] of dh.entries()) {
+        try {
+          if (h.kind==='directory') {
+            await walkDirForAllApex(h);
+          } else if (h.kind==='file' && /\.(cls|trigger)$/i.test(name)) {
+            _srcFileMap.set(name.replace(/\.(cls|trigger)$/i,'').toLowerCase(), h);
+          }
+        } catch(_){ }
+      }
+    } catch(_){ }
+  }
+
   async function openSourceFolder() {
     if (window.showDirectoryPicker) {
       try {
         const dh=await window.showDirectoryPicker({mode:'read'});
         _srcFileMap.clear();_bodyCache.clear();
+        _srcScanScope='force-app';
         const startInScope = dh.name.toLowerCase()==='force-app';
         await walkDirForSrc(dh, startInScope);
+        if (_srcFileMap.size===0) {
+          _srcScanScope='selected-folder';
+          await walkDirForAllApex(dh);
+        }
         _srcFolderName=dh.name;
         updateSrcFolderUI();
       } catch(e){if(e.name!=='AbortError')console.error(e);}
@@ -2023,7 +2054,8 @@ function initAnalyzer(rootEl, fetchSource) {
     const el=$('srcFolderName');if(!el)return;
     if (_srcFolderName){
       el.textContent=_srcFolderName;
-      el.title=`${_srcFileMap.size} Apex files found under force-app in "${_srcFolderName}"`;
+      const scopeLabel=_srcScanScope==='force-app'?'under force-app':'in selected folder scope';
+      el.title=`${_srcFileMap.size} Apex files found ${scopeLabel} in "${_srcFolderName}"`;
     } else {el.textContent='';el.title='';}
   }
 
@@ -2044,12 +2076,19 @@ function initAnalyzer(rootEl, fetchSource) {
   if (_srcFallback) {
     _srcFallback.addEventListener('change',()=>{
       _srcFileMap.clear();_bodyCache.clear();
+      const allApex=[];
+      const forceAppApex=[];
       for (const f of _srcFallback.files){
         const path=(f.webkitRelativePath||f.name).replace(/\\/g,'/');
-        // collect if path contains /force-app/ OR the root dir itself is force-app
-        const underForceApp=/(?:^|\/)force-app\//i.test(path)||/^force-app\//i.test(path);
-        if (underForceApp&&/\.(cls|trigger)$/i.test(f.name))
-          _srcFileMap.set(f.name.replace(/\.(cls|trigger)$/i,'').toLowerCase(),{_rawFile:f});
+        if (/\.(cls|trigger)$/i.test(f.name)) {
+          allApex.push(f);
+          if (/(?:^|\/)force-app\//i.test(path)||/^force-app\//i.test(path)) forceAppApex.push(f);
+        }
+      }
+      const srcList=forceAppApex.length?forceAppApex:allApex;
+      _srcScanScope=forceAppApex.length?'force-app':'selected-folder';
+      for (const f of srcList){
+        _srcFileMap.set(f.name.replace(/\.(cls|trigger)$/i,'').toLowerCase(),{_rawFile:f});
       }
       if (_srcFallback.files.length){_srcFolderName='Loaded files';updateSrcFolderUI();}
       _srcFallback.value='';
@@ -2143,7 +2182,7 @@ function initAnalyzer(rootEl, fetchSource) {
       return;
     }
 
-    body.innerHTML = '<div class="snippet-loading">Loading source…</div>';
+    body.innerHTML = '<div class="snippet-loading"><div class="snippet-spinner" aria-hidden="true"></div><div>Loading source file…</div></div>';
     const renderHtml = (html) => {
       body.innerHTML = html;
       const target = body.querySelector('.sline-target');
