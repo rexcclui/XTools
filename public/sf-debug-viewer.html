@@ -178,6 +178,9 @@ const CSS = `
 .log-ctx-item.danger:hover{background:#2d1117;color:#ff7b72}
 .log-ctx-sep{height:1px;background:#30363d;margin:3px 0}
 .log-ctx-label{padding:5px 16px 2px;font-size:10px;color:#768390;text-transform:uppercase;letter-spacing:.7px;user-select:none}
+.log-ctx-item.disabled{color:#586069;cursor:default;flex-direction:column;align-items:flex-start;gap:1px}
+.log-ctx-item.disabled:hover{background:none;color:#586069}
+.log-ctx-item .ctx-reason{font-size:10px;color:#586069}
 .log-ctx-info{padding:6px 14px 5px;background:#0d1117;border-bottom:1px solid #30363d;margin-bottom:2px}
 .log-ctx-info-name{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#79c0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px}
 .log-ctx-info-meta{font-size:10px;color:#768390;margin-top:2px}
@@ -992,6 +995,12 @@ function initAnalyzer(rootEl, fetchSource) {
     function lbl(text){
       const d=document.createElement('div');d.className='log-ctx-label';d.textContent=text;menu.appendChild(d);
     }
+    function disabledItem(text,reason){
+      const d=document.createElement('div');d.className='log-ctx-item disabled';
+      const t=document.createElement('span');t.textContent=text;d.appendChild(t);
+      if (reason){const r=document.createElement('span');r.className='ctx-reason';r.textContent=reason;d.appendChild(r)}
+      menu.appendChild(d);
+    }
 
     // ── block info + jump ──────────────────────────────────────────────────
     const chain=tab.tree&&ns>0?findBlockChainAtNs(tab.tree,ns):[];
@@ -1021,20 +1030,24 @@ function initAnalyzer(rootEl, fetchSource) {
     // ── view source ──────────────────────────────────────────────────────
     if (ll?.ev){
       const m=evMeta(ll.ev,ll.rest);
+      const lrTxt=m.lr?':'+m.lr.replace(/[\[\]]/g,''):'';
       if (m.cls){
-        item(`⌗ View source: ${m.cls}${m.lr?':'+m.lr.replace(/[\[\]]/g,''):''}`, '', ()=>{
+        item(`⌗ View source: ${m.cls}${lrTxt}`, '', ()=>{
           closeLogContextMenu();
           showSnippet(m.cls, m.lr||'', rowEl);
         });
         sep(menu);
-      } else if (m.lr && !m.cls) {
-        // event has a line ref but no class — show line ref only
-        const lr=m.lr.replace(/[\[\]]/g,'');
-        item(`⌗ Line ${lr} in current class`, '', ()=>{
-          closeLogContextMenu();
-          const chainCls=chain.length?[...chain].reverse().find(n=>n.cls)?.cls:'';
-          if (chainCls) showSnippet(chainCls, m.lr||'', rowEl);
-        });
+      } else if (m.lr) {
+        // event has a line ref but no class of its own — infer the enclosing class
+        const chainCls=chain.length?[...chain].reverse().find(n=>n.cls)?.cls:'';
+        if (chainCls){
+          item(`⌗ View source: ${chainCls}${lrTxt}`, '', ()=>{
+            closeLogContextMenu();
+            showSnippet(chainCls, m.lr||'', rowEl);
+          });
+        } else {
+          disabledItem('⌗ View source', 'no Apex class for this line (anonymous/system code)');
+        }
         sep(menu);
       }
     }
