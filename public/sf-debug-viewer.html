@@ -258,6 +258,7 @@ const HTML = `
     <div id="hideTags" class="hide-row"></div>
   </div>
   <button class="btn btn-sm" id="btn-history">📚 History</button>
+  <button class="btn btn-sm" id="btn-copyLog" title="Copy entire raw log to clipboard">⎘ Copy Log</button>
   <div style="width:1px;height:20px;background:var(--bd)"></div>
   <button class="btn btn-sm" id="btn-openSrc" title="Open Salesforce source project folder">📂 Source</button>
   <span id="srcFolderName" style="font-size:10px;color:var(--vd);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default"></span>
@@ -379,6 +380,7 @@ const HTML = `
       <div class="help-s">
         <h4>History &amp; Layout</h4>
         <div class="help-r"><span class="help-k">📚 History</span><span class="help-d">Previously parsed logs are auto-saved to localStorage; click History to reload any past session</span></div>
+        <div class="help-r"><span class="help-k">⎘ Copy Log</span><span class="help-d">Copy the active tab's entire raw log to the clipboard</span></div>
         <div class="help-r"><span class="help-k">Expand/Collapse</span><span class="help-d">Expand All / Collapse All flatten or fully expand the call tree at once</span></div>
         <div class="help-r"><span class="help-k">⋮ divider</span><span class="help-d">Drag the vertical divider between the raw log and tree panels to resize them</span></div>
         <div class="help-r"><span class="help-k">Stats bar</span><span class="help-d">Footer shows totals: methods, SOQL, DML, callouts, exceptions, and execution duration</span></div>
@@ -2185,6 +2187,15 @@ function initAnalyzer(rootEl, fetchSource) {
   $('hideInput').addEventListener('keydown', e=>{if(e.key==='Enter')addHideKeyword()});
   $('btn-addHide').addEventListener('click', addHideKeyword);
   $('btn-history').addEventListener('click', toggleHistory);
+  $('btn-copyLog').addEventListener('click', async () => {
+    const tab=getActiveTab();
+    const text=tab?.raw||'';
+    const btn=$('btn-copyLog');
+    if(!text.trim()){btn.textContent='Nothing to copy';setTimeout(()=>{btn.textContent='⎘ Copy Log';},1200);return;}
+    const ok=await copyTextToClipboard(text);
+    btn.textContent=ok?'✓ Copied':'Copy failed';
+    setTimeout(()=>{btn.textContent='⎘ Copy Log';},1200);
+  });
   $('btn-addTab').addEventListener('click', ()=>addTab(null,'Untitled',''));
   $('btn-closeHist').addEventListener('click', toggleHistory);
   $('btn-hideTree').addEventListener('click', hideTreePane);
