@@ -229,7 +229,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
   <div id="ctx-locate-other" class="ctx-item" onclick="ctxLocateOtherSide()" style="display:none"><span>⇆</span> Locate on other side</div>
   <div id="ctx-copy-json" class="ctx-item" onclick="ctxCopyJSON()"><span>⎘</span> Copy node JSON</div>
   <div id="ctx-parse-json" class="ctx-item" onclick="ctxParseJSON()"><span>⊞</span> Convert string to JSON table</div>
-  <div id="ctx-convert-newline" class="ctx-item" onclick="ctxConvertNewline()"><span>↵</span> Convert \n to newline</div>
+  <div id="ctx-convert-encode" class="ctx-item" onclick="ctxConvertEncode()"><span>↵</span> Convert Encode (&amp;gt; &amp; \n)</div>
   <div id="ctx-compare" class="ctx-item" onclick="openCompare()"><span>⇄</span> Compare selected nodes</div>
 </div>
 <div id="node-popup"></div>
@@ -289,7 +289,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
         <div class="help-row"><span class="help-key">+N / −</span><span class="help-desc">Click the yellow badge to expand an array/object; − to collapse</span></div>
         <div class="help-row"><span class="help-key">col +/−</span><span class="help-desc">Toggle button in the table header expands or collapses all values in that column</span></div>
         <div class="help-row"><span class="help-key">⎘ node</span><span class="help-desc">Hover any nested node to reveal its copy button and copy that value as JSON</span></div>
-        <div class="help-row"><span class="help-key">Right-click</span><span class="help-desc">Copy node JSON, Convert string to JSON table, Convert \n to newline, Compare selected nodes</span></div>
+        <div class="help-row"><span class="help-key">Right-click</span><span class="help-desc">Copy node JSON, Convert string to JSON table, Convert Encode (decode &amp;gt; entities + \n), Compare selected nodes</span></div>
       </div>
       <div class="help-sec">
         <h4>Compare &amp; Diff</h4>
@@ -1313,11 +1313,15 @@ function ctxParseJSON(){
     rebuildGP(cellId);
   }catch(e){alert('Not valid JSON/Apex object: '+e.message);}
 }
-function ctxConvertNewline(){
+function decodeEntities(str){
+  // textarea innerHTML decodes entities without parsing tags (RCDATA) — safe, no script execution
+  const ta=document.createElement('textarea');ta.innerHTML=str;return ta.value;
+}
+function ctxConvertEncode(){
   if(!_ctxTarget)return;const{path,cid}=_ctxTarget;hideCtxMenu();
   const v=getAt(cid,path);
   if(typeof v!=='string')return;
-  const converted=v.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n');
+  const converted=decodeEntities(v).replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n');
   const cellId=cellIdFromCid(cid);
   cs(cellId).parsedPaths[path]=converted;
   rebuildGP(cellId);
@@ -1524,14 +1528,14 @@ document.addEventListener('contextmenu',e=>{
   const m=document.getElementById('ctx-menu');
   const v=cid?getAt(cid,useEl.dataset.p):undefined;
   const isJsonStr=typeof v==='string'&&(v.trim().startsWith('{')||v.trim().startsWith('['));
-  const hasLiteralNL=typeof v==='string'&&v.includes('\\n');
+  const hasEncoded=typeof v==='string'&&(v.includes('\\n')||/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/.test(v));
   const canLocate=inGrid||inSrc;
   document.getElementById('ctx-locate-other').style.display=canLocate?'flex':'none';
   document.getElementById('ctx-copy-json').style.display=v!==undefined?'flex':'none';
   document.getElementById('ctx-parse-json').style.display=isJsonStr?'flex':'none';
-  document.getElementById('ctx-convert-newline').style.display=hasLiteralNL?'flex':'none';
+  document.getElementById('ctx-convert-encode').style.display=hasEncoded?'flex':'none';
   document.getElementById('ctx-compare').style.display=_sel.length===2?'flex':'none';
-  if(!canLocate&&v===undefined&&!isJsonStr&&!hasLiteralNL&&_sel.length!==2){hideCtxMenu();return;}
+  if(!canLocate&&v===undefined&&!isJsonStr&&!hasEncoded&&_sel.length!==2){hideCtxMenu();return;}
   const vw=window.innerWidth,vh=window.innerHeight;
   m.style.display='block';
   m.style.left=(e.clientX+220>vw?e.clientX-220:e.clientX)+'px';
