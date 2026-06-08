@@ -1173,7 +1173,7 @@ function toggleSel(el,cid,path){
   const k=cid+'::'+path;
   const idx=_sel.findIndex(x=>x.key===k);
   if(idx>-1){_sel[idx].el.classList.remove('sel-node');_sel.splice(idx,1);}
-  else{if(_sel.length>=2){const o=_sel.shift();if(o.el)o.el.classList.remove('sel-node');}el.classList.add('sel-node');_sel.push({cid,path,key:k,el});}
+  else{el.classList.add('sel-node');_sel.push({cid,path,key:k,el});}
   updSelBadge();
 }
 function updSelBadge(){
@@ -1182,7 +1182,7 @@ function updSelBadge(){
 }
 function showCmpHelp(){
   if(_sel.length===2){openCompare();return;}
-  alert('Click any value cell in the grid table to select it (turns orange). Select two cells, then right-click and choose "Compare selected nodes". Click a selected cell again to deselect it.');
+  alert('Select exactly two nodes to compare. Click any value cell in the grid table to select it (turns orange), then right-click and choose "Compare selected nodes". Click a selected cell again to deselect it.');
 }
 
 function openCompare(){
@@ -1285,12 +1285,19 @@ function diffRows(a,b,basePath){
 /* ══ CONTEXT MENU ══ */
 let _ctxTarget=null;
 function hideCtxMenu(){document.getElementById('ctx-menu').style.display='none';}
+function selectedCtxValues(){
+  return _sel
+    .map(s=>getAt(s.cid,s.path))
+    .filter(v=>v!==undefined);
+}
 function ctxCopyJSON(){
   if(!_ctxTarget)return;
+  const selectedValues=selectedCtxValues();
   const v=getAt(_ctxTarget.cid,_ctxTarget.path);
   hideCtxMenu();
-  if(v===undefined){alert('Could not read value.');return;}
-  const text=typeof v==='object'?JSON.stringify(v,null,2):String(v);
+  if(!selectedValues.length&&v===undefined){alert('Could not read value.');return;}
+  const copyValue=selectedValues.length>1?selectedValues:(selectedValues.length===1?selectedValues[0]:v);
+  const text=typeof copyValue==='object'?JSON.stringify(copyValue,null,2):String(copyValue);
   navigator.clipboard.writeText(text).then(()=>{
     // brief visual feedback on the element
     const el=_ctxTarget.el;
@@ -1531,12 +1538,15 @@ document.addEventListener('contextmenu',e=>{
   const isJsonStr=typeof v==='string'&&(v.trim().startsWith('{')||v.trim().startsWith('['));
   const hasEncoded=typeof v==='string'&&(v.includes('\\n')||/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/.test(v));
   const canLocate=inGrid||inSrc;
+  const hasSelection=_sel.length>0;
+  const copyItem=document.getElementById('ctx-copy-json');
+  copyItem.innerHTML=`<span>⎘</span> ${hasSelection?`Copy selected nodes (${_sel.length})`:'Copy node JSON'}`;
   document.getElementById('ctx-locate-other').style.display=canLocate?'flex':'none';
-  document.getElementById('ctx-copy-json').style.display=v!==undefined?'flex':'none';
+  copyItem.style.display=(hasSelection||v!==undefined)?'flex':'none';
   document.getElementById('ctx-parse-json').style.display=isJsonStr?'flex':'none';
   document.getElementById('ctx-convert-encode').style.display=hasEncoded?'flex':'none';
   document.getElementById('ctx-compare').style.display=_sel.length===2?'flex':'none';
-  if(!canLocate&&v===undefined&&!isJsonStr&&!hasEncoded&&_sel.length!==2){hideCtxMenu();return;}
+  if(!canLocate&&!hasSelection&&v===undefined&&!isJsonStr&&!hasEncoded&&_sel.length!==2){hideCtxMenu();return;}
   const vw=window.innerWidth,vh=window.innerHeight;
   m.style.display='block';
   m.style.left=(e.clientX+220>vw?e.clientX-220:e.clientX)+'px';
