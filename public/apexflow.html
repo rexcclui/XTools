@@ -85,6 +85,7 @@
         .fe-file.loaded { color: var(--primary); font-weight: 600; }
         .fe-file-icon { font-size: 10px; color: #64748b; flex-shrink: 0; }
         .fe-file.loaded .fe-file-icon { color: var(--primary); }
+        .fe-file .fe-file-icon.fe-load-error { color: #ef4444; }
 
         /* METHOD PICKER PANEL */
         #method-picker { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
@@ -211,6 +212,7 @@
         #loading-indicator { display: none; align-items: center; gap: 7px; padding: 5px 11px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.5); border-radius: 14px; color: var(--primary); font-size: 11px; font-weight: 500; white-space: nowrap; max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
         #loading-indicator.visible { display: inline-flex; }
         #loading-indicator .loading-text { overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+        #loading-indicator.error { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.5); color: #ef4444; }
         #html-index-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--border); background: rgba(148,163,184,0.08); color: #94a3b8; font-size: 10px; font-weight: 600; white-space: nowrap; }
         #html-index-status i { font-size: 9px; }
         #html-index-status.ready { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.12); color: var(--primary); }
@@ -1085,6 +1087,9 @@
             feState.lwcIndex = new Map(cached.lwcIndex);
             feState.apexIndex = new Map(cached.apexIndex);
             hideLoadingStatus();
+            // The cached tree goes stale when files are added/removed on disk,
+            // so rescan in the background and swap in the fresh tree if it differs.
+            revalidateTreeCache(dirHandle, cacheKey);
         } else {
             await showLoadingStatus(`Indexing "${dirHandle.name}"…`);
             try {
@@ -1141,6 +1146,45 @@
         }
 
         await idbSaveHandle(dirHandle);
+    }
+
+    function treeFileSignature(tree) {
+        return flatFiles(tree).map(f => f.path || f.name).sort().join('\n');
+    }
+
+    let treeRevalidationInProgress = false;
+
+    // Rescan the folder quietly after a cached tree was restored. Directory
+    // enumeration is far cheaper than file reads, so this stays in the
+    // background; the tree/indexes are only swapped when the file set changed.
+    async function revalidateTreeCache(dirHandle, cacheKey) {
+        if (treeRevalidationInProgress) return;
+        treeRevalidationInProgress = true;
+        try {
+            // lastReport: Infinity suppresses buildHandleTree's progress banner.
+            const freshTree = await buildHandleTree(dirHandle, dirHandle.name, { dirs: 0, lastReport: Infinity });
+            if (feState.dirHandle !== dirHandle) return;
+            if (treeFileSignature(freshTree) === treeFileSignature(feState.tree)) return;
+            feState.tree = freshTree;
+            feState.lwcIndex = new Map();
+            feState.apexIndex = new Map();
+            if (freshTree) {
+                indexLwcFromTree(freshTree);
+                indexApexFromTree(freshTree);
+            }
+            idbSaveTreeCache(cacheKey, {
+                ts: Date.now(),
+                tree: freshTree,
+                lwcIndex: [...feState.lwcIndex.entries()],
+                apexIndex: [...feState.apexIndex.entries()],
+            });
+            updateIndexBadges();
+            renderFileTree();
+        } catch (e) {
+            console.warn('Folder re-scan failed; keeping cached index', e);
+        } finally {
+            treeRevalidationInProgress = false;
+        }
     }
 
     async function reindexFolder() {
@@ -1411,9 +1455,16 @@
         }
     }
 
+    let loadErrorHideTimer = null;
+
     async function showLoadingStatus(msg) {
         const el = document.getElementById('loading-indicator');
         if (!el) return;
+        if (loadErrorHideTimer) { clearTimeout(loadErrorHideTimer); loadErrorHideTimer = null; }
+        el.classList.remove('error');
+        el.title = '';
+        const icon = el.querySelector('i');
+        if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
         el.querySelector('.loading-text').textContent = msg;
         el.classList.add('visible');
         // Yield so the new message paints before sync work continues.
@@ -1422,7 +1473,25 @@
 
     function hideLoadingStatus() {
         const el = document.getElementById('loading-indicator');
-        if (el) el.classList.remove('visible');
+        // An error banner stays visible until its own timer (or the next
+        // showLoadingStatus call) clears it.
+        if (el && !el.classList.contains('error')) el.classList.remove('visible');
+    }
+
+    function showLoadError(msg, autoHideMs = 8000) {
+        const el = document.getElementById('loading-indicator');
+        if (!el) return;
+        el.classList.add('error', 'visible');
+        const icon = el.querySelector('i');
+        if (icon) icon.className = 'fa-solid fa-triangle-exclamation';
+        el.querySelector('.loading-text').textContent = msg;
+        el.title = msg;
+        if (loadErrorHideTimer) clearTimeout(loadErrorHideTimer);
+        loadErrorHideTimer = setTimeout(() => {
+            loadErrorHideTimer = null;
+            el.classList.remove('error', 'visible');
+            el.title = '';
+        }, autoHideMs);
     }
 
     function updateIndexBadges() {
@@ -1721,6 +1790,7 @@
             scheduleSearchMatchPrefetch(fileNode.name);
         }
 
+        let loadFailed = false;
         try {
             const name = fileNode.name;
             const lower = name.toLowerCase();
@@ -1802,9 +1872,17 @@
             }
         } catch (e) {
             console.error('Failed to load', fileNode.name, e);
+            loadFailed = true;
+            const reason = e?.message || e?.name || String(e);
+            if (!isAutoLoad) showLoadError(`Failed to load ${fileNode.name} — ${reason}`);
+            if (iconEl) iconEl.className = 'fa-solid fa-triangle-exclamation fe-file-icon fe-load-error';
+            if (rowEl) rowEl.title = `Load failed: ${reason}\nClick to retry.`;
         } finally {
             endForegroundFileLoad();
-            if (iconEl) iconEl.className = 'fa-solid fa-file-code fe-file-icon';
+            if (!loadFailed) {
+                if (iconEl) iconEl.className = 'fa-solid fa-file-code fe-file-icon';
+                if (rowEl) rowEl.removeAttribute('title');
+            }
             hideLoadingStatus();
             if (isFirstLoad && feState.autoLoadQueue.length > 0) {
                 setTimeout(loadNextFromAutoLoadQueue, 100);
