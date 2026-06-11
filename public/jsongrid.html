@@ -228,6 +228,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 <div id="ctx-menu">
   <div id="ctx-locate-other" class="ctx-item" onclick="ctxLocateOtherSide()" style="display:none"><span>⇆</span> Locate on other side</div>
   <div id="ctx-copy-json" class="ctx-item" onclick="ctxCopyJSON()"><span>⎘</span> Copy node JSON</div>
+  <div id="ctx-list-view" class="ctx-item" onclick="ctxToggleListView()" style="display:none"><span>▦</span> List items as a table</div>
   <div id="ctx-parse-json" class="ctx-item" onclick="ctxParseJSON()"><span>⊞</span> Convert string to JSON table</div>
   <div id="ctx-convert-encode" class="ctx-item" onclick="ctxConvertEncode()"><span>↵</span> Convert Encode (&amp;gt; &amp; \n)</div>
   <div id="ctx-compare" class="ctx-item" onclick="openCompare()"><span>⇄</span> Compare selected nodes</div>
@@ -371,11 +372,19 @@ function syncAll(){
   if(!G)return;
   document.querySelectorAll('textarea[id^="ta-"]').forEach(ta=>{
     const id=ta.id.replace('ta-','');
-    if(!G.cells[id])G.cells[id]={text:'',title:'',pretty:false,parsedPaths:{}};
+    if(!G.cells[id])G.cells[id]={text:'',title:'',pretty:false,parsedPaths:{},arrayViewModes:{}};
     G.cells[id].text=ta.value;
   });
 }
-function cs(id){if(!G.cells[id])G.cells[id]={text:'',title:'',pretty:false,parsedPaths:{}};return G.cells[id];}
+function ensureCellStateShape(s){
+  if(!s.parsedPaths)s.parsedPaths={};
+  if(!s.arrayViewModes)s.arrayViewModes={};
+  return s;
+}
+function cs(id){
+  if(!G.cells[id])G.cells[id]={text:'',title:'',pretty:false,parsedPaths:{},arrayViewModes:{}};
+  return ensureCellStateShape(G.cells[id]);
+}
 
 /* ══ PRETTY SOURCE ══ */
 function prettySrc(val,ind,path,cid){
@@ -535,19 +544,46 @@ function rV(val,level,path,cid,s){
 }
 
 function rArr(arr,level,base,cid,s){
+  const tryParseRowObject=v=>{
+    if(v&&typeof v==='object'&&!Array.isArray(v))return v;
+    if(typeof v!=='string')return null;
+    const t=v.trim();
+    if(!t||t[0]!=='{'||t[t.length-1]!=='}')return null;
+    try{
+      const parsed=JSON.parse(t);
+      return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:null;
+    }catch(e){
+      return null;
+    }
+  };
+  const mode=(s.arrayViewModes&&s.arrayViewModes[base])||'auto';
+  let rowObjects,objectRows,useObjectTable;
+  if(mode==='table'){
+    // When user explicitly chooses table: parse JSON strings as rows
+    rowObjects=arr.map(v=>tryParseRowObject(v));
+    objectRows=rowObjects.filter(Boolean);
+    useObjectTable=objectRows.length>0;
+  }else{
+    // Default/auto/vertical: only use objects as-is, don't auto-parse strings
+    rowObjects=arr.map(v=>v&&typeof v==='object'&&!Array.isArray(v)?v:null);
+    objectRows=rowObjects.filter(Boolean);
+    useObjectTable=mode==='vertical'?false:(mode==='auto'&&arr.length>0&&objectRows.length===arr.length);
+  }
   const tid='t'+escA(base);
-  if(arr.length>0&&arr.every(v=>v&&typeof v==='object'&&!Array.isArray(v))){
-    const keys=[...new Set(arr.flatMap(o=>Object.keys(o)))];
-    let h=`<table class="jg-tbl" id="${tid}"><thead><tr><th style="width:32px">#</th>`;
+  if(useObjectTable){
+    const keys=[...new Set(objectRows.flatMap(o=>Object.keys(o)))];
+    const hasNonObjectRows=objectRows.length!==arr.length;
+    if(hasNonObjectRows)keys.push('__value');
+    let h=`<table class="jg-tbl" id="${tid}" data-array-base="${escA(base)}" data-cid="${cid}"><thead><tr><th style="width:32px">#</th>`;
     keys.forEach((k,i)=>{
       // Determine if any cell in this column is an object/array (expandable)
-      const colHasNested=arr.some(row=>{const v=row?row[k]:undefined;return v&&typeof v==='object';});
+      const colHasNested=k==='__value'?false:rowObjects.some(rowObj=>{const v=rowObj?rowObj[k]:undefined;return v&&typeof v==='object';});
       // Determine current state - collapsed if ALL nested in column are collapsed
       let colState='none';
       if(colHasNested){
         let anyOpen=false,anyClosed=false;
-        arr.forEach((row,ri)=>{
-          const v=row?row[k]:undefined;
+        rowObjects.forEach((rowObj,ri)=>{
+          const v=rowObj?rowObj[k]:undefined;
           if(v&&typeof v==='object'){
             const p=base+'['+ri+'].'+k;
             if(_exp[p]===false)anyClosed=true;else anyOpen=true;
@@ -558,21 +594,29 @@ function rArr(arr,level,base,cid,s){
       const togBtn=colHasNested
         ? `<button class="col-tog" data-col-key="${escA(k)}" data-col-base="${escA(base)}" onclick="togCol(event,this,'${escA(base)}','${escA(k)}','${cid}')" title="${colState==='expanded'?'Collapse':'Expand'} all ${escH(k)}">${colState==='expanded'?'−':'+'}</button>`
         : '';
-      h+=`<th><div class="th-cell">${togBtn}<span>${escH(k)}</span><div class="cr" onmousedown="startCR(event,'${tid}',${i},this)"></div></div></th>`;
+      const title=k==='__value'?'value':k;
+      h+=`<th><div class="th-cell">${togBtn}<span>${escH(title)}</span><div class="cr" onmousedown="startCR(event,'${tid}',${i},this)"></div></div></th>`;
     });
     h+=`</tr></thead><tbody>`;
     arr.forEach((row,ri)=>{
-      const rowHasNested=row&&typeof row==='object'&&Object.values(row).some(v=>v&&typeof v==='object');
+      const rowObj=rowObjects[ri];
+      const rowHasNested=rowObj&&Object.values(rowObj).some(v=>v&&typeof v==='object');
       let rowAnyOpen=false;
-      if(rowHasNested)Object.keys(row).forEach(k=>{const v=row[k];if(v&&typeof v==='object'&&_exp[base+'['+ri+'].'+k]!==false)rowAnyOpen=true;});
+      if(rowHasNested)Object.keys(rowObj).forEach(k=>{const v=rowObj[k];if(v&&typeof v==='object'&&_exp[base+'['+ri+'].'+k]!==false)rowAnyOpen=true;});
       const rowBtn=rowHasNested?`<button class="col-tog" onclick="togRowColl('${escA(base)}',${ri},'${cid}')" title="${rowAnyOpen?'Collapse':'Expand'} row ${ri}">${rowAnyOpen?'−':'+'}</button> `:'';
       h+=`<tr><td style="background:var(--bg2);padding:4px;font-size:10px;text-align:center;white-space:nowrap">${rowBtn}${ri}</td>`;
-      keys.forEach(k=>h+=`<td data-p="${escA(base+'['+ri+'].'+k)}" data-cid="${cid}">${row.hasOwnProperty(k)?rV(row[k],level,base+'['+ri+'].'+k,cid,s):'—'}</td>`);
+      keys.forEach(k=>{
+        if(k==='__value'){
+          h+=`<td data-p="${escA(base+'['+ri+']')}" data-cid="${cid}">${rowObj?'—':rV(row,level,base+'['+ri+']',cid,s)}</td>`;
+          return;
+        }
+        h+=`<td data-p="${escA(base+'['+ri+'].'+k)}" data-cid="${cid}">${rowObj&&Object.prototype.hasOwnProperty.call(rowObj,k)?rV(rowObj[k],level,base+'['+ri+'].'+k,cid,s):'—'}</td>`;
+      });
       h+=`</tr>`;
     });
     return h+`</tbody></table>`;
   }
-  let h=`<table class="jg-tbl" id="${tid}"><thead><tr><th style="width:32px">#</th><th><div class="th-cell"><span>value</span><div class="cr" onmousedown="startCR(event,'${tid}',0,this)"></div></div></th></tr></thead><tbody>`;
+  let h=`<table class="jg-tbl" id="${tid}" data-array-base="${escA(base)}" data-cid="${cid}"><thead><tr><th style="width:32px">#</th><th><div class="th-cell"><span>value</span><div class="cr" onmousedown="startCR(event,'${tid}',0,this)"></div></div></th></tr></thead><tbody>`;
   arr.forEach((v,i)=>h+=`<tr><td style="background:var(--bg2);padding:4px;font-size:10px;text-align:center">${i}</td><td data-p="${escA(base+'['+i+']')}" data-cid="${cid}">${rV(v,level,base+'['+i+']',cid,s)}</td></tr>`);
   return h+`</tbody></table>`;
 }
@@ -885,7 +929,7 @@ function syncTA(id){
   ta.onfocus=()=>{showStorageDrop(id);};
 }
 
-function clearCell(id){G.cells[id]={text:'',title:'',pretty:false,parsedPaths:{}};const cell=document.getElementById('cell-'+id);if(cell){const r=parseInt(id),c=parseInt(id.split('_')[1]);cell.innerHTML=cellHTML(id,parseInt(id.split('_')[0]),parseInt(id.split('_')[1]),G.cells[id]);const ta=document.getElementById('ta-'+id);if(ta)ta.value='';syncTA(id);setupColDivider(cell,id);setupSyncEvents(cell,id);setupDD(cell,id);}saveAppState();}
+function clearCell(id){G.cells[id]={text:'',title:'',pretty:false,parsedPaths:{},arrayViewModes:{}};const cell=document.getElementById('cell-'+id);if(cell){const r=parseInt(id),c=parseInt(id.split('_')[1]);cell.innerHTML=cellHTML(id,parseInt(id.split('_')[0]),parseInt(id.split('_')[1]),G.cells[id]);const ta=document.getElementById('ta-'+id);if(ta)ta.value='';syncTA(id);setupColDivider(cell,id);setupSyncEvents(cell,id);setupDD(cell,id);}saveAppState();}
 function clearAll(){if(confirm('Clear Tab?')){G.cells={};renderGrid();saveAppState();}}
 /* ══ ROW DRAG REORDER ══ */
 let _dragRow=null;
@@ -936,7 +980,7 @@ function reorderRows(from,to){
     const row=[];
     for(let c=0;c<G.cols;c++){
       const s=cs(r+'_'+c);
-      row.push({text:s.text,title:s.title,pretty:s.pretty,parsedPaths:{}});
+      row.push({text:s.text,title:s.title,pretty:s.pretty,parsedPaths:{},arrayViewModes:{...(s.arrayViewModes||{})}});
     }
     snap.push(row);
   }
@@ -974,11 +1018,11 @@ function removeRow(r){
   for(let rr=r;rr<G.rows-1;rr++){
     for(let c=0;c<G.cols;c++){
       const src=cs((rr+1)+'_'+c);
-      G.cells[rr+'_'+c]={text:src.text,title:src.title,pretty:src.pretty,parsedPaths:{}};
+      G.cells[rr+'_'+c]={text:src.text,title:src.title,pretty:src.pretty,parsedPaths:{},arrayViewModes:{...(src.arrayViewModes||{})}};
     }
   }
   // Clear last row
-  for(let c=0;c<G.cols;c++) G.cells[(G.rows-1)+'_'+c]={text:'',title:'',pretty:false,parsedPaths:{}};
+  for(let c=0;c<G.cols;c++) G.cells[(G.rows-1)+'_'+c]={text:'',title:'',pretty:false,parsedPaths:{},arrayViewModes:{}};
   G.rows--;
   if(G.maxRow!==null&&G.maxRow>=G.rows)G.maxRow=null;
   G.cR.delete(G.rows);
@@ -1137,6 +1181,7 @@ function appendPreviewLines(lines,label,v,depth,maxDepth){
 function buildNodePreview(path,cid){
   const v=getAt(cid,path);
   if(v===undefined)return '';
+  if(Array.isArray(v))return '';
   if(v===null||typeof v!=='object')return '';
   if((Array.isArray(v)&&v.length===0)||(!Array.isArray(v)&&Object.keys(v).length===0))return '';
   const lines=[];
@@ -1334,6 +1379,41 @@ function ctxConvertEncode(){
   cs(cellId).parsedPaths[path]=converted;
   rebuildGP(cellId);
 }
+function parentPath(path){
+  const p=String(path||'');
+  if(!p)return null;
+  if(/\[\d+\]$/.test(p))return p.replace(/\[\d+\]$/,'');
+  if(/\.[^.\[]+$/.test(p))return p.replace(/\.[^.\[]+$/,'');
+  return null;
+}
+function findNearestArrayPath(cid,path){
+  let p=String(path||'');
+  while(p){
+    const v=getAt(cid,p);
+    if(Array.isArray(v))return p;
+    p=parentPath(p);
+  }
+  return null;
+}
+function canListAsTable(arr){
+  return Array.isArray(arr)&&arr.length>0;
+}
+function ctxToggleListView(){
+  if(!_ctxTarget)return;
+  const {cid,path}= _ctxTarget;
+  const arrayPath=findNearestArrayPath(cid,path);
+  if(!arrayPath){hideCtxMenu();return;}
+  const arr=getAt(cid,arrayPath);
+  if(!canListAsTable(arr)){hideCtxMenu();return;}
+  const cellId=cellIdFromCid(cid);
+  const s=cs(cellId);
+  const curMode=(s.arrayViewModes&&s.arrayViewModes[arrayPath])||'auto';
+  // Toggle between table and vertical so users can switch back explicitly.
+  s.arrayViewModes[arrayPath]=(curMode==='table')?'vertical':'table';
+  hideCtxMenu();
+  rebuildGP(cellId);
+  saveAppState();
+}
 // Single document-level handler for node selection - never stacks
 document.addEventListener('click',e=>{
   // Must click inside a grid-panel or src-pretty
@@ -1521,32 +1601,48 @@ function navSearch(id,dir){
 document.addEventListener('contextmenu',e=>{
   const elCid=e.target.closest('[data-p][data-cid],.jv');
   const elP=e.target.closest('[data-p]');
-  if(!elP&&!elCid){hideCtxMenu();return;}
+  const elArray=e.target.closest('table[data-array-base]');
+  if(!elP&&!elCid&&!elArray){hideCtxMenu();return;}
   e.preventDefault();
-  const useEl=elCid||elP;
+  const useEl=elCid||elP||elArray;
   // derive cid from element or from parent cell
   let cid=useEl.dataset.cid;
   if(!cid){
     const cellEl=useEl.closest('[id^="cell-"]');
     if(cellEl) cid='t'+G.id+'_'+cellEl.id.replace('cell-','');
   }
+  let targetPath=useEl.dataset.p;
+  if(!targetPath&&elArray&&elArray.dataset.arrayBase)targetPath=elArray.dataset.arrayBase;
   const inGrid=!!useEl.closest('.grid-panel,.jg-wrap');
   const inSrc=!!useEl.closest('.src-pretty');
-  _ctxTarget={el:useEl,path:useEl.dataset.p,cid,inGrid,inSrc};
+  _ctxTarget={el:useEl,path:targetPath,cid,inGrid,inSrc};
   const m=document.getElementById('ctx-menu');
-  const v=cid?getAt(cid,useEl.dataset.p):undefined;
+  const v=cid&&targetPath?getAt(cid,targetPath):undefined;
   const isJsonStr=typeof v==='string'&&(v.trim().startsWith('{')||v.trim().startsWith('['));
   const hasEncoded=typeof v==='string'&&(v.includes('\\n')||/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/.test(v));
   const canLocate=inGrid||inSrc;
+  const arrayPath=cid&&targetPath?findNearestArrayPath(cid,targetPath):(elArray&&elArray.dataset.arrayBase?elArray.dataset.arrayBase:null);
+  const arrayVal=arrayPath?getAt(cid,arrayPath):undefined;
+  const canToggleList=canListAsTable(arrayVal);
   const hasSelection=_sel.length>0;
   const copyItem=document.getElementById('ctx-copy-json');
+  const listItem=document.getElementById('ctx-list-view');
+  const listCellId=cid?cellIdFromCid(cid):null;
+  const listState=listCellId&&arrayPath?cs(listCellId):null;
+  const listMode=arrayPath&&listState?((listState.arrayViewModes&&listState.arrayViewModes[arrayPath])||'auto'):'auto';
   copyItem.innerHTML=`<span>⎘</span> ${hasSelection?`Copy selected nodes (${_sel.length})`:'Copy node JSON'}`;
+  if(listItem){
+    listItem.style.display=canToggleList?'flex':'none';
+    listItem.innerHTML=listMode==='table'
+      ? '<span>▤</span> List items as vertical'
+      : '<span>▦</span> List items as a table';
+  }
   document.getElementById('ctx-locate-other').style.display=canLocate?'flex':'none';
   copyItem.style.display=(hasSelection||v!==undefined)?'flex':'none';
   document.getElementById('ctx-parse-json').style.display=isJsonStr?'flex':'none';
   document.getElementById('ctx-convert-encode').style.display=hasEncoded?'flex':'none';
   document.getElementById('ctx-compare').style.display=_sel.length===2?'flex':'none';
-  if(!canLocate&&!hasSelection&&v===undefined&&!isJsonStr&&!hasEncoded&&_sel.length!==2){hideCtxMenu();return;}
+  if(!canLocate&&!hasSelection&&v===undefined&&!isJsonStr&&!hasEncoded&&!canToggleList&&_sel.length!==2){hideCtxMenu();return;}
   const vw=window.innerWidth,vh=window.innerHeight;
   m.style.display='block';
   m.style.left=(e.clientX+220>vw?e.clientX-220:e.clientX)+'px';
@@ -1627,7 +1723,8 @@ function saveAppState(){
         cells:Object.fromEntries(Object.entries(tab.cells||{}).map(([k,v])=>([k,{
           text:v.text||'',
           title:v.title||'',
-          pretty:!!v.pretty
+          pretty:!!v.pretty,
+          arrayViewModes:v.arrayViewModes||{}
         }]))),
         cR:[...(tab.cR||new Set())],
         rowHeights:Array.isArray(tab.rowHeights)?tab.rowHeights:[1,1,1,1,1,1,1,1],
@@ -1647,7 +1744,7 @@ function loadAppState(){
       cols:Math.max(1,Math.min(5,tab.cols||1)),
       rows:Math.max(1,Math.min(8,tab.rows||1)),
       cells:Object.fromEntries(Object.entries(tab.cells||{}).map(([k,v])=>[k,{
-        text:v.text||'',title:v.title||'',pretty:!!v.pretty,parsedPaths:{}
+        text:v.text||'',title:v.title||'',pretty:!!v.pretty,parsedPaths:{},arrayViewModes:v.arrayViewModes||{}
       }])),
       cR:new Set(Array.isArray(tab.cR)?tab.cR:[]),
       rowHeights:Array.isArray(tab.rowHeights)&&tab.rowHeights.length?tab.rowHeights:[1,1,1,1,1,1,1,1],
