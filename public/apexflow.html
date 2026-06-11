@@ -550,6 +550,14 @@
     let htmlReferenceIndexVersion = 0;
     let htmlReferenceMissCache = new Set();
     let htmlReferenceCacheKey = null;
+    const AUTO_WARMUP_HTML_REFERENCE_INDEX = false;
+    const SLOW_FILE_READ_THRESHOLD_MS = 5000;
+    const textFileDecoder = new TextDecoder('utf-8');
+    let foregroundFileLoadCount = 0;
+    let fileReadQueueSeq = 0;
+    let fileReadActiveCount = 0;
+    const fileReadQueue = [];
+    const fileTextMemoryCache = new Map();
 
     function setHtmlIndexStatus(state, text) {
         const el = document.getElementById('html-index-status');
@@ -576,6 +584,167 @@
         setHtmlIndexStatus('idle', 'HTML Ref Cache: Idle');
     }
 
+    function beginForegroundFileLoad() {
+        foregroundFileLoadCount++;
+    }
+
+    function endForegroundFileLoad() {
+        foregroundFileLoadCount = Math.max(0, foregroundFileLoadCount - 1);
+    }
+
+    async function waitForForegroundFileLoadToFinish() {
+        while (foregroundFileLoadCount > 0) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+
+    function pumpFileReadQueue() {
+        if (fileReadActiveCount > 0 || !fileReadQueue.length) return;
+        let nextIndex = 0;
+        for (let i = 1; i < fileReadQueue.length; i++) {
+            const a = fileReadQueue[i];
+            const b = fileReadQueue[nextIndex];
+            if (a.priority > b.priority || (a.priority === b.priority && a.seq < b.seq)) {
+                nextIndex = i;
+            }
+        }
+
+        const next = fileReadQueue.splice(nextIndex, 1)[0];
+        fileReadActiveCount++;
+        Promise.resolve()
+            .then(next.task)
+            .then(next.resolve, next.reject)
+            .finally(() => {
+                fileReadActiveCount = Math.max(0, fileReadActiveCount - 1);
+                pumpFileReadQueue();
+            });
+    }
+
+    function queueFileRead(task, priority = 'background') {
+        const priorityValue = priority === 'foreground' ? 2 : 1;
+        return new Promise((resolve, reject) => {
+            fileReadQueue.push({ task, resolve, reject, priority: priorityValue, seq: fileReadQueueSeq++ });
+            pumpFileReadQueue();
+        });
+    }
+
+    async function readBrowserFileAsText(file, options = {}) {
+        const { timeoutMs = 0, label = 'file', timingPrefix = '' } = options;
+        const arrayBufferStart = performance.now();
+        const buffer = timeoutMs
+            ? await withTimeout(file.arrayBuffer(), timeoutMs, `readBytes(${label})`)
+            : await file.arrayBuffer();
+        if (timingPrefix) console.log(`${timingPrefix}-array-buffer:`, performance.now() - arrayBufferStart, 'ms');
+        const decodeStart = performance.now();
+        const text = textFileDecoder.decode(buffer);
+        if (timingPrefix) console.log(`${timingPrefix}-decode:`, performance.now() - decodeStart, 'ms');
+        return text;
+    }
+
+    function getFileTextCacheKey(filePath) {
+        const folderKey = htmlReferenceCacheKey || feState.dirHandle?.name || 'session';
+        const normalizedPath = String(filePath || '').trim().toLowerCase();
+        return normalizedPath ? `${folderKey}::${normalizedPath}` : '';
+    }
+
+    async function getCachedFileText(cacheKey) {
+        if (!cacheKey) return null;
+        if (fileTextMemoryCache.has(cacheKey)) return fileTextMemoryCache.get(cacheKey);
+        try {
+            const db = await idbOpen();
+            const entry = await new Promise((resolve, reject) => {
+                const req = db.transaction(IDB_FILE_TEXT_STORE, 'readonly').objectStore(IDB_FILE_TEXT_STORE).get(cacheKey);
+                req.onsuccess = e => resolve(e.target.result || null);
+                req.onerror = e => reject(e.target.error);
+            });
+            if (entry) fileTextMemoryCache.set(cacheKey, entry);
+            return entry;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function setCachedFileText(cacheKey, payload) {
+        if (!cacheKey || !payload?.text) return;
+        fileTextMemoryCache.set(cacheKey, payload);
+        try {
+            const db = await idbOpen();
+            db.transaction(IDB_FILE_TEXT_STORE, 'readwrite').objectStore(IDB_FILE_TEXT_STORE).put(payload, cacheKey);
+        } catch (e) {
+            console.warn('idb file text cache save failed', e);
+        }
+    }
+
+    async function clearFileTextCache() {
+        fileTextMemoryCache.clear();
+        try {
+            const db = await idbOpen();
+            db.transaction(IDB_FILE_TEXT_STORE, 'readwrite').objectStore(IDB_FILE_TEXT_STORE).clear();
+        } catch (e) { /* ignore */ }
+    }
+
+    async function isCachedFileCurrent(handle, cacheKey, options = {}) {
+        const { timeoutMs = 0, label = 'file' } = options;
+        const cached = await getCachedFileText(cacheKey);
+        if (!cached || !handle) return false;
+        try {
+            const file = timeoutMs
+                ? await withTimeout(handle.getFile(), timeoutMs, `getFile(${label})`)
+                : await handle.getFile();
+            return (file.lastModified || 0) === (cached.lastModified || 0)
+                && file.size === cached.size;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function markSlowFileReads(totalMs) {
+        if (totalMs < SLOW_FILE_READ_THRESHOLD_MS || feState.disableAutoLoadForSlowReads) return;
+        feState.disableAutoLoadForSlowReads = true;
+        cancelPendingAutoLoadQueue();
+        console.warn('Wildcard auto-load disabled because file reads are too slow on this system.', { totalMs });
+    }
+
+    function readHandleTextDetailed(handle, options = {}) {
+        const { priority = 'background', timeoutMs = 0, label = 'file', timingPrefix = '', cacheKey = '', allowCache = true } = options;
+        const queuedAt = performance.now();
+        return queueFileRead(async () => {
+            if (allowCache && cacheKey) {
+                const cached = await getCachedFileText(cacheKey);
+                if (cached?.text) {
+                    if (timingPrefix) console.log(`${timingPrefix}-cache-hit:`, cacheKey);
+                    return {
+                        file: { size: cached.size || cached.text.length, lastModified: cached.lastModified || 0 },
+                        text: cached.text,
+                        fromCache: true,
+                    };
+                }
+            }
+            const startedAt = performance.now();
+            if (timingPrefix) console.log(`${timingPrefix}-queue-wait:`, startedAt - queuedAt, 'ms');
+            const getFileStart = performance.now();
+            const file = timeoutMs
+                ? await withTimeout(handle.getFile(), timeoutMs, `getFile(${label})`)
+                : await handle.getFile();
+            if (timingPrefix) console.log(`${timingPrefix}-get-file:`, performance.now() - getFileStart, 'ms');
+            const text = await readBrowserFileAsText(file, { timeoutMs, label, timingPrefix });
+            if (allowCache && cacheKey) {
+                setCachedFileText(cacheKey, {
+                    text,
+                    size: file.size,
+                    lastModified: file.lastModified || 0,
+                    ts: Date.now(),
+                });
+            }
+            return { file, text, fromCache: false };
+        }, priority);
+    }
+
+    async function readHandleText(handle, options = {}) {
+        const result = await readHandleTextDetailed(handle, options);
+        return result.text;
+    }
+
     async function persistHtmlReferenceIndex() {
         if (!htmlReferenceCacheKey) return;
         const payload = {
@@ -590,10 +759,21 @@
 
     function warmupHtmlReferenceIndex() {
         if (!feState.lwcIndex?.size) return;
-        setHtmlIndexStatus('building', 'HTML Ref Cache: Building…');
-        setTimeout(() => {
+        if (!AUTO_WARMUP_HTML_REFERENCE_INDEX) {
+            setHtmlIndexStatus('idle', 'HTML Ref Cache: Manual');
+            return;
+        }
+        const tryWarmup = () => {
+            const loadingEl = document.getElementById('loading-indicator');
+            if (loadingEl?.classList.contains('visible')) {
+                setTimeout(tryWarmup, 1500);
+                return;
+            }
             ensureHtmlReferenceIndex().catch(e => console.warn('HTML reference index warmup failed', e));
-        }, 50);
+        };
+
+        setHtmlIndexStatus('idle', 'HTML Ref Cache: Waiting for idle');
+        setTimeout(tryWarmup, 1500);
     }
 
     const SYSTEM_TYPES = new Set([
@@ -661,21 +841,21 @@
             if (lower.endsWith('.js')) {
                 const base = file.name.replace(/\.js$/i, '');
                 const sibling = fileByName.get(`${base}.html`);
-                const jsText = await file.text();
-                const htmlText = sibling ? await sibling.text() : '';
+                const jsText = await readBrowserFileAsText(file, { label: file.name });
+                const htmlText = sibling ? await readBrowserFileAsText(sibling, { label: sibling.name }) : '';
                 parseLwc(base, jsText, htmlText);
                 processed.add(file.name);
                 if (sibling) processed.add(sibling.name);
             } else if (lower.endsWith('.html')) {
                 const base = file.name.replace(/\.html$/i, '');
                 const sibling = fileByName.get(`${base}.js`);
-                const htmlText = await file.text();
-                const jsText = sibling ? await sibling.text() : '';
+                const htmlText = await readBrowserFileAsText(file, { label: file.name });
+                const jsText = sibling ? await readBrowserFileAsText(sibling, { label: sibling.name }) : '';
                 parseLwc(base, jsText, htmlText);
                 processed.add(file.name);
                 if (sibling) processed.add(sibling.name);
             } else {
-                const text = await file.text();
+                const text = await readBrowserFileAsText(file, { label: file.name });
                 parseApex(text);
                 processed.add(file.name);
             }
@@ -685,23 +865,24 @@
     });
 
     // ── FILE EXPLORER ──────────────────────────────────────────────────────────
-    const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null, lwcIndex: new Map(), apexIndex: new Map() };
+    const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null, lwcIndex: new Map(), apexIndex: new Map(), autoLoadQueue: [], autoLoadInProgress: false, disableAutoLoadForSlowReads: false, prefetchQueue: [], prefetchInProgress: false, prefetchTimer: null };
     const LWC_SKIP_DIRS = new Set(['__tests__', '__mocks__', 'node_modules', '.git', '.sfdx', '.sf', 'dist', 'build', 'target', 'out', '.next', '.cache', '.vscode']);
     const AUTO_LOAD_REL_IMPORTS = false;
 
     // ── IndexedDB persistence for the directory handle ─────────────────────────
-    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory', IDB_TREE_STORE = 'treeCache', IDB_REF_STORE = 'htmlRefCache';
+    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory', IDB_TREE_STORE = 'treeCache', IDB_REF_STORE = 'htmlRefCache', IDB_FILE_TEXT_STORE = 'fileTextCache';
     const MAX_FILE_HIST = 30;
 
     function idbOpen() {
         return new Promise((res, rej) => {
-            const req = indexedDB.open(IDB_NAME, 4); // v4 adds htmlRefCache store
+            const req = indexedDB.open(IDB_NAME, 5); // v5 adds fileTextCache store
             req.onupgradeneeded = e => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains(IDB_DIR_STORE)) db.createObjectStore(IDB_DIR_STORE);
                 if (!db.objectStoreNames.contains(IDB_HIST_STORE)) db.createObjectStore(IDB_HIST_STORE, { keyPath: 'name' });
                 if (!db.objectStoreNames.contains(IDB_TREE_STORE)) db.createObjectStore(IDB_TREE_STORE);
                 if (!db.objectStoreNames.contains(IDB_REF_STORE)) db.createObjectStore(IDB_REF_STORE);
+                if (!db.objectStoreNames.contains(IDB_FILE_TEXT_STORE)) db.createObjectStore(IDB_FILE_TEXT_STORE);
             };
             req.onsuccess = e => res(e.target.result);
             req.onerror = e => rej(e.target.error);
@@ -891,6 +1072,7 @@
         feState.dirHandle = dirHandle;
         feState.lwcIndex = new Map();
         feState.apexIndex = new Map();
+        feState.disableAutoLoadForSlowReads = false;
         invalidateHtmlReferenceIndex();
 
         const cacheKey = dirHandle.name;
@@ -929,6 +1111,7 @@
         showFolderPath(dirHandle.name, !isReopen);
         updateIndexBadges();
         renderFileTree();
+        scheduleSmallFolderPrefetch();
 
         // Reuse persisted HTML reference index if it matches the current LWC set size.
         const refCached = (!forceReindex)
@@ -964,6 +1147,7 @@
         if (!feState.dirHandle) return;
         await idbClearTreeCache(feState.dirHandle.name);
         await idbClearHtmlRefCache(feState.dirHandle.name);
+        await clearFileTextCache();
         lsClearHtmlRefCache(feState.dirHandle.name);
         await loadDirHandle(feState.dirHandle, true, true);
     }
@@ -1202,8 +1386,11 @@
 
             tasks.push((async () => {
                 try {
-                    const file = await withTimeout(fileNode.handle.getFile(), 3500, `getFile(${fileName})`);
-                    const text = await withTimeout(file.text(), 3500, `readText(${fileName})`);
+                    const text = await readHandleText(fileNode.handle, {
+                        priority: 'background',
+                        timeoutMs: 3500,
+                        label: fileName,
+                    });
                     return { targetKey, text, resolvedDir, fileName };
                 } catch (e) {
                     console.warn('Auto-load relative import failed', relPath, e);
@@ -1256,10 +1443,180 @@
         return out;
     }
 
+    function feSearchToRegExp(query) {
+        let pattern = query
+            .trim()
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*')
+            .replace(/\?/g, '.');
+        // If pattern doesn't end with .* (from a trailing wildcard), add .* to match file extensions
+        if (!pattern.endsWith('.*')) {
+            pattern += '.*';
+        }
+        return new RegExp(`^${pattern}$`, 'i');
+    }
+
+    function feFileMatchesSearch(fileName, query) {
+        const normalizedQuery = query.trim();
+        if (!normalizedQuery) return true;
+        if (normalizedQuery.includes('*') || normalizedQuery.includes('?')) {
+            try {
+                return feSearchToRegExp(normalizedQuery).test(fileName);
+            } catch (e) {
+                console.warn('Invalid wildcard search pattern', normalizedQuery, e);
+                return fileName.toLowerCase().includes(normalizedQuery.toLowerCase());
+            }
+        }
+        return fileName.toLowerCase().includes(normalizedQuery.toLowerCase());
+    }
+
+    function findMatchingFilesForSearch(query) {
+        if (!query.trim() || !feState.tree) return [];
+        const allFiles = flatFiles(feState.tree);
+        return allFiles.filter(f => feFileMatchesSearch(f.name, query));
+    }
+
+    async function loadNextFromAutoLoadQueue() {
+        if (feState.autoLoadInProgress || !feState.autoLoadQueue.length) return;
+        feState.autoLoadInProgress = true;
+        const fileNode = feState.autoLoadQueue.shift();
+        try {
+            await loadFileNode(fileNode, null, { source: 'auto' });
+        } catch (e) {
+            console.warn('Auto-load failed for', fileNode.name, e);
+        } finally {
+            feState.autoLoadInProgress = false;
+            if (feState.autoLoadQueue.length) {
+                setTimeout(loadNextFromAutoLoadQueue, 100);
+            }
+        }
+    }
+
+    function cancelPendingPrefetchQueue() {
+        feState.prefetchQueue = [];
+        if (feState.prefetchTimer) {
+            clearTimeout(feState.prefetchTimer);
+            feState.prefetchTimer = null;
+        }
+    }
+
+    async function prefetchNextTextCacheItem() {
+        if (feState.prefetchInProgress || !feState.prefetchQueue.length) return;
+        feState.prefetchInProgress = true;
+        const fileNode = feState.prefetchQueue.shift();
+        try {
+            if (!fileNode?.handle || getLoadedRegistryNameForFile(fileNode)) return;
+            const cacheKey = getFileTextCacheKey(fileNode.path || fileNode.name);
+            const cached = await getCachedFileText(cacheKey);
+            if (cached?.text) return;
+            await readHandleTextDetailed(fileNode.handle, {
+                priority: 'background',
+                label: fileNode.name,
+                cacheKey,
+                allowCache: true,
+            });
+        } catch (e) {
+            console.warn('Search match prefetch failed', fileNode?.name, e);
+        } finally {
+            feState.prefetchInProgress = false;
+            if (feState.prefetchQueue.length) {
+                feState.prefetchTimer = setTimeout(() => {
+                    feState.prefetchTimer = null;
+                    prefetchNextTextCacheItem();
+                }, 250);
+            }
+        }
+    }
+
+    function scheduleTextCachePrefetch(fileNodes, delayMs = 1200) {
+        cancelPendingPrefetchQueue();
+        if (feState.disableAutoLoadForSlowReads) return;
+        const matches = (fileNodes || []).filter(Boolean).slice(0, 12);
+        if (!matches.length) return;
+        feState.prefetchQueue = matches;
+        feState.prefetchTimer = setTimeout(() => {
+            feState.prefetchTimer = null;
+            prefetchNextTextCacheItem();
+        }, delayMs);
+    }
+
+    function scheduleSearchMatchPrefetch(clickedFileName) {
+        const query = feState.search.trim();
+        const hasWildcard = query.includes('*') || query.includes('?');
+        if (!hasWildcard || feState.disableAutoLoadForSlowReads) return;
+        const matches = findMatchingFilesForSearch(query)
+            .filter(f => f.name !== clickedFileName)
+            .slice(0, 12);
+        scheduleTextCachePrefetch(matches, 1200);
+    }
+
+    function scheduleSmallFolderPrefetch() {
+        if (feState.disableAutoLoadForSlowReads || !feState.tree) return;
+        const files = flatFiles(feState.tree).filter(isSourceFile);
+        if (files.length === 0 || files.length > 10) return;
+        scheduleTextCachePrefetch(files, 1600);
+    }
+
+    function initializeAutoLoadQueue(clickedFileName) {
+        const query = feState.search.trim();
+        const hasWildcard = query.includes('*') || query.includes('?');
+        if (!hasWildcard || feState.disableAutoLoadForSlowReads) return;
+
+        const matches = findMatchingFilesForSearch(query);
+        feState.autoLoadQueue = matches.filter(f => f.name !== clickedFileName);
+    }
+
+    function cancelPendingAutoLoadQueue() {
+        feState.autoLoadQueue = [];
+    }
+
+    function getLoadedRegistryNameForFile(fileNode) {
+        const name = String(fileNode?.name || '');
+        const lower = name.toLowerCase();
+        if (lower.endsWith('.js') || lower.endsWith('.html')) {
+            const base = name.replace(/\.(js|html)$/i, '');
+            return registry[base] ? base : null;
+        }
+        if (lower.endsWith('.cls') || lower.endsWith('.java')) {
+            const className = name.replace(/\.(cls|java)$/i, '');
+            return registry[className] ? className : null;
+        }
+        return null;
+    }
+
+    async function resolveLoadedRegistryNameForFile(fileNode, options = {}) {
+        const { validateFreshness = false } = options;
+        const loadedRegistryName = getLoadedRegistryNameForFile(fileNode);
+        if (!loadedRegistryName) return null;
+        if (!validateFreshness) return loadedRegistryName;
+
+        const cacheKey = getFileTextCacheKey(fileNode?.path || fileNode?.name || loadedRegistryName);
+        const cacheIsCurrent = await isCachedFileCurrent(fileNode?.handle, cacheKey, { label: fileNode?.name || loadedRegistryName });
+        if (cacheIsCurrent) return loadedRegistryName;
+
+        unloadRegistryEntry(loadedRegistryName);
+        return null;
+    }
+
+    function unloadRegistryEntry(name) {
+        const entry = registry[name];
+        delete registry[name];
+        hiddenClasses.delete(name);
+        if (focusedClass === name) focusedClass = null;
+        if (selectedClassName === name) selectedClassName = null;
+        if (entry?.kind === 'lwc' || entry?.kind === 'lwcChild') {
+            feState.loadedNames.delete(`${name}.js`);
+            feState.loadedNames.delete(`${name}.html`);
+        } else {
+            feState.loadedNames.delete(`${name}.cls`);
+            feState.loadedNames.delete(`${name}.java`);
+        }
+    }
+
     function renderFileTree() {
         const treeEl = document.getElementById('fe-tree');
         const emptyEl = document.getElementById('fe-empty');
-        const q = feState.search.toLowerCase();
+        const q = feState.search;
 
         if (!feState.tree) {
             treeEl.innerHTML = '';
@@ -1268,7 +1625,7 @@
         }
 
         const allFiles = flatFiles(feState.tree);
-        const matched = q ? allFiles.filter(f => f.name.toLowerCase().includes(q)) : null;
+        const matched = q.trim() ? allFiles.filter(f => feFileMatchesSearch(f.name, q)) : null;
 
         treeEl.innerHTML = '';
 
@@ -1333,11 +1690,36 @@
         return row;
     }
 
-    async function loadFileNode(fileNode, rowEl) {
+    async function loadFileNode(fileNode, rowEl, options = {}) {
+        const { source = 'manual' } = options;
+        const isAutoLoad = source === 'auto';
+        const readPriority = isAutoLoad ? 'background' : 'foreground';
+        const loadedRegistryName = await resolveLoadedRegistryNameForFile(fileNode, {
+            validateFreshness: !isAutoLoad,
+        });
+        if (loadedRegistryName) {
+            if (rowEl) rowEl.classList.add('loaded');
+            if (!isAutoLoad) {
+                focusAndHighlight(loadedRegistryName);
+                renderFileTree();
+            }
+            return;
+        }
         const iconEl = rowEl?.querySelector('.fe-file-icon');
         if (iconEl) iconEl.className = 'fa-solid fa-spinner fa-spin fe-file-icon';
         // Yield so the spinner actually paints before the (potentially slow) Mermaid render kicks in.
         await new Promise(r => setTimeout(r, 0));
+        beginForegroundFileLoad();
+
+        const isFirstLoad = !feState.autoLoadInProgress;
+        if (!isAutoLoad) {
+            cancelPendingAutoLoadQueue();
+            cancelPendingPrefetchQueue();
+        }
+        if (isFirstLoad && !isAutoLoad) {
+            initializeAutoLoadQueue(fileNode.name);
+            scheduleSearchMatchPrefetch(fileNode.name);
+        }
 
         try {
             const name = fileNode.name;
@@ -1352,8 +1734,8 @@
                     // Read JS + HTML concurrently — both come from the same handle API
                     // and the round-trips dominate over the parse cost.
                     const [jsText, htmlText] = await Promise.all([
-                        lwc.jsHandle ? lwc.jsHandle.getFile().then(f => f.text()) : Promise.resolve(''),
-                        lwc.htmlHandle ? lwc.htmlHandle.getFile().then(f => f.text()) : Promise.resolve(''),
+                        lwc.jsHandle ? readHandleText(lwc.jsHandle, { priority: readPriority, label: `${base}.js` }) : Promise.resolve(''),
+                        lwc.htmlHandle ? readHandleText(lwc.htmlHandle, { priority: readPriority, label: `${base}.html` }) : Promise.resolve(''),
                     ]);
                     parseLwc(base, jsText, htmlText, lwc.folderPath);
                     feState.loadedNames.add(`${base}.js`);
@@ -1373,11 +1755,11 @@
 
                     let jsText = '';
                     let htmlText = '';
-                    if (lower.endsWith('.js')) jsText = await (await fileNode.handle.getFile()).text();
-                    else htmlText = await (await fileNode.handle.getFile()).text();
+                    if (lower.endsWith('.js')) jsText = await readHandleText(fileNode.handle, { priority: readPriority, label: name });
+                    else htmlText = await readHandleText(fileNode.handle, { priority: readPriority, label: name });
 
                     if (siblingNode) {
-                        const siblingText = await (await siblingNode.handle.getFile()).text();
+                        const siblingText = await readHandleText(siblingNode.handle, { priority: readPriority, label: siblingName });
                         if (lower.endsWith('.js')) htmlText = siblingText;
                         else jsText = siblingText;
                         feState.loadedNames.add(siblingName);
@@ -1389,24 +1771,44 @@
                 }
                 if (rowEl) rowEl.classList.add('loaded');
                 await showLoadingStatus('Rendering diagram…');
-                await render();
+                scheduleRender();
                 await idbSaveFileHistory(name, fileNode.handle);
             } else {
                 await showLoadingStatus(`Loading ${name}…`);
-                const file = await fileNode.handle.getFile();
-                const text = await file.text();
+                const fileReadStart = performance.now();
+                const cacheKey = getFileTextCacheKey(fileNode.path || name);
+                const { file, text } = await readHandleTextDetailed(fileNode.handle, {
+                    priority: readPriority,
+                    label: name,
+                    timingPrefix: isAutoLoad ? '' : 'file-read-apex',
+                    cacheKey,
+                });
+                if (!isAutoLoad) {
+                    console.log('File size:', file.size, 'bytes');
+                    const totalMs = performance.now() - fileReadStart;
+                    console.log('file-read-apex-total:', totalMs, 'ms');
+                    markSlowFileReads(totalMs);
+                }
+                console.time('parse-apex');
                 parseApex(text, fileNode.path || null);
+                console.timeEnd('parse-apex');
                 feState.loadedNames.add(name);
                 if (rowEl) rowEl.classList.add('loaded');
                 await showLoadingStatus('Rendering diagram…');
-                await render();
+                console.time('schedule-render');
+                scheduleRender();
+                console.timeEnd('schedule-render');
                 await idbSaveFileHistory(name, fileNode.handle);
             }
         } catch (e) {
             console.error('Failed to load', fileNode.name, e);
         } finally {
+            endForegroundFileLoad();
             if (iconEl) iconEl.className = 'fa-solid fa-file-code fe-file-icon';
             hideLoadingStatus();
+            if (isFirstLoad && feState.autoLoadQueue.length > 0) {
+                setTimeout(loadNextFromAutoLoadQueue, 100);
+            }
         }
     }
 
@@ -1522,18 +1924,17 @@
                         const lwc = feState.lwcIndex?.get(base);
                         let jsText = '', htmlText = '';
                         if (lwc) {
-                            if (lwc.jsHandle) jsText = await (await lwc.jsHandle.getFile()).text();
-                            if (lwc.htmlHandle) htmlText = await (await lwc.htmlHandle.getFile()).text();
+                            if (lwc.jsHandle) jsText = await readHandleText(lwc.jsHandle, { priority: 'foreground', label: `${base}.js` });
+                            if (lwc.htmlHandle) htmlText = await readHandleText(lwc.htmlHandle, { priority: 'foreground', label: `${base}.html` });
                         } else {
-                            const text = await (await h.handle.getFile()).text();
+                            const text = await readHandleText(h.handle, { priority: 'foreground', label: h.name });
                             if (lower.endsWith('.js')) jsText = text;
                             else htmlText = text;
                         }
                         parseLwc(base, jsText, htmlText, lwc?.folderPath);
                         if (lwc?.folderPath) await loadLwcRelImports(jsText, lwc.folderPath, base);
                     } else {
-                        const file = await h.handle.getFile();
-                        const text = await file.text();
+                        const text = await readHandleText(h.handle, { priority: 'foreground', label: h.name });
                         parseApex(text);
                     }
                     feState.loadedNames.add(h.name);
@@ -1645,7 +2046,7 @@
             const file = picker.files[0];
             if (!file) return;
             const lower = file.name.toLowerCase();
-            const text = await file.text();
+            const text = await readBrowserFileAsText(file, { label: file.name });
             if (lower.endsWith('.js')) {
                 parseLwc(file.name.replace(/\.js$/i, ''), text, '');
             } else if (lower.endsWith('.html')) {
@@ -2096,7 +2497,21 @@
         applyHiddenChildEdges();
     }
 
+    let pendingRenderFrame = null;
+
+    function scheduleRender() {
+        if (pendingRenderFrame !== null) return;
+        pendingRenderFrame = requestAnimationFrame(() => {
+            pendingRenderFrame = null;
+            setTimeout(() => {
+                render();
+            }, 0);
+        });
+    }
+
     async function render() {
+        console.time('render-total');
+        console.time('render-cards');
         const list = document.getElementById('registry-list');
         list.innerHTML = "";
         Object.keys(registry).sort().forEach(name => {
@@ -2111,7 +2526,7 @@
                     <button class="btn" title="${isHidden ? 'Show in diagram' : 'Hide from diagram'}" onclick="event.stopPropagation(); toggleClassVisibility('${name}')">
                         <i class="fa-solid ${isHidden ? 'fa-eye' : 'fa-eye-slash'}"></i>
                     </button>
-                    <button class="btn" style="border-color:var(--danger); color:var(--danger);" onclick="event.stopPropagation(); delete registry['${name}']; render();">✖</button>
+                    <button class="btn" style="border-color:var(--danger); color:var(--danger);" onclick="event.stopPropagation(); unloadRegistryEntry('${name}'); render(); renderFileTree();">✖</button>
                 </div>`;
             list.appendChild(card);
         });
@@ -2209,6 +2624,7 @@
             document.getElementById('view-title').innerText = "System Architecture Map";
             document.getElementById('reset-btn').style.display = "none";
             // LR (Left-Right) for rightward cascading flow
+            console.time('build-def-nofocus');
             def = "graph LR\n";
             Object.keys(registry).filter(cName => !hiddenClasses.has(cName)).forEach(cName => {
                 const flows = aggregateFlows(registry[cName].raw, registry[cName].varMap, cName);
@@ -2378,8 +2794,12 @@
             savedPanZoom = { pan: panZoomInstance.getPan(), zoom: panZoomInstance.getZoom() };
             panZoomInstance.destroy(); panZoomInstance = null;
         }
+        console.timeEnd('build-mermaid-def');
+        console.time('mermaid-render');
         try {
             const { svg } = await mermaid.render('graphDiv', def);
+            console.timeEnd('mermaid-render');
+            console.time('svg-post-process');
             wrapper.innerHTML = svg;
             const svgEl = wrapper.querySelector('svg');
             if (svgEl) {
@@ -2414,7 +2834,9 @@
                 // Re-apply per-parent edge hides so they survive a full re-render.
                 applyHiddenChildEdges();
             }
+            console.timeEnd('svg-post-process');
         } catch (err) { console.error(err); }
+        console.timeEnd('render-total');
     }
 
     function selectNodeText(node) {
@@ -2740,19 +3162,19 @@
             const total = entries.length;
             let cursor = 0;
             let processed = 0;
-            const concurrency = Math.min(24, total);
+            const concurrency = Math.min(2, total);
 
             setHtmlIndexStatus('building', `HTML Ref Cache: Building 0/${total}`);
-            await showLoadingStatus(`Task Progress: HTML ref scan 0/${total}`);
 
             const worker = async () => {
                 while (true) {
+                    await waitForForegroundFileLoadToFinish();
                     const idx = cursor++;
                     if (idx >= total) return;
                     const [componentName, lwc] = entries[idx];
                     try {
                         if (lwc?.htmlHandle) {
-                            const htmlText = await lwc.htmlHandle.getFile().then(f => f.text());
+                            const htmlText = await readHandleText(lwc.htmlHandle, { priority: 'background', label: `${componentName}.html` });
                             const refs = extractHtmlReferenceSnippets(htmlText);
                             refs.forEach(ref => addReferenceToIndex(nextIndex, ref.target, componentName, ref.snippet));
                         }
@@ -2763,7 +3185,6 @@
                     processed++;
                     if (processed === total || processed % 100 === 0) {
                         setHtmlIndexStatus('building', `HTML Ref Cache: Building ${processed}/${total}`);
-                        await showLoadingStatus(`Task Progress: HTML ref scan ${processed}/${total}`);
                     }
                 }
             };
@@ -2827,11 +3248,8 @@
         });
 
         if (htmlReferenceIndex.size === 0) {
-            // Do not block right-click lookup by forcing a full index build.
-            // If allowed, kick off build in background for future lookups.
-            if (allowIndexBuild && !htmlReferenceIndexBuildPromise) {
-                ensureHtmlReferenceIndex().catch(e => console.warn('Background HTML reference index build failed', e));
-            }
+            // Keep lookups demand-driven. A speculative global build can monopolize
+            // the File System API and block real file loads for minutes.
         }
 
         const collectResult = (componentName, entryKind, snippet) => {
@@ -2894,7 +3312,7 @@
                     if (!lwc?.htmlHandle) continue;
                     debug.indexedHtmlScanned++;
                     try {
-                        const htmlText = await lwc.htmlHandle.getFile().then(f => f.text());
+                        const htmlText = await readHandleText(lwc.htmlHandle, { priority: 'background', label: `${componentName}.html` });
                         const lines = htmlText.split('\n');
                         const hit = lines.find(l => {
                             const low = l.toLowerCase();
@@ -2940,7 +3358,7 @@
                     const fileNode = htmlNodes[idx];
                     debug.treeHtmlScanned++;
                     try {
-                        const text = await fileNode.handle.getFile().then(f => f.text());
+                        const text = await readHandleText(fileNode.handle, { priority: 'background', label: fileNode.name || 'html-node' });
                         const lines = text.split('\n');
                         const hit = lines.find(l => {
                             const low = l.toLowerCase();
@@ -3063,8 +3481,8 @@
         if (!lwc || !lwc.jsHandle) return false;
 
         const [jsText, htmlText] = await Promise.all([
-            lwc.jsHandle ? lwc.jsHandle.getFile().then(f => f.text()) : Promise.resolve(''),
-            lwc.htmlHandle ? lwc.htmlHandle.getFile().then(f => f.text()) : Promise.resolve(''),
+            lwc.jsHandle ? readHandleText(lwc.jsHandle, { priority: 'foreground', label: `${componentName}.js` }) : Promise.resolve(''),
+            lwc.htmlHandle ? readHandleText(lwc.htmlHandle, { priority: 'foreground', label: `${componentName}.html` }) : Promise.resolve(''),
         ]);
 
         parseLwc(componentName, jsText, htmlText, lwc.folderPath);
