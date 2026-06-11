@@ -1079,20 +1079,20 @@
 
         const cacheKey = dirHandle.name;
         htmlReferenceCacheKey = cacheKey;
-        const cached = (!forceReindex) ? await idbLoadTreeCache(cacheKey) : null;
+        try {
+            await showLoadingStatus(`Opening "${dirHandle.name}"…`);
+            const cached = (!forceReindex) ? await idbLoadTreeCache(cacheKey) : null;
 
-        if (cached?.tree && cached?.lwcIndex && cached?.apexIndex) {
-            await showLoadingStatus(`Restoring index for "${dirHandle.name}"…`);
-            feState.tree = cached.tree;
-            feState.lwcIndex = new Map(cached.lwcIndex);
-            feState.apexIndex = new Map(cached.apexIndex);
-            hideLoadingStatus();
-            // The cached tree goes stale when files are added/removed on disk,
-            // so rescan in the background and swap in the fresh tree if it differs.
-            revalidateTreeCache(dirHandle, cacheKey);
-        } else {
-            await showLoadingStatus(`Indexing "${dirHandle.name}"…`);
-            try {
+            if (cached?.tree && cached?.lwcIndex && cached?.apexIndex) {
+                await showLoadingStatus(`Restoring index for "${dirHandle.name}"…`);
+                feState.tree = cached.tree;
+                feState.lwcIndex = new Map(cached.lwcIndex);
+                feState.apexIndex = new Map(cached.apexIndex);
+                // The cached tree goes stale when files are added/removed on disk,
+                // so rescan in the background and swap in the fresh tree if it differs.
+                revalidateTreeCache(dirHandle, cacheKey);
+            } else {
+                await showLoadingStatus(`Scanning "${dirHandle.name}"…`);
                 feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
                 if (feState.tree) {
                     await showLoadingStatus('Indexing LWC components…');
@@ -1107,15 +1107,18 @@
                         apexIndex: [...feState.apexIndex.entries()],
                     });
                 }
-            } finally {
-                hideLoadingStatus();
             }
-        }
 
-        if (!isReopen) localStorage.removeItem(LS_PATH_KEY);
-        showFolderPath(dirHandle.name, !isReopen);
-        updateIndexBadges();
-        renderFileTree();
+            if (!isReopen) localStorage.removeItem(LS_PATH_KEY);
+            showFolderPath(dirHandle.name, !isReopen);
+            // Keep the indicator up through tree rendering — building the DOM
+            // for a large project can freeze the page for a noticeable moment.
+            await showLoadingStatus('Rendering file tree…');
+            updateIndexBadges();
+            renderFileTree();
+        } finally {
+            hideLoadingStatus();
+        }
         scheduleSmallFolderPrefetch();
 
         // Reuse persisted HTML reference index if it matches the current LWC set size.
@@ -1202,7 +1205,10 @@
                 const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
                 await loadDirHandle(dirHandle);
             } catch (e) {
-                if (e.name !== 'AbortError') console.error(e);
+                if (e.name !== 'AbortError') {
+                    console.error(e);
+                    showLoadError(`Failed to open folder — ${e.message || e.name}`);
+                }
             }
         } else {
             document.getElementById('fe-fallback').click();
@@ -1214,7 +1220,10 @@
         try {
             const perm = await feState.dirHandle.requestPermission({ mode: 'read' });
             if (perm === 'granted') await loadDirHandle(feState.dirHandle, true);
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            showLoadError(`Failed to reopen folder — ${e.message || e.name}`);
+        }
     }
 
     // On load: restore last handle if available
@@ -1238,10 +1247,13 @@
 
         ctx = ctx || { dirs: 0, lastReport: 0 };
         ctx.dirs++;
-        if (ctx.dirs - ctx.lastReport >= 250) {
-            ctx.lastReport = ctx.dirs;
+        // Time-based throttle: on slow storage even a handful of folders can
+        // take seconds, so report by elapsed time rather than folder count.
+        // (lastReport: Infinity keeps background rescans silent.)
+        if (performance.now() - ctx.lastReport >= 200) {
+            ctx.lastReport = performance.now();
             // Don't block on UI updates; let them paint when the browser can.
-            showLoadingStatus(`Scanned ${ctx.dirs.toLocaleString()} folders…`);
+            showLoadingStatus(`Scanning folders… ${ctx.dirs.toLocaleString()} found`);
         }
 
         // Snapshot entries first so the recursion can fan out via Promise.all.
