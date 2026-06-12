@@ -475,7 +475,7 @@ body.has-intro .btn-toggle{top:46px}
     <div id="file-explorer">
         <div id="file-explorer-header">
             <span>File Explorer</span>
-            <button id="fe-open-btn"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
+            <button id="fe-open-btn" title="Pick your project folder (e.g. an SFDX project root). Apex Flow scans it for Apex classes and LWC components to build the architecture map and call-flow diagrams. Files are read locally — nothing is uploaded."><i class="fa-solid fa-folder-open"></i> Open Folder</button>
             <input id="fe-fallback" type="file" accept=".cls,.java,.js,.html" webkitdirectory multiple>
         </div>
         <div id="fe-folder-path">
@@ -491,7 +491,7 @@ body.has-intro .btn-toggle{top:46px}
             <input id="fe-folder-name" type="text" spellcheck="false" placeholder="Paste full path here, e.g. /home/user/project/src" autocomplete="off">
         </div>
         <input id="fe-search" placeholder="Search files…" autocomplete="off">
-        <div id="fe-tree"><div id="fe-empty">Open a folder to browse source files</div></div>
+        <div id="fe-tree"><div id="fe-empty" title="Apex Flow needs a project folder to analyse: it indexes the Apex classes and LWC components inside it, then draws an interactive class diagram and call flows. Everything stays in your browser.">Open a folder to browse source files</div></div>
     </div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>
