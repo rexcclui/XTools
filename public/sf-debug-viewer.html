@@ -3,14 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SF Debug Viewer</title>
+  <title>SF Debug Viewer — Salesforce Apex Debug Log Analyzer</title>
+  <meta name="description" content="Analyze Salesforce Apex debug logs online: collapsible call tree, SOQL and DML breakdown, exceptions, timings, multi-log tabs, search and custom highlighting. Paste or drop a raw log — free, private, runs entirely in your browser.">
+  <link rel="canonical" href="https://apexdebug.trendx.uk/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SF Debug Viewer">
+  <meta property="og:title" content="SF Debug Viewer — Salesforce Apex Debug Log Analyzer">
+  <meta property="og:description" content="Paste or drop a Salesforce Apex debug log and explore its call tree, SOQL queries, DML and exceptions instantly — free and fully in-browser.">
+  <meta property="og:url" content="https://apexdebug.trendx.uk/">
+  <meta name="twitter:card" content="summary">
+  <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"SF Debug Viewer","url":"https://apexdebug.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Salesforce Apex debug log analyzer with collapsible call tree, SOQL and DML breakdown, exception highlighting and multi-log search. Runs entirely in the browser; logs never leave your machine."}
+  </script>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iIzBkMTExNyIvPjx0ZXh0IHg9IjE2IiB5PSIyMiIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiMzODhiZmQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNGPC90ZXh0Pjwvc3ZnPg=="/>
   <style>
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
     #root { height: 100vh; overflow: hidden; }
   </style>
 </head>
-<body>
+<body class="has-intro">
+  <style>
+#tool-intro{display:flex;align-items:center;gap:8px;padding:0 10px;height:34px;font-size:12.5px;color:#fff;background:linear-gradient(90deg,#0d419d,#1f6feb);white-space:nowrap;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body.has-intro #root{height:calc(100vh - 34px)}
+#tool-intro .ti-desc{overflow:hidden;text-overflow:ellipsis}
+#tool-intro .ti-links{display:flex;align-items:center;gap:6px;margin-left:auto;font-weight:500}
+#tool-intro a{color:#fff;text-decoration:none;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:2px 10px;font-weight:600;transition:background .15s}
+#tool-intro a:hover{background:rgba(255,255,255,.32)}
+#tool-intro .ti-close{background:none;border:none;color:#fff;opacity:.7;cursor:pointer;font-size:13px;padding:2px 4px}
+#tool-intro .ti-close:hover{opacity:1}
+@media(max-width:700px){#tool-intro .ti-desc{display:none}}
+  </style>
+  <div id="tool-intro">
+    <span class="ti-desc"><b>🐞 SF Debug Viewer</b> — paste a Salesforce Apex debug log and explore its call tree, SOQL &amp; DML instantly. Logs never leave your browser.</span>
+    <span class="ti-links">More free dev tools:<a href="https://jsongrid.trendx.uk/" title="Online JSON viewer, editor &amp; diff">⊞ JSON Grid</a><a href="https://apexflow.trendx.uk/" title="Salesforce Apex &amp; LWC class diagrams and call-flow maps">🗺 Apex Flow</a></span>
+    <button class="ti-close" title="Dismiss" onclick="localStorage.setItem('tiDismiss','1');document.getElementById('tool-intro').style.display='none';document.body.classList.remove('has-intro')">✕</button>
+  </div>
+  <script>if(localStorage.getItem('tiDismiss')){document.getElementById('tool-intro').style.display='none';document.body.classList.remove('has-intro');}</script>
   <div id="root"></div>
   <script>
 // ─── CSS ──────────────────────────────────────────────────────────────────────

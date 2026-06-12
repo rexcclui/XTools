@@ -2,7 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Apex / Java / LWC Class Diagram</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Flow — Salesforce Apex &amp; LWC Class Diagram and Call Flow Visualizer</title>
+    <meta name="description" content="Visualize Salesforce Apex classes and Lightning Web Components as interactive architecture maps and recursive call-flow diagrams. Open a project folder directly in your browser — no server, no install. Java is supported too.">
+    <link rel="canonical" href="https://apexflow.trendx.uk/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Apex Flow">
+    <meta property="og:title" content="Apex Flow — Salesforce Apex &amp; LWC Class Diagram and Call Flow Visualizer">
+    <meta property="og:description" content="Interactive architecture maps and call-flow diagrams for Salesforce Apex, LWC and Java — straight from a local project folder, entirely in your browser.">
+    <meta property="og:url" content="https://apexflow.trendx.uk/">
+    <meta name="twitter:card" content="summary">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Apex Flow","url":"https://apexflow.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Class diagram and call-flow visualizer for Salesforce Apex, Lightning Web Components and Java. Renders interactive architecture maps from a local project folder, entirely in the browser."}
+    </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iIzFlMjkzYiIvPjxyZWN0IHg9IjkiIHk9IjQiIHdpZHRoPSIxNCIgaGVpZ2h0PSI3IiByeD0iMiIgZmlsbD0iIzYwYTVmYSIvPjxsaW5lIHgxPSIxNiIgeTE9IjExIiB4Mj0iMTYiIHkyPSIxNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwb2x5Z29uIHBvaW50cz0iMTYsMTQgMjEsMjAgMTYsMjYgMTEsMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzgxOGNmOCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48bGluZSB4MT0iMTYiIHkxPSIyNiIgeDI9IjE2IiB5Mj0iMjkiIHN0cm9rZT0iIzk0YTNiOCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48L3N2Zz4="/>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
@@ -372,7 +384,25 @@
         .hlp-sum-flow .hlp-step { background:var(--bg-sidebar);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:#60a5fa; }
     </style>
 </head>
-<body>
+<body class="has-intro">
+<style>
+#tool-intro{position:fixed;top:0;left:0;right:0;z-index:800;display:flex;align-items:center;gap:8px;padding:0 10px;height:34px;font-size:12.5px;color:#fff;background:linear-gradient(90deg,#312e81,#6d28d9);white-space:nowrap;overflow:hidden}
+body.has-intro{height:calc(100vh - 34px);margin-top:34px}
+body.has-intro .btn-toggle{top:46px}
+#tool-intro .ti-desc{overflow:hidden;text-overflow:ellipsis}
+#tool-intro .ti-links{display:flex;align-items:center;gap:6px;margin-left:auto;font-weight:500}
+#tool-intro a{color:#fff;text-decoration:none;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:2px 10px;font-weight:600;transition:background .15s}
+#tool-intro a:hover{background:rgba(255,255,255,.32)}
+#tool-intro .ti-close{background:none;border:none;color:#fff;opacity:.7;cursor:pointer;font-size:13px;padding:2px 4px}
+#tool-intro .ti-close:hover{opacity:1}
+@media(max-width:700px){#tool-intro .ti-desc{display:none}}
+</style>
+<div id="tool-intro">
+  <span class="ti-desc"><b>🗺 Apex Flow</b> — visualize Salesforce Apex &amp; LWC as interactive class diagrams and call flows, straight from a local folder.</span>
+  <span class="ti-links">More free dev tools:<a href="https://jsongrid.trendx.uk/" title="Online JSON viewer, editor &amp; diff">⊞ JSON Grid</a><a href="https://apexdebug.trendx.uk/" title="Salesforce Apex debug log analyzer">🐞 SF Debug Viewer</a></span>
+  <button class="ti-close" title="Dismiss" onclick="localStorage.setItem('tiDismiss','1');document.getElementById('tool-intro').style.display='none';document.body.classList.remove('has-intro')">✕</button>
+</div>
+<script>if(localStorage.getItem('tiDismiss')){document.getElementById('tool-intro').style.display='none';document.body.classList.remove('has-intro');}</script>
 <div id="drop-overlay">Drop .cls / .java / .js / .html files anywhere</div>
 
 <div id="code-tooltip">
@@ -445,7 +475,7 @@
     <div id="file-explorer">
         <div id="file-explorer-header">
             <span>File Explorer</span>
-            <button id="fe-open-btn"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
+            <button id="fe-open-btn" title="Pick your project folder (e.g. an SFDX project root). Apex Flow scans it for Apex classes and LWC components to build the architecture map and call-flow diagrams. Files are read locally — nothing is uploaded."><i class="fa-solid fa-folder-open"></i> Open Folder</button>
             <input id="fe-fallback" type="file" accept=".cls,.java,.js,.html" webkitdirectory multiple>
         </div>
         <div id="fe-folder-path">
@@ -461,7 +491,7 @@
             <input id="fe-folder-name" type="text" spellcheck="false" placeholder="Paste full path here, e.g. /home/user/project/src" autocomplete="off">
         </div>
         <input id="fe-search" placeholder="Search files…" autocomplete="off">
-        <div id="fe-tree"><div id="fe-empty">Open a folder to browse source files</div></div>
+        <div id="fe-tree"><div id="fe-empty" title="Apex Flow needs a project folder to analyse: it indexes the Apex classes and LWC components inside it, then draws an interactive class diagram and call flows. Everything stays in your browser.">Open a folder to browse source files</div></div>
     </div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>

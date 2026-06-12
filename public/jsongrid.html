@@ -3,7 +3,18 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>JSON Grid Workspace</title>
+<title>JSON Grid — Free Online JSON Viewer, Editor &amp; Diff Tool</title>
+<meta name="description" content="View, format, edit and compare JSON online in a multi-cell grid workspace. Pretty-print with collapsible tree view, side-by-side JSON diff, search, and Salesforce Apex debug output parsing. Free, no signup, runs entirely in your browser."/>
+<link rel="canonical" href="https://jsongrid.trendx.uk/"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="JSON Grid"/>
+<meta property="og:title" content="JSON Grid — Free Online JSON Viewer, Editor &amp; Diff Tool"/>
+<meta property="og:description" content="View, format, edit and compare JSON in a multi-cell grid workspace. Pretty-print, tree view, side-by-side diff, search. Free, no signup, runs entirely in your browser."/>
+<meta property="og:url" content="https://jsongrid.trendx.uk/"/>
+<meta name="twitter:card" content="summary"/>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"JSON Grid","url":"https://jsongrid.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Online JSON viewer, editor and diff tool with a multi-cell grid workspace, collapsible tree view, side-by-side comparison and search. Runs entirely in the browser."}
+</script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iIzE4NUZBNSIvPjxyZWN0IHg9IjUiIHk9IjUiIHdpZHRoPSI5IiBoZWlnaHQ9IjkiIHJ4PSIxIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuOSIvPjxyZWN0IHg9IjE4IiB5PSI1IiB3aWR0aD0iOSIgaGVpZ2h0PSI5IiByeD0iMSIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iLjkiLz48cmVjdCB4PSI1IiB5PSIxOCIgd2lkdGg9IjkiIGhlaWdodD0iOSIgcng9IjEiIGZpbGw9IiNmZmYiIG9wYWNpdHk9Ii45Ii8+PHJlY3QgeD0iMTgiIHk9IjE4IiB3aWR0aD0iOSIgaGVpZ2h0PSI5IiByeD0iMSIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iLjkiLz48L3N2Zz4="/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -208,6 +219,22 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 </style>
 </head>
 <body>
+<style>
+#tool-intro{display:flex;align-items:center;gap:8px;padding:0 10px;height:34px;flex:none;font-size:12.5px;color:#fff;background:linear-gradient(90deg,#185fa5,#3b82f6);white-space:nowrap;overflow:hidden}
+#tool-intro .ti-desc{overflow:hidden;text-overflow:ellipsis}
+#tool-intro .ti-links{display:flex;align-items:center;gap:6px;margin-left:auto;font-weight:500}
+#tool-intro a{color:#fff;text-decoration:none;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:2px 10px;font-weight:600;transition:background .15s}
+#tool-intro a:hover{background:rgba(255,255,255,.32)}
+#tool-intro .ti-close{background:none;border:none;color:#fff;opacity:.7;cursor:pointer;font-size:13px;padding:2px 4px}
+#tool-intro .ti-close:hover{opacity:1}
+@media(max-width:700px){#tool-intro .ti-desc{display:none}}
+</style>
+<div id="tool-intro">
+  <span class="ti-desc"><b>⊞ JSON Grid</b> — free online JSON viewer, editor &amp; diff. Paste JSON, get a navigable grid — no signup, nothing leaves your browser.</span>
+  <span class="ti-links">More free dev tools:<a href="https://apexflow.trendx.uk/" title="Salesforce Apex &amp; LWC class diagrams and call-flow maps">🗺 Apex Flow</a><a href="https://apexdebug.trendx.uk/" title="Salesforce Apex debug log analyzer">🐞 SF Debug Viewer</a></span>
+  <button class="ti-close" title="Dismiss" onclick="localStorage.setItem('tiDismiss','1');document.getElementById('tool-intro').style.display='none'">✕</button>
+</div>
+<script>if(localStorage.getItem('tiDismiss'))document.getElementById('tool-intro').style.display='none';</script>
 <div id="toolbar">
   <span style="font-weight:600;margin-right:6px">⊞ JSON Grid</span>
   <span style="font-size:12px;color:var(--tx2)">Cols</span>

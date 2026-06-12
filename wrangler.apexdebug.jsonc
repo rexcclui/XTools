@@ -6,7 +6,9 @@
   "build": { "command": "npm run build" },
   "assets": {
     "directory": "dist",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "run_worker_first": true
   },
   "kv_namespaces": [
     { "binding": "VISITS", "id": "81c54a172328490484ef906f64ff2677" }
