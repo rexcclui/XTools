@@ -6,6 +6,8 @@
     "build:readable": "node build.js --no-obfuscate"
   },
   "devDependencies": {
-    "javascript-obfuscator": "^4.1.1"
+    "javascript-obfuscator": "^4.1.1",
+    "mermaid": "^11.15.0",
+    "svg-pan-zoom": "^3.6.2"
   }
 }
