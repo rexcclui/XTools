@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Building obfuscated assets into dist/..."
+# wrangler runs `npm run build` itself before each deploy (build.command
+# in the wrangler configs); we only need to make sure deps are installed.
 if [ ! -d node_modules ]; then
   npm ci
 fi
-npm run build
-echo ""
 
 echo "Deploying jsongrid.trendx.uk..."
 npx wrangler deploy

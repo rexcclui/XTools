@@ -3,6 +3,9 @@
 	"name": "jsongrid",
 	"compatibility_date": "2026-04-30",
 	"main": "src/index.js",
+	"build": {
+		"command": "npm run build"
+	},
 	"assets": {
 		"directory": "dist",
 		"binding": "ASSETS"
