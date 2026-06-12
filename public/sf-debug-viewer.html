@@ -360,6 +360,7 @@ const HTML = `
       <div class="help-s help-summary">
         <h4>At a Glance</h4>
         <p class="help-sum-desc">Turn a raw Salesforce debug log into an interactive call tree. The raw log and the tree stay in sync — click either side to jump to the other. Filter by event type, search across tabs, color-code lines, and (with a project folder open) jump straight to the Apex source.</p>
+        <p class="help-sum-desc" style="margin-top:10px"><button class="btn btn-primary" id="btn-helpSample">▶ Load sample log</button> <span style="font-size:12px;opacity:.65">— parses an example log instantly</span></p>
         <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="help-sum-flow">
           <span class="help-step">1. Paste / drop a log → Parse</span> →
@@ -2371,6 +2372,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
   $('btn-help').addEventListener('click',()=>$('helpModal').classList.add('open'));
   $('btn-closeHelp').addEventListener('click',()=>$('helpModal').classList.remove('open'));
+  $('btn-helpSample').addEventListener('click',()=>{loadSample();parseActiveTab();$('helpModal').classList.remove('open');});
   $('helpModal').addEventListener('click',e=>{if(e.target===$('helpModal'))$('helpModal').classList.remove('open');});
 
   renderHlSlots();

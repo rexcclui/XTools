@@ -895,6 +895,39 @@ body.has-intro .btn-toggle{top:46px}
         render();
     });
 
+    // ── SAMPLE DATA (reachable from the Help modal) ─────────────────────────────
+    function loadApexSample() {
+        const SAMPLE_CLASSES = [
+`public class OrderService {
+    private OrderSelector selector = new OrderSelector();
+    private NotificationService notifier = new NotificationService();
+    public void processOrders(List<Id> orderIds) {
+        List<Order__c> orders = selector.selectByIds(orderIds);
+        for (Order__c o : orders) { o.Status__c = 'Processed'; }
+        update orders;
+        notifier.notifyCustomers(orders);
+    }
+}`,
+`public class OrderSelector {
+    public List<Order__c> selectByIds(List<Id> ids) {
+        return [SELECT Id, Status__c FROM Order__c WHERE Id IN :ids];
+    }
+}`,
+`public class NotificationService {
+    public void notifyCustomers(List<Order__c> orders) {
+        EmailHelper.send(orders, 'Your order was processed');
+    }
+}`,
+`public class EmailHelper {
+    public static void send(List<Order__c> orders, String message) {
+        System.debug(message + ': ' + orders.size());
+    }
+}`];
+        SAMPLE_CLASSES.forEach(src => parseApex(src));
+        document.getElementById('help-modal').classList.remove('open');
+        render();
+    }
+
     // ── FILE EXPLORER ──────────────────────────────────────────────────────────
     const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null, lwcIndex: new Map(), apexIndex: new Map(), autoLoadQueue: [], autoLoadInProgress: false, disableAutoLoadForSlowReads: false, prefetchQueue: [], prefetchInProgress: false, prefetchTimer: null };
     const LWC_SKIP_DIRS = new Set(['__tests__', '__mocks__', 'node_modules', '.git', '.sfdx', '.sf', 'dist', 'build', 'target', 'out', '.next', '.cache', '.vscode']);
@@ -4371,6 +4404,7 @@ body.has-intro .btn-toggle{top:46px}
       <div class="hlp-sec hlp-summary">
         <h4>At a Glance</h4>
         <p class="hlp-sum-desc">Visualize how your Apex, Java, and LWC source connects. Loading files auto-builds a system-level dependency map; from there you can drill into a single class's call flow, expand referenced "ghost" nodes on demand, and read the underlying code without leaving the diagram.</p>
+        <p class="hlp-sum-desc" style="margin-top:10px"><button class="btn btn-primary" onclick="loadApexSample()">▶ Load sample classes</button> <span style="font-size:12px;opacity:.65">— renders an example architecture map instantly</span></p>
         <p class="hlp-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="hlp-sum-flow">
           <span class="hlp-step">1. Open folder / drop files</span> →

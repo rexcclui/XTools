@@ -274,6 +274,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
       <div class="help-sec help-summary">
         <h4>At a Glance</h4>
         <p class="help-sum-desc">A multi-cell workspace for inspecting JSON. Paste or drop data into any cell, pretty-print it into a navigable table, then search, expand, and compare values across cells. Apex debug output is auto-converted to JSON, and every tab and cell is saved locally so your workspace persists.</p>
+        <p class="help-sum-desc" style="margin-top:10px"><button class="tbtn" style="background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600" onclick="loadSampleJson()">▶ Load sample JSON</button> <span style="font-size:12px;opacity:.65">— see the grid in action instantly</span></p>
         <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="help-sum-flow">
           <span class="help-step">1. Paste / drop JSON into a cell</span> →
@@ -2094,6 +2095,17 @@ const escA=s=>String(s).replace(/"/g,'&quot;');
 
 function showHelp(){const m=document.getElementById('help-modal');if(m)m.style.display='flex';}
 function closeHelp(){const m=document.getElementById('help-modal');if(m)m.style.display='none';}
+function loadSampleJson(){
+  const ta=document.querySelector('textarea.src-raw');
+  if(!ta)return;
+  ta.value=JSON.stringify([
+    {id:1,name:'Acme Corp',status:'Active',revenue:982000,contact:{email:'ceo@acme.com',phone:'555-0101'},tags:['enterprise','priority']},
+    {id:2,name:'Globex',status:'Prospect',revenue:154000,contact:{email:'info@globex.com',phone:'555-0102'},tags:['smb']},
+    {id:3,name:'Initech',status:'Churned',revenue:0,contact:{email:'bill@initech.com',phone:'555-0103'},tags:[]}
+  ],null,2);
+  ta.dispatchEvent(new Event('input',{bubbles:true}));
+  closeHelp();
+}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeHelp();});
 
 window.addEventListener('beforeunload',()=>{syncAll();saveAppState();saveAllHistory();});
