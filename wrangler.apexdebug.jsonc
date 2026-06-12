@@ -3,8 +3,9 @@
   "name": "apexdebug",
   "compatibility_date": "2026-04-30",
   "main": "src/index.js",
+  "build": { "command": "npm run build" },
   "assets": {
-    "directory": "public",
+    "directory": "dist",
     "binding": "ASSETS"
   },
   "kv_namespaces": [
