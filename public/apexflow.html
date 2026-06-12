@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apex Flow — Salesforce Apex &amp; LWC Class Diagram and Call Flow Visualizer</title>
-    <meta name="description" content="Visualize Salesforce Apex classes and Lightning Web Components as interactive architecture maps and recursive call-flow diagrams. Open a project folder directly in your browser — no server, no install. Java is supported too.">
+    <title>Apex Flow — Apex Class Diagram &amp; Flow Diagram Online (Salesforce, LWC)</title>
+    <meta name="description" content="Free online Apex class diagram and flow diagram generator for Salesforce. Draw interactive LWC design flow charts and Apex/LWC online diagrams from a local project folder — call flows, dependencies, architecture maps. No server, no install; Java supported too.">
     <link rel="canonical" href="https://apexflow.trendx.uk/">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Apex Flow">
-    <meta property="og:title" content="Apex Flow — Salesforce Apex &amp; LWC Class Diagram and Call Flow Visualizer">
+    <meta property="og:title" content="Apex Flow — Apex Class Diagram &amp; Flow Diagram Online (Salesforce, LWC)">
     <meta property="og:description" content="Interactive architecture maps and call-flow diagrams for Salesforce Apex, LWC and Java — straight from a local project folder, entirely in your browser.">
     <meta property="og:url" content="https://apexflow.trendx.uk/">
     <meta name="twitter:card" content="summary">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebApplication","name":"Apex Flow","url":"https://apexflow.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Class diagram and call-flow visualizer for Salesforce Apex, Lightning Web Components and Java. Renders interactive architecture maps from a local project folder, entirely in the browser."}
+{"@context":"https://schema.org","@type":"WebApplication","name":"Apex Flow","url":"https://apexflow.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Online Apex class diagram and flow diagram tool for Salesforce. Renders interactive LWC design flow charts, call flows and architecture maps from a local project folder, entirely in the browser. Java supported."}
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iIzFlMjkzYiIvPjxyZWN0IHg9IjkiIHk9IjQiIHdpZHRoPSIxNCIgaGVpZ2h0PSI3IiByeD0iMiIgZmlsbD0iIzYwYTVmYSIvPjxsaW5lIHgxPSIxNiIgeTE9IjExIiB4Mj0iMTYiIHkyPSIxNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwb2x5Z29uIHBvaW50cz0iMTYsMTQgMjEsMjAgMTYsMjYgMTEsMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzgxOGNmOCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48bGluZSB4MT0iMTYiIHkxPSIyNiIgeDI9IjE2IiB5Mj0iMjkiIHN0cm9rZT0iIzk0YTNiOCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48L3N2Zz4="/>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
@@ -413,7 +413,7 @@ body.has-intro .btn-toggle{top:46px}
                 <button class="font-size-btn" onclick="decreaseFontSize()" title="Decrease font size">−</button>
                 <button class="font-size-btn" onclick="increaseFontSize()" title="Increase font size">+</button>
             </div>
-            <button id="tooltip-copy-btn" onclick="copyTooltipCode()"><i class="fa-regular fa-copy"></i> Copy</button>
+            <button id="tooltip-copy-btn" onclick="copyTooltipCode()" title="Copy this code snippet to the clipboard"><i class="fa-regular fa-copy"></i> Copy</button>
             <button id="tooltip-close-btn" onclick="hideCodeTooltip()" title="Close">✕</button>
         </div>
     </div>
@@ -448,20 +448,20 @@ body.has-intro .btn-toggle{top:46px}
 <div id="reference-lookup-modal">
     <div id="reference-modal-header">
         <span>Found References</span>
-        <button id="reference-modal-close" onclick="closeReferenceLookup()">✕</button>
+        <button id="reference-modal-close" onclick="closeReferenceLookup()" title="Close reference lookup">✕</button>
     </div>
     <div id="reference-modal-debug">lookup: idle</div>
     <div id="reference-modal-list"></div>
     <div class="reference-modal-footer">
-        <button onclick="closeReferenceLookup()">Cancel</button>
-        <button class="btn-primary" onclick="loadSelectedReferences()">Load Selected</button>
+        <button onclick="closeReferenceLookup()" title="Close without loading anything">Cancel</button>
+        <button class="btn-primary" onclick="loadSelectedReferences()" title="Load the selected classes into the diagram">Load Selected</button>
     </div>
 </div>
 
 <div id="class-history-panel">
     <div id="chp-header">
         <span>Class History</span>
-        <button id="chp-close-btn">✕</button>
+        <button id="chp-close-btn" title="Close">✕</button>
     </div>
     <div id="chp-list"></div>
 </div>
@@ -495,11 +495,11 @@ body.has-intro .btn-toggle{top:46px}
     </div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>
-        <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()">Clear All</button></div>
+        <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()" title="Reload the page and clear every loaded class and component">Clear All</button></div>
     </div>
     <div id="method-picker">
         <div id="method-picker-header">
-            <button class="btn" onclick="exitAnalyzeFlow()" style="padding:6px 10px;"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="btn" onclick="exitAnalyzeFlow()" style="padding:6px 10px;" title="Back to the full architecture map"><i class="fa-solid fa-arrow-left"></i></button>
             <span id="method-picker-classname"></span>
         </div>
         <div id="method-picker-list"></div>
@@ -525,7 +525,7 @@ body.has-intro .btn-toggle{top:46px}
             </button>
             <a class="btn" style="text-decoration:none;display:inline-flex;align-items:center" href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" title="Enjoying this tool? Buy me a coffee">☕</a>
             <button class="btn" onclick="document.getElementById('help-modal').classList.add('open')" title="Features &amp; usage guide">? Help</button>
-            <button class="btn btn-primary" id="reset-btn" onclick="exitAnalyzeFlow()" style="display:none;">Back to Overview</button>
+            <button class="btn btn-primary" id="reset-btn" onclick="exitAnalyzeFlow()" style="display:none;" title="Return to the full architecture map">Back to Overview</button>
         </div>
     </div>
     <div id="diagram-wrapper">
@@ -924,6 +924,18 @@ body.has-intro .btn-toggle{top:46px}
     }
 }`];
         SAMPLE_CLASSES.forEach(src => parseApex(src));
+        parseLwc('orderDashboard',
+`import { LightningElement } from 'lwc';
+import processOrders from '@salesforce/apex/OrderService.processOrders';
+export default class OrderDashboard extends LightningElement {
+    selectedIds = [];
+    handleProcess() {
+        processOrders({ orderIds: this.selectedIds });
+    }
+}`,
+`<template>
+    <lightning-button label="Process orders" onclick={handleProcess}></lightning-button>
+</template>`);
         document.getElementById('help-modal').classList.remove('open');
         render();
     }
@@ -2586,11 +2598,11 @@ body.has-intro .btn-toggle{top:46px}
             card.onclick = () => focusAndHighlight(name);
             card.innerHTML = `<div style="font-weight:600; font-size:13px;">${name}</div>
                 <div style="display:flex; gap:8px; margin-top:10px;">
-                    <button class="btn btn-primary" onclick="event.stopPropagation(); setView('${name}')" style="flex:1">Analyze Flow</button>
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); setView('${name}')" style="flex:1" title="Show this class's recursive call-flow diagram">Analyze Flow</button>
                     <button class="btn" title="${isHidden ? 'Show in diagram' : 'Hide from diagram'}" onclick="event.stopPropagation(); toggleClassVisibility('${name}')">
                         <i class="fa-solid ${isHidden ? 'fa-eye' : 'fa-eye-slash'}"></i>
                     </button>
-                    <button class="btn" style="border-color:var(--danger); color:var(--danger);" onclick="event.stopPropagation(); unloadRegistryEntry('${name}'); render(); renderFileTree();">✖</button>
+                    <button class="btn" style="border-color:var(--danger); color:var(--danger);" onclick="event.stopPropagation(); unloadRegistryEntry('${name}'); render(); renderFileTree();" title="Unload this entry from the diagram">✖</button>
                 </div>`;
             list.appendChild(card);
         });
@@ -4398,13 +4410,13 @@ body.has-intro .btn-toggle{top:46px}
   <div class="hlp-box">
     <div class="hlp-hdr">
       <h3>Apex / Java / LWC Class Diagram — Features &amp; Usage</h3>
-      <button class="btn" onclick="document.getElementById('help-modal').classList.remove('open')">✕ Close</button>
+      <button class="btn" onclick="document.getElementById('help-modal').classList.remove('open')" title="Close this help">✕ Close</button>
     </div>
     <div class="hlp-body">
       <div class="hlp-sec hlp-summary">
         <h4>At a Glance</h4>
         <p class="hlp-sum-desc">Visualize how your Apex, Java, and LWC source connects. Loading files auto-builds a system-level dependency map; from there you can drill into a single class's call flow, expand referenced "ghost" nodes on demand, and read the underlying code without leaving the diagram.</p>
-        <p class="hlp-sum-desc" style="margin-top:10px"><button class="btn btn-primary" onclick="loadApexSample()">▶ Load sample classes</button> <span style="font-size:12px;opacity:.65">— renders an example architecture map instantly</span></p>
+        <p class="hlp-sum-desc" style="margin-top:10px"><button class="btn btn-primary" onclick="loadApexSample()" title="Load four linked example Apex classes plus an LWC component and render the architecture map">▶ Load sample Apex class, LWC/js</button> <span style="font-size:12px;opacity:.65">— renders an example architecture map instantly</span></p>
         <p class="hlp-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="hlp-sum-flow">
           <span class="hlp-step">1. Open folder / drop files</span> →
