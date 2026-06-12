@@ -1,0 +1,11 @@
+{
+  "name": "jsongrid-tools",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "build:readable": "node build.js --no-obfuscate"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.1.1"
+  }
+}

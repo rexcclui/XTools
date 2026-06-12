@@ -212,13 +212,25 @@ wrangler login
 ./deploy.sh
 ```
 
-Or deploy individually:
+Or deploy individually (run `npm run build` first — wrangler serves `dist/`, not `public/`):
 
 ```bash
 npx wrangler deploy                                    # jsongrid.trendx.uk
 npx wrangler deploy --config wrangler.apexflow.jsonc   # apexflow.trendx.uk
 npx wrangler deploy --config wrangler.apexdebug.jsonc  # apexdebug.trendx.uk
 ```
+
+### Build / obfuscation
+
+The readable source lives in `public/*.html` — that is the only place to edit. `npm run build` generates `dist/` (gitignored), obfuscating the inline JavaScript of each tool with [javascript-obfuscator](https://github.com/javascript-obfuscator/javascript-obfuscator); `deploy.sh` runs it automatically and wrangler deploys `dist/`.
+
+To debug a production issue against readable code, deploy a non-obfuscated build:
+
+```bash
+npm run build:readable   # same dist/ output, scripts left readable
+```
+
+Notes baked into `build.js`: globals are never renamed (the HTML calls them from inline `onclick=` attributes), heavy transforms (control-flow flattening, dead code) are off to keep large-log/JSON parsing fast, and `sf-debug-viewer.html` skips the string-array transform because it serializes functions with `.toString()` to build its Web Worker.
 
 ### How routing works
 
