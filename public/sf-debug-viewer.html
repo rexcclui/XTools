@@ -21,7 +21,24 @@
     #root { height: 100vh; overflow: hidden; }
   </style>
 </head>
-<body>
+<body class="has-intro">
+  <style>
+#tool-intro{display:flex;align-items:center;gap:8px;padding:0 10px;height:34px;font-size:12.5px;color:#fff;background:linear-gradient(90deg,#0d419d,#1f6feb);white-space:nowrap;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body.has-intro #root{height:calc(100vh - 34px)}
+#tool-intro .ti-desc{overflow:hidden;text-overflow:ellipsis}
+#tool-intro .ti-links{display:flex;align-items:center;gap:6px;margin-left:auto;font-weight:500}
+#tool-intro a{color:#fff;text-decoration:none;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:2px 10px;font-weight:600;transition:background .15s}
+#tool-intro a:hover{background:rgba(255,255,255,.32)}
+#tool-intro .ti-close{background:none;border:none;color:#fff;opacity:.7;cursor:pointer;font-size:13px;padding:2px 4px}
+#tool-intro .ti-close:hover{opacity:1}
+@media(max-width:700px){#tool-intro .ti-desc{display:none}}
+  </style>
+  <div id="tool-intro">
+    <span class="ti-desc"><b>🐞 SF Debug Viewer</b> — paste a Salesforce Apex debug log and explore its call tree, SOQL &amp; DML instantly. Logs never leave your browser.</span>
+    <span class="ti-links">More free dev tools:<a href="https://jsongrid.trendx.uk/" title="Online JSON viewer, editor &amp; diff">⊞ JSON Grid</a><a href="https://apexflow.trendx.uk/" title="Salesforce Apex &amp; LWC class diagrams and call-flow maps">🗺 Apex Flow</a></span>
+    <button class="ti-close" title="Dismiss" onclick="localStorage.setItem('tiDismiss','1');document.getElementById('tool-intro').style.display='none';document.body.classList.remove('has-intro')">✕</button>
+  </div>
+  <script>if(localStorage.getItem('tiDismiss')){document.getElementById('tool-intro').style.display='none';document.body.classList.remove('has-intro');}</script>
   <div id="root"></div>
   <script>
 // ─── CSS ──────────────────────────────────────────────────────────────────────
