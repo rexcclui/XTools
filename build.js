@@ -58,6 +58,9 @@ function transformHtml(html, name) {
   let block = 0;
   return html.replace(INLINE_SCRIPT_RE, (match, open, code, close) => {
     if (!code.trim()) return match;
+    // Only obfuscate executable JS; leave data blocks (application/ld+json
+    // structured data, text templates) untouched.
+    if (/\btype\s*=\s*["'](?!(?:text\/javascript|module)\b)/i.test(open)) return match;
     block++;
     const label = `${name} (script block ${block})`;
     const options = { ...OBFUSCATOR_OPTIONS, ...PER_FILE_OPTIONS[name] };

@@ -7,6 +7,13 @@ const SUBDOMAIN_MAP = {
   apexflow:  'apexflow.html',
   apexdebug: 'sf-debug-viewer.html',
 };
+// Covers both /jsongrid.html and the extensionless /jsongrid that the old
+// asset html_handling used to redirect to (those URLs exist in the wild).
+const FILE_TO_SUBDOMAIN = {};
+for (const [sub, file] of Object.entries(SUBDOMAIN_MAP)) {
+  FILE_TO_SUBDOMAIN[`/${file}`] = sub;
+  FILE_TO_SUBDOMAIN[`/${file.replace(/\.html$/, '')}`] = sub;
+}
 
 export default {
   async fetch(request, env) {
@@ -17,10 +24,37 @@ export default {
       return handleVisits(request, env, subdomain);
     }
 
-    if (url.pathname === '/' || url.pathname === '') {
-      const filename = SUBDOMAIN_MAP[subdomain];
-      if (filename) {
-        return Response.redirect(new URL(`/${filename}`, url).toString(), 302);
+    if (SUBDOMAIN_MAP[subdomain]) {
+      const origin = `https://${url.hostname}`;
+
+      // Serve the tool at the root URL (rewrite, not redirect) so search
+      // engines index the clean canonical https://<sub>.trendx.uk/ directly.
+      if (url.pathname === '/' || url.pathname === '') {
+        return env.ASSETS.fetch(new Request(new URL(`/${SUBDOMAIN_MAP[subdomain]}`, url), request));
+      }
+
+      if (url.pathname === '/robots.txt') {
+        return new Response(`User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`, {
+          headers: { 'content-type': 'text/plain' },
+        });
+      }
+
+      if (url.pathname === '/sitemap.xml') {
+        return new Response(
+          '<?xml version="1.0" encoding="UTF-8"?>\n' +
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+          `  <url><loc>${origin}/</loc></url>\n` +
+          '</urlset>\n',
+          { headers: { 'content-type': 'application/xml' } },
+        );
+      }
+
+      // Every worker deploys all three HTML files, so each tool would be
+      // reachable (and indexed as duplicate content) on every subdomain.
+      // Redirect direct .html hits to the tool's canonical home instead.
+      const home = FILE_TO_SUBDOMAIN[url.pathname];
+      if (home) {
+        return Response.redirect(`https://${url.hostname.replace(/^[^.]+/, home)}/`, 301);
       }
     }
 
