@@ -2,6 +2,10 @@
 
 A browser-based parser and visualiser for Salesforce Apex debug logs. Paste or drop a raw log and instantly explore its call tree, SOQL queries, DML operations, and debug output.
 
+**Live:** [apexdebug.trendx.uk](https://apexdebug.trendx.uk/) · logs are parsed entirely in your browser — nothing is uploaded.
+
+> New here? Click **? Help → ▶ Load Sample debug** to parse an example log instantly. The Help dialog also shows an example screenshot.
+
 ## Features
 
 ### Log Parsing
