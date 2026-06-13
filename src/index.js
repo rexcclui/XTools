@@ -40,10 +40,11 @@ export default {
       }
 
       if (url.pathname === '/sitemap.xml') {
+        const shot = `sample-${SUBDOMAIN_MAP[subdomain].replace(/\.html$/, '')}.jpg`;
         return new Response(
           '<?xml version="1.0" encoding="UTF-8"?>\n' +
-          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-          `  <url><loc>${origin}/</loc></url>\n` +
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' +
+          `  <url><loc>${origin}/</loc><image:image><image:loc>${origin}/${shot}</image:loc></image:image></url>\n` +
           '</urlset>\n',
           { headers: { 'content-type': 'application/xml' } },
         );

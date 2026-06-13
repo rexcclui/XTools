@@ -11,7 +11,9 @@
   <meta property="og:title" content="SF Debug Viewer — Apex Debug Log Analyzer Online (Salesforce)">
   <meta property="og:description" content="Paste or drop a Salesforce Apex debug log and explore its call tree, SOQL queries, DML and exceptions instantly — free and fully in-browser.">
   <meta property="og:url" content="https://apexdebug.trendx.uk/">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg">
   <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebApplication","name":"SF Debug Viewer","url":"https://apexdebug.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Online Apex debug log analyzer for Salesforce with collapsible call tree, SOQL and DML breakdown, exception highlighting and multi-log search. Runs entirely in the browser; logs never leave your machine."}
   </script>
@@ -22,6 +24,7 @@
   </style>
 </head>
 <body class="has-intro">
+  <noscript><div style="max-width:760px;margin:40px auto;padding:0 20px;font-family:system-ui,sans-serif;line-height:1.6;color:#c9d1d9;background:#0d1117"><h1>SF Debug Viewer — Apex Debug Log Analyzer Online</h1><p>SF Debug Viewer is a free, browser-based analyzer for Salesforce Apex debug logs. Paste or drop a raw log to explore it online as a collapsible call tree, with a SOQL and DML breakdown, exceptions, method timings, multi-log tabs, full-text search and custom highlighting. The log is parsed entirely in your browser and never leaves your machine.</p><p>More free developer tools: <a href="https://jsongrid.trendx.uk/">JSON Grid — online JSON viewer &amp; diff</a> · <a href="https://apexflow.trendx.uk/">Apex Flow — Apex &amp; LWC class diagrams</a>.</p><p>This tool needs JavaScript enabled to run.</p></div></noscript>
   <style>
 #tool-intro{display:flex;align-items:center;gap:8px;padding:0 10px;height:34px;font-size:12.5px;color:#fff;background:linear-gradient(90deg,#0d419d,#1f6feb);white-space:nowrap;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 body.has-intro #root{height:calc(100vh - 34px)}
@@ -361,6 +364,7 @@ const HTML = `
         <h4>At a Glance</h4>
         <p class="help-sum-desc">Turn a raw Salesforce debug log into an interactive call tree. The raw log and the tree stay in sync — click either side to jump to the other. Filter by event type, search across tabs, color-code lines, and (with a project folder open) jump straight to the Apex source.</p>
         <p class="help-sum-desc" style="margin-top:10px"><button class="btn btn-primary" id="btn-helpSample" title="Fill the editor with an example Apex debug log and parse it">▶ Load Sample debug</button> <span style="font-size:12px;opacity:.65">— parses an example log instantly</span></p>
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;opacity:.8">📷 Example screenshot — sample debug log parsed into a call tree</summary><img src="sample-sf-debug-viewer.jpg" alt="SF Debug Viewer showing a parsed Salesforce Apex debug log with color-coded events and stats" loading="lazy" style="max-width:100%;border:1px solid #30363d;border-radius:6px;margin-top:8px"></details>
         <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="help-sum-flow">
           <span class="help-step">1. Paste / drop a log → Parse</span> →
