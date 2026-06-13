@@ -85,7 +85,7 @@ If you stay under 100k requests/day across all three subdomains combined, the en
 ## 6. Project Layout
 
 ```
-jsonGrid/
+XTools/
 ├── public/
 │   ├── jsongrid.html         # JSON Grid tool
 │   ├── apexflow.html         # Apex / Java / LWC class-diagram tool
@@ -104,8 +104,8 @@ jsonGrid/
 ## 7. Local Setup (no deploy)
 
 ```bash
-git clone <your-fork-url> jsonGrid
-cd jsonGrid
+git clone <your-fork-url> XTools
+cd XTools
 
 # Serve the public/ directory on http://localhost:8000
 python -m http.server 8000 --directory public
@@ -247,7 +247,7 @@ Defaults to http://localhost:8787. The subdomain routing in `src/index.js` will 
 
 ```bash
 # Clone
-git clone <repo-url> jsonGrid && cd jsonGrid
+git clone <repo-url> XTools && cd XTools
 
 # Run locally
 python -m http.server 8000 --directory public

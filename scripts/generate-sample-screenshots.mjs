@@ -8,9 +8,12 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 
-const root = '/home/user/jsonGrid';
+// Resolve the repo root from this script's location (scripts/ → repo root)
+// so it works regardless of where the checkout lives.
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const server = http.createServer((req, res) => {
   if (req.url === '/api/visits') { res.end(JSON.stringify({ count: 1280 })); return; }
   try { res.setHeader('content-type', 'text/html'); res.end(fs.readFileSync(path.join(root, 'dist', req.url.slice(1)))); }
