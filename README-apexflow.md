@@ -2,6 +2,10 @@
 
 A browser-based tool for visualising Salesforce Apex, Java, and Lightning Web Component source as interactive architecture maps and recursive call-flow diagrams, without any server or build step.
 
+**Live:** [apexflow.trendx.uk](https://apexflow.trendx.uk/) · files are read locally in your browser — nothing is uploaded.
+
+> New here? Click **? Help → ▶ Load sample Apex class, LWC/js** to render an example architecture map instantly. The Help dialog also shows an example screenshot.
+
 ## Features
 
 ### File Explorer

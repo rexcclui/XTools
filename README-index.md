@@ -2,6 +2,10 @@
 
 A browser-based, multi-tab JSON explorer and editor that renders JSON as an interactive grid table alongside a raw/formatted source panel.
 
+**Live:** [jsongrid.trendx.uk](https://jsongrid.trendx.uk/) · runs entirely in your browser — no signup, nothing uploaded.
+
+> New here? Click **? Help → ▶ Load sample JSON** to see the grid in action instantly. The Help dialog also shows an example screenshot.
+
 ## Features
 
 ### Multi-Tab Workspace
