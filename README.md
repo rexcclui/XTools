@@ -1,10 +1,12 @@
-# jsonGrid — Free Browser-Based Developer Tools
+# XTools — Free Browser-Based Developer Tools
 
 Three fast, private, zero-install developer tools that run **entirely in your browser**. No signup, no upload — your data never leaves your machine. Built especially for Salesforce developers, plus a general-purpose JSON workspace.
 
+Includes an online **JSON viewer / formatter / beautifier / validator & diff** tool, a **Salesforce Apex & LWC class diagram and call-flow** generator, and an **Apex debug log analyzer**.
+
 | Tool | What it does | Open it |
 |---|---|---|
-| 🟦 **JSON Grid** | View, format, edit & compare JSON in a grid | **[jsongrid.trendx.uk](https://jsongrid.trendx.uk/)** |
+| 🟦 **JSON Grid** | View, format, beautify, validate & compare JSON in a grid | **[jsongrid.trendx.uk](https://jsongrid.trendx.uk/)** |
 | 🟪 **Apex Flow** | Salesforce Apex & LWC class diagrams + call-flow charts | **[apexflow.trendx.uk](https://apexflow.trendx.uk/)** |
 | 🟦 **SF Debug Viewer** | Salesforce Apex debug log analyzer | **[apexdebug.trendx.uk](https://apexdebug.trendx.uk/)** |
 
@@ -16,7 +18,7 @@ Each tool has a **? Help** button with a built-in **Load sample** so you can see
 
 ## 🟦 JSON Grid
 
-An interactive workspace for viewing, editing, and comparing JSON using a flexible grid layout — paste JSON, get a navigable table.
+An interactive online JSON viewer, formatter, and editor for viewing, beautifying, validating, and comparing JSON using a flexible grid layout — paste JSON, get a navigable table.
 
 ![JSON Grid rendering a JSON array as a navigable grid table](public/sample-jsongrid.jpg)
 

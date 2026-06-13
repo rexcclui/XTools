@@ -1,6 +1,6 @@
 # JSON Grid Workspace
 
-A browser-based, multi-tab JSON explorer and editor that renders JSON as an interactive grid table alongside a raw/formatted source panel.
+A browser-based, multi-tab online JSON viewer, formatter, and editor that renders JSON as an interactive grid table alongside a raw/formatted source panel — format, beautify, validate, and diff JSON in your browser.
 
 **Live:** [jsongrid.trendx.uk](https://jsongrid.trendx.uk/) · runs entirely in your browser — no signup, nothing uploaded.
 
