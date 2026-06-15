@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>XTools — Free Browser-Based Developer Tools (JSON, Salesforce Apex & LWC)</title>
+<meta name="description" content="XTools is a free suite of private, browser-based developer tools: an online JSON viewer/formatter/diff grid, a Salesforce Apex &amp; LWC class-diagram and flowchart generator, and an Apex debug log analyzer. No signup, nothing uploaded — everything runs in your browser."/>
+<link rel="canonical" href="https://xtools.trendx.uk/"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="XTools"/>
+<meta property="og:title" content="XTools — Free Browser-Based Developer Tools"/>
+<meta property="og:description" content="A free suite of private, in-browser developer tools: JSON Grid X, Apex Flow, and SF Debug Viewer. No signup, nothing uploaded."/>
+<meta property="og:url" content="https://xtools.trendx.uk/"/>
+<meta property="og:image" content="https://xtools.trendx.uk/sample-jsongrid.jpg"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="https://xtools.trendx.uk/sample-jsongrid.jpg"/>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"XTools","url":"https://xtools.trendx.uk/","description":"A free suite of private, browser-based developer tools for JSON and Salesforce.","hasPart":[{"@type":"WebApplication","name":"JSON Grid X","url":"https://jsongrid.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Online JSON viewer, formatter, editor and diff tool with a multi-cell grid workspace."},{"@type":"WebApplication","name":"Apex Flow","url":"https://apexflow.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Apex and LWC class diagram, flow chart and flowchart design tool for Salesforce."},{"@type":"WebApplication","name":"SF Debug Viewer","url":"https://apexdebug.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Online Salesforce Apex debug log parser, analyzer and tracer."}]}
+</script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg2:#f5f6f8;--card:#ffffff;
+  --tx:#15181d;--tx2:#5b6470;--tx3:#8a94a2;
+  --bd:rgba(0,0,0,.10);--bd2:rgba(0,0,0,.18);
+  --accent:#2563eb;--accent2:#1d4ed8;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#0d1117;--bg2:#11161d;--card:#161b22;
+    --tx:#e6edf3;--tx2:#9aa6b2;--tx3:#6b7682;
+    --bd:rgba(255,255,255,.10);--bd2:rgba(255,255,255,.18);
+    --accent:#60a5fa;--accent2:#3b82f6;
+  }
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+/* header */
+header{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(10px);background:color-mix(in srgb,var(--bg) 85%,transparent);border-bottom:1px solid var(--bd)}
+.nav{display:flex;align-items:center;gap:14px;height:60px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:-.3px}
+.brand .logo{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;background:#111827;color:#60a5fa;font-weight:800}
+.nav .sp{flex:1}
+.nav a.ghost{color:var(--tx2);font-size:14px;font-weight:600}
+
+/* hero */
+.hero{text-align:center;padding:64px 0 36px}
+.hero h1{font-size:clamp(30px,5vw,46px);line-height:1.1;letter-spacing:-1px;font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,#2563eb,#7c3aed);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p.sub{margin:18px auto 0;max-width:640px;font-size:18px;color:var(--tx2)}
+.badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:22px}
+.badge{font-size:12.5px;font-weight:600;color:var(--tx2);background:var(--bg2);border:1px solid var(--bd);border-radius:999px;padding:5px 12px}
+
+/* tool cards */
+.tools{display:flex;flex-direction:column;gap:26px;padding:20px 0 10px}
+.tool{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:26px;overflow:hidden}
+.tool:nth-child(even){grid-template-columns:1fr 1fr}
+.tool .shot{order:2}
+.tool:nth-child(even) .info{order:2}
+.tool:nth-child(even) .shot{order:1}
+.tool .shot img{width:100%;height:auto;border-radius:10px;border:1px solid var(--bd2);display:block}
+.tool .tag{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:12px}
+.tool h2{font-size:24px;letter-spacing:-.4px;font-weight:800;margin-bottom:6px}
+.tool .lead{color:var(--tx2);font-size:15px;margin-bottom:14px}
+.tool ul{list-style:none;display:flex;flex-direction:column;gap:7px;margin-bottom:18px}
+.tool ul li{position:relative;padding-left:24px;font-size:14.5px;color:var(--tx)}
+.tool ul li::before{content:'✓';position:absolute;left:0;top:0;color:#16a34a;font-weight:800}
+.cta{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:#fff;background:var(--accent);padding:10px 18px;border-radius:9px}
+.cta:hover{background:var(--accent2);text-decoration:none}
+
+/* why */
+.why{padding:46px 0}
+.why h2{text-align:center;font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px}
+.why p.s{text-align:center;color:var(--tx2);max-width:560px;margin:0 auto 30px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.feat{background:var(--bg2);border:1px solid var(--bd);border-radius:13px;padding:20px}
+.feat .ico{font-size:22px;margin-bottom:8px}
+.feat h3{font-size:16px;font-weight:700;margin-bottom:4px}
+.feat p{font-size:14px;color:var(--tx2)}
+
+/* footer */
+footer{border-top:1px solid var(--bd);margin-top:30px;padding:30px 0;color:var(--tx2);font-size:14px}
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:center;text-align:center}
+.foot .sp{flex:1;min-width:20px}
+
+@media(max-width:760px){
+  .tool,.tool:nth-child(even){grid-template-columns:1fr}
+  .tool .shot,.tool:nth-child(even) .shot,.tool:nth-child(even) .info{order:0}
+  .grid3{grid-template-columns:1fr}
+  .hero{padding:44px 0 24px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <span class="brand"><span class="logo">X</span>XTools</span>
+    <span class="sp"></span>
+    <a class="ghost" href="#tools">Tools</a>
+    <a class="ghost" href="#why">Why</a>
+    <a class="ghost" href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero wrap">
+    <h1>Free, private <span class="grad">developer tools</span><br/>that run in your browser</h1>
+    <p class="sub">A small suite of fast, zero-install tools for JSON and Salesforce development. No signup, no upload — your data never leaves your machine.</p>
+    <div class="badges">
+      <span class="badge">🔒 100% client-side</span>
+      <span class="badge">⚡ No signup</span>
+      <span class="badge">📴 Works offline</span>
+      <span class="badge">🌙 Dark mode</span>
+      <span class="badge">🆓 Open source</span>
+    </div>
+  </section>
+
+  <section id="tools" class="tools wrap">
+
+    <article class="tool">
+      <div class="info">
+        <span class="tag" style="background:rgba(37,99,235,.12);color:#2563eb">⊞ JSON Grid X</span>
+        <h2>JSON Grid X</h2>
+        <p class="lead">An online JSON viewer, formatter and diff tool — but built as a multi-cell <em>workspace</em>, not a single textarea.</p>
+        <ul>
+          <li>Multi-cell grid: many JSON documents side by side, with tabs</li>
+          <li>Spreadsheet-style table view of arrays &amp; nested objects</li>
+          <li>Pretty-print, beautify &amp; validate JSON</li>
+          <li>Diff any two values across cells, color-coded</li>
+          <li>Converts Salesforce Apex debug output to JSON</li>
+        </ul>
+        <a class="cta" href="https://jsongrid.trendx.uk/">Open JSON Grid X →</a>
+      </div>
+      <div class="shot"><a href="https://jsongrid.trendx.uk/"><img src="sample-jsongrid.jpg" alt="JSON Grid X rendering a JSON array as a navigable grid table" loading="lazy"/></a></div>
+    </article>
+
+    <article class="tool">
+      <div class="info">
+        <span class="tag" style="background:rgba(99,102,241,.14);color:#6366f1">🗺 Apex Flow</span>
+        <h2>Apex Flow</h2>
+        <p class="lead">Turn a Salesforce Apex, LWC or Java project into interactive class diagrams and call-flow charts — straight from a local folder.</p>
+        <ul>
+          <li>Class diagrams for Apex, LWC and Java</li>
+          <li>Recursive method call-flow charts</li>
+          <li>Architecture map of a whole project folder</li>
+          <li>Cross-language links (LWC → Apex imports)</li>
+          <li>Pan &amp; zoom; export the Mermaid definition</li>
+        </ul>
+        <a class="cta" href="https://apexflow.trendx.uk/">Open Apex Flow →</a>
+      </div>
+      <div class="shot"><a href="https://apexflow.trendx.uk/"><img src="sample-apexflow.jpg" alt="Apex Flow architecture map of LWC components calling Apex classes" loading="lazy"/></a></div>
+    </article>
+
+    <article class="tool">
+      <div class="info">
+        <span class="tag" style="background:rgba(56,139,253,.14);color:#388bfd">🐞 SF Debug Viewer</span>
+        <h2>SF Debug Viewer</h2>
+        <p class="lead">Paste a raw Salesforce Apex debug log and explore it as a navigable call tree instead of thousands of raw lines.</p>
+        <ul>
+          <li>Collapsible Apex call tree</li>
+          <li>SOQL &amp; DML breakdown with counts</li>
+          <li>Exceptions, stack traces &amp; method timings</li>
+          <li>Multi-log tabs with global search</li>
+          <li>Custom highlighting &amp; type filters</li>
+        </ul>
+        <a class="cta" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer →</a>
+      </div>
+      <div class="shot"><a href="https://apexdebug.trendx.uk/"><img src="sample-sf-debug-viewer.jpg" alt="SF Debug Viewer showing a parsed Apex debug log as a color-coded call tree" loading="lazy"/></a></div>
+    </article>
+
+  </section>
+
+  <section id="why" class="why wrap">
+    <h2>Why XTools?</h2>
+    <p class="s">Built especially for Salesforce developers, plus a general-purpose JSON workspace — with privacy and speed as first principles.</p>
+    <div class="grid3">
+      <div class="feat"><div class="ico">🔒</div><h3>Private by design</h3><p>Everything runs client-side. Your JSON, code, and debug logs are never uploaded to any server.</p></div>
+      <div class="feat"><div class="ico">⚡</div><h3>No install, no signup</h3><p>Just open a URL. The tools also work offline once loaded — no account required.</p></div>
+      <div class="feat"><div class="ico">🆓</div><h3>Free &amp; open source</h3><p>All three tools are free and the source is on GitHub. If they save you time, you can buy me a coffee.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>© <span id="yr">2026</span> XTools — free browser-based developer tools</span>
+    <span class="sp"></span>
+    <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener">☕ Buy me a coffee</a>
+  </div>
+</footer>
+<script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+</body>
+</html>
