@@ -3,9 +3,10 @@
 	"name": "jsongrid",
 	"compatibility_date": "2026-04-30",
 	"main": "src/index.js",
-	// xtools.trendx.uk (the portal hub) is attached to this Worker on deploy.
-	// jsongrid.trendx.uk and the other tool domains stay dashboard-managed.
+	// Both hostnames this Worker serves are listed so a deploy never drops one.
+	// (Wrangler treats this list as authoritative for the Worker's custom domains.)
 	"routes": [
+		{ "pattern": "jsongrid.trendx.uk", "custom_domain": true },
 		{ "pattern": "xtools.trendx.uk", "custom_domain": true }
 	],
 	"build": {
