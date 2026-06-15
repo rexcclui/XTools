@@ -1,4 +1,4 @@
-# JSON Grid Workspace
+# JSON Grid X Workspace
 
 A browser-based, multi-tab online JSON viewer, formatter, and editor that renders JSON as an interactive grid table alongside a raw/formatted source panel — format, beautify, validate, and diff JSON in your browser.
 
