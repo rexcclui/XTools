@@ -3,6 +3,11 @@
 	"name": "jsongrid",
 	"compatibility_date": "2026-04-30",
 	"main": "src/index.js",
+	// xtools.trendx.uk (the portal hub) is attached to this Worker on deploy.
+	// jsongrid.trendx.uk and the other tool domains stay dashboard-managed.
+	"routes": [
+		{ "pattern": "xtools.trendx.uk", "custom_domain": true }
+	],
 	"build": {
 		"command": "npm run build"
 	},
