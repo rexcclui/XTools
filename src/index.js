@@ -6,6 +6,14 @@ const SUBDOMAIN_MAP = {
   jsongrid:  'jsongrid.html',
   apexflow:  'apexflow.html',
   apexdebug: 'sf-debug-viewer.html',
+  xtools:    'xtools.html',
+};
+// Screenshot used in each tool's image sitemap entry. The xtools portal has
+// no single screenshot, so it is intentionally absent (image tag is omitted).
+const SCREENSHOT = {
+  jsongrid:  'sample-jsongrid.jpg',
+  apexflow:  'sample-apexflow.jpg',
+  apexdebug: 'sample-sf-debug-viewer.jpg',
 };
 // Covers both /jsongrid.html and the extensionless /jsongrid that the old
 // asset html_handling used to redirect to (those URLs exist in the wild).
@@ -40,11 +48,13 @@ export default {
       }
 
       if (url.pathname === '/sitemap.xml') {
-        const shot = `sample-${SUBDOMAIN_MAP[subdomain].replace(/\.html$/, '')}.jpg`;
+        // The portal (xtools) has no per-tool screenshot, so omit the image tag.
+        const shot = SCREENSHOT[subdomain];
+        const img = shot ? `<image:image><image:loc>${origin}/${shot}</image:loc></image:image>` : '';
         return new Response(
           '<?xml version="1.0" encoding="UTF-8"?>\n' +
           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' +
-          `  <url><loc>${origin}/</loc><image:image><image:loc>${origin}/${shot}</image:loc></image:image></url>\n` +
+          `  <url><loc>${origin}/</loc>${img}</url>\n` +
           '</urlset>\n',
           { headers: { 'content-type': 'application/xml' } },
         );
