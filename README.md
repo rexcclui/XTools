@@ -6,7 +6,7 @@ Includes an online **JSON viewer / formatter / beautifier / validator & diff** t
 
 | Tool | What it does | Open it |
 |---|---|---|
-| 🟦 **JSON Grid** | View, format, beautify, validate & compare JSON in a grid | **[jsongrid.trendx.uk](https://jsongrid.trendx.uk/)** |
+| 🟦 **JSON Grid X** | View, format, beautify, validate & compare JSON in a grid | **[jsongrid.trendx.uk](https://jsongrid.trendx.uk/)** |
 | 🟪 **Apex Flow** | Salesforce Apex & LWC class diagrams + call-flow charts | **[apexflow.trendx.uk](https://apexflow.trendx.uk/)** |
 | 🟦 **SF Debug Viewer** | Salesforce Apex debug log analyzer | **[apexdebug.trendx.uk](https://apexdebug.trendx.uk/)** |
 
@@ -16,11 +16,11 @@ Each tool has a **? Help** button with a built-in **Load sample** so you can see
 
 ---
 
-## 🟦 JSON Grid
+## 🟦 JSON Grid X
 
 An interactive online JSON viewer, formatter, and editor for viewing, beautifying, validating, and comparing JSON using a flexible grid layout — paste JSON, get a navigable table.
 
-![JSON Grid rendering a JSON array as a navigable grid table](public/sample-jsongrid.jpg)
+![JSON Grid X rendering a JSON array as a navigable grid table](public/sample-jsongrid.jpg)
 
 **Highlights**
 
@@ -32,7 +32,7 @@ An interactive online JSON viewer, formatter, and editor for viewing, beautifyin
 - **Salesforce Apex debug parsing** — paste Apex object print-outs or noisy log lines and convert them to JSON tables
 - **Drag & drop** `.json` files, **copy** any node, and **auto-save** to local history
 
-👉 **[Open JSON Grid](https://jsongrid.trendx.uk/)** · full details in [`README-index.md`](README-index.md)
+👉 **[Open JSON Grid X](https://jsongrid.trendx.uk/)** · full details in [`README-index.md`](README-index.md)
 
 ---
 

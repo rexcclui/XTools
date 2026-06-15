@@ -87,7 +87,7 @@ If you stay under 100k requests/day across all three subdomains combined, the en
 ```
 XTools/
 ├── public/
-│   ├── jsongrid.html         # JSON Grid tool
+│   ├── jsongrid.html         # JSON Grid X tool
 │   ├── apexflow.html         # Apex / Java / LWC class-diagram tool
 │   └── sf-debug-viewer.html  # Salesforce debug log viewer
 ├── src/
