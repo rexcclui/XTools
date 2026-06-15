@@ -31,7 +31,7 @@ This is a **static-HTML toolset deployed as Cloudflare Workers**. The tools them
 
 ### Local development only (no deploy)
 
-- A modern browser: Chrome, Edge, Firefox, or Safari (Chromium recommended for the File System Access API features in Apex Flow).
+- A modern browser: Chrome, Edge, Firefox, or Safari (Chromium recommended for the File System Access API features in Apex Flow X).
 - Optional: Python 3, Node.js, or any static file server to serve `public/` over HTTP (some browser features require `http://` rather than `file://`).
 
 ### To deploy to Cloudflare
@@ -239,7 +239,7 @@ Defaults to http://localhost:8787. The subdomain routing in `src/index.js` will 
 | Worker name conflict | Change `name` in `wrangler.jsonc` — it must be unique within your account. |
 | Custom domain returns 522 / not found | Make sure the apex domain is on Cloudflare DNS, and the subdomain is added via the Worker's **Custom Domains** tab (not a manual CNAME). |
 | `*.workers.dev` URL shows nothing | Your account may have disabled the workers.dev subdomain — re-enable in the Cloudflare dashboard, or use a custom domain. |
-| File System Access API not working in Apex Flow | Use a Chromium-based browser (Chrome/Edge). Firefox/Safari do not implement it; the page falls back to a regular file picker. |
+| File System Access API not working in Apex Flow X | Use a Chromium-based browser (Chrome/Edge). Firefox/Safari do not implement it; the page falls back to a regular file picker. |
 
 ---
 

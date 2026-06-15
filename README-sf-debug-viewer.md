@@ -1,4 +1,4 @@
-# SF Debug Viewer
+# SF Debug Viewer X
 
 A browser-based parser and visualiser for Salesforce Apex debug logs. Paste or drop a raw log and instantly explore its call tree, SOQL queries, DML operations, and debug output.
 
