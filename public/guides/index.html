@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>JSON Guides — How to View, Visualize &amp; Read JSON Online | JSON Grid X</title>
+<meta name="description" content="Practical guides for working with JSON in the browser: view JSON as a table, visualize complex nested structures, and open large JSON files without crashing — free, no signup."/>
+<link rel="canonical" href="https://jsongrid.trendx.uk/guides"/>
+<meta name="robots" content="index,follow"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="JSON Grid X"/>
+<meta property="og:title" content="JSON Guides — How to View, Visualize &amp; Read JSON Online"/>
+<meta property="og:description" content="Practical guides for working with JSON in the browser — free, no signup, nothing uploaded."/>
+<meta property="og:url" content="https://jsongrid.trendx.uk/guides"/>
+<meta property="og:image" content="https://jsongrid.trendx.uk/sample-jsongrid.jpg"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="https://jsongrid.trendx.uk/sample-jsongrid.jpg"/>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[{"@type":"CollectionPage","name":"JSON Guides","url":"https://jsongrid.trendx.uk/guides","description":"Practical guides for viewing, visualizing and reading JSON in the browser."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"JSON Grid X","item":"https://jsongrid.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://jsongrid.trendx.uk/guides"}]},{"@type":"ItemList","itemListElement":[{"@type":"ListItem","position":1,"url":"https://jsongrid.trendx.uk/guides/view-json-as-table","name":"How to view JSON data as a table online"},{"@type":"ListItem","position":2,"url":"https://jsongrid.trendx.uk/guides/visualize-complex-json","name":"Best way to visualize complex, nested JSON"},{"@type":"ListItem","position":3,"url":"https://jsongrid.trendx.uk/guides/large-json-file","name":"How to open a large JSON file without crashing your browser"}]}]}
+</script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f6f8;--tx:#15181d;--tx2:#5b6470;--tx3:#8a94a2;--bd:rgba(0,0,0,.10);--bd2:rgba(0,0,0,.18);--accent:#2563eb;--accent2:#1d4ed8;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--bg2:#11161d;--tx:#e6edf3;--tx2:#9aa6b2;--tx3:#6b7682;--bd:rgba(255,255,255,.10);--bd2:rgba(255,255,255,.18);--accent:#60a5fa;--accent2:#3b82f6}}
+body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(10px);background:color-mix(in srgb,var(--bg) 85%,transparent);border-bottom:1px solid var(--bd)}
+.nav{display:flex;align-items:center;gap:14px;height:58px;max-width:760px;margin:0 auto;padding:0 20px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;letter-spacing:-.3px;color:var(--tx)}
+.brand .logo{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#111827;color:#60a5fa;font-weight:800}
+.nav .sp{flex:1}.nav a.ghost{color:var(--tx2);font-size:14px;font-weight:600}
+.crumb{font-size:13px;color:var(--tx3);margin:18px 0 2px}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.15;letter-spacing:-.6px;font-weight:800;margin:6px 0 10px}
+.lead{font-size:18px;color:var(--tx2);margin:0 0 18px}
+.cards{display:flex;flex-direction:column;gap:14px;margin:18px 0}
+.card{display:block;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px 20px;color:var(--tx)}
+.card:hover{border-color:var(--accent);text-decoration:none}
+.card h2{font-size:18px;font-weight:700;margin:0 0 4px}
+.card p{font-size:14.5px;color:var(--tx2);margin:0}
+footer{border-top:1px solid var(--bd);margin-top:40px;padding:26px 0;color:var(--tx2);font-size:14px}
+.foot{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
+    <span class="sp"></span>
+    <a class="ghost" href="/guides">Guides</a>
+    <a class="ghost" href="https://jsongrid.trendx.uk/">Open JSON Grid X</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="crumb"><a href="https://jsongrid.trendx.uk/">JSON Grid X</a> › Guides</p>
+  <h1>JSON guides</h1>
+  <p class="lead">Short, practical guides for reading and working with JSON in your browser — all using <a href="https://jsongrid.trendx.uk/">JSON Grid X</a>, the free, private, in-browser JSON viewer.</p>
+
+  <div class="cards">
+    <a class="card" href="/guides/view-json-as-table">
+      <h2>How to view JSON data as a table online</h2>
+      <p>Turn JSON arrays into a spreadsheet-style grid of rows and columns you can scan at a glance.</p>
+    </a>
+    <a class="card" href="/guides/visualize-complex-json">
+      <h2>Best way to visualize complex, nested JSON</h2>
+      <p>Pretty-print, collapse, and grid views that make deeply nested structures readable.</p>
+    </a>
+    <a class="card" href="/guides/large-json-file">
+      <h2>Open a large JSON file without crashing your browser</h2>
+      <p>Inspect big files locally with no upload — and know when to slice them with jq instead.</p>
+    </a>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>© 2026 XTools — free browser-based developer tools</span>
+    <a href="https://jsongrid.trendx.uk/">JSON Grid X</a>
+    <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

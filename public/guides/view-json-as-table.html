@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>How to View JSON as a Table Online (Free, In-Browser) — JSON Grid X</title>
+<meta name="description" content="A step-by-step guide to viewing JSON data as a sortable, spreadsheet-style table online. Turn JSON arrays into a grid view in your browser — free, no signup, nothing uploaded."/>
+<link rel="canonical" href="https://jsongrid.trendx.uk/guides/view-json-as-table"/>
+<meta name="robots" content="index,follow"/>
+<meta property="og:type" content="article"/>
+<meta property="og:site_name" content="JSON Grid X"/>
+<meta property="og:title" content="How to View JSON as a Table Online (Free, In-Browser)"/>
+<meta property="og:description" content="Turn JSON arrays into a spreadsheet-style grid in your browser — free, no signup, nothing uploaded."/>
+<meta property="og:url" content="https://jsongrid.trendx.uk/guides/view-json-as-table"/>
+<meta property="og:image" content="https://jsongrid.trendx.uk/sample-jsongrid.jpg"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="https://jsongrid.trendx.uk/sample-jsongrid.jpg"/>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"How to View JSON as a Table Online (Free, In-Browser)","description":"A step-by-step guide to viewing JSON data as a spreadsheet-style table online by turning JSON arrays into a grid view in your browser.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://jsongrid.trendx.uk/guides/view-json-as-table","image":"https://jsongrid.trendx.uk/sample-jsongrid.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"JSON Grid X","item":"https://jsongrid.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://jsongrid.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"View JSON as a table","item":"https://jsongrid.trendx.uk/guides/view-json-as-table"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I view JSON data as a table online?","acceptedAnswer":{"@type":"Answer","text":"Open JSON Grid X, paste your JSON (or drop a .json file) into a cell, and it renders an array of objects as a navigable table — one row per item, one column per key. No upload and no signup; everything runs in your browser."}},{"@type":"Question","name":"Is there an online JSON viewer that looks like Excel?","acceptedAnswer":{"@type":"Answer","text":"Yes. JSON Grid X shows arrays of objects in a spreadsheet-style grid with column headers and rows, similar to Excel or Google Sheets, while keeping the underlying JSON one click away. Nested objects and arrays expand and collapse inside their cells."}},{"@type":"Question","name":"How do I display a JSON array in a grid view?","acceptedAnswer":{"@type":"Answer","text":"Paste an array of objects into a cell in JSON Grid X and switch to the rendered view. Each object becomes a row and each property becomes a column, so a JSON array is displayed as a readable grid instead of raw text."}}]}]}
+</script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f6f8;--tx:#15181d;--tx2:#5b6470;--tx3:#8a94a2;--bd:rgba(0,0,0,.10);--bd2:rgba(0,0,0,.18);--accent:#2563eb;--accent2:#1d4ed8;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--bg2:#11161d;--tx:#e6edf3;--tx2:#9aa6b2;--tx3:#6b7682;--bd:rgba(255,255,255,.10);--bd2:rgba(255,255,255,.18);--accent:#60a5fa;--accent2:#3b82f6}}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(10px);background:color-mix(in srgb,var(--bg) 85%,transparent);border-bottom:1px solid var(--bd)}
+.nav{display:flex;align-items:center;gap:14px;height:58px;max-width:760px;margin:0 auto;padding:0 20px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;letter-spacing:-.3px;color:var(--tx)}
+.brand .logo{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#111827;color:#60a5fa;font-weight:800}
+.nav .sp{flex:1}.nav a.ghost{color:var(--tx2);font-size:14px;font-weight:600}
+main{padding:14px 0 10px}
+.crumb{font-size:13px;color:var(--tx3);margin:18px 0 2px}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.15;letter-spacing:-.6px;font-weight:800;margin:6px 0 14px}
+h2{font-size:22px;font-weight:800;letter-spacing:-.3px;margin:34px 0 10px}
+h3{font-size:17px;font-weight:700;margin:22px 0 6px}
+p{margin:12px 0}
+.lead{font-size:18px;color:var(--tx2);margin:0 0 10px}
+ul{margin:12px 0 12px 22px}li{margin:6px 0}
+ol.steps{list-style:none;counter-reset:s;margin:14px 0}
+ol.steps>li{counter-increment:s;position:relative;padding:12px 14px 12px 52px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;margin:10px 0}
+ol.steps>li::before{content:counter(s);position:absolute;left:12px;top:11px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.cta{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:16px;color:#fff;background:var(--accent);padding:12px 22px;border-radius:10px;margin:10px 0}
+.cta:hover{background:var(--accent2);text-decoration:none}
+.callout{background:var(--bg2);border:1px solid var(--bd);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin:18px 0;font-size:15px;color:var(--tx2)}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:1px 5px}
+img.shot{width:100%;height:auto;border-radius:10px;border:1px solid var(--bd2);margin:16px 0;display:block}
+.faq dt{font-weight:700;margin:20px 0 4px;font-size:16px}
+.faq dd{margin:0;color:var(--tx2)}
+.related{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.related a{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 14px;font-weight:600;color:var(--tx)}
+.related a:hover{border-color:var(--accent);text-decoration:none}
+footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(--tx2);font-size:14px}
+.foot{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
+    <span class="sp"></span>
+    <a class="ghost" href="/guides">Guides</a>
+    <a class="ghost" href="https://jsongrid.trendx.uk/">Open JSON Grid X</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="crumb"><a href="https://jsongrid.trendx.uk/">JSON Grid X</a> › <a href="/guides">Guides</a> › View JSON as a table</p>
+  <h1>How to view JSON data as a table online</h1>
+  <p class="lead">Raw JSON is hard to scan. The fastest way to read it is to turn an array of objects into a spreadsheet-style grid — rows and columns you can skim like a table. Here is how to do it in your browser, with nothing to install and nothing uploaded.</p>
+
+  <a class="cta" href="https://jsongrid.trendx.uk/">Open JSON Grid X →</a>
+
+  <h2>View JSON as a table in 4 steps</h2>
+  <ol class="steps">
+    <li><strong>Open JSON Grid X.</strong> It loads instantly in any modern browser and runs 100% client-side — your data never leaves your machine.</li>
+    <li><strong>Paste your JSON</strong> into a cell, or drag &amp; drop a <code>.json</code> file onto it. You can also load the built-in sample from the <strong>? Help</strong> panel to see it working in one click.</li>
+    <li><strong>Read it as a grid.</strong> An array of objects renders as a table: one row per item, one column per key. Nested objects and arrays sit inside their cells and expand on click.</li>
+    <li><strong>Drill in.</strong> Expand or collapse any node, search across values, and copy any branch. Add more cells to view several documents side by side.</li>
+  </ol>
+
+  <img class="shot" src="/sample-jsongrid.jpg" alt="JSON Grid X rendering a JSON array of objects as a navigable grid table with columns and rows" loading="lazy"/>
+
+  <h2>Why a grid beats raw text</h2>
+  <ul>
+    <li><strong>Scannable like a spreadsheet</strong> — column headers and aligned rows make it easy to compare records at a glance.</li>
+    <li><strong>Nested data stays in context</strong> — child objects and arrays expand inline instead of forcing you to count brackets.</li>
+    <li><strong>Side-by-side cells</strong> — view (and diff) two JSON documents at once in the same workspace.</li>
+    <li><strong>Private</strong> — everything is parsed in the browser, so sensitive payloads are never sent to a server.</li>
+  </ul>
+
+  <div class="callout">Looking for something closer to Excel? JSON Grid X lays arrays of objects out as a real grid of rows and columns, with the underlying JSON one click away — so you get the spreadsheet feel without leaving the structure behind.</div>
+
+  <h2>Frequently asked questions</h2>
+  <dl class="faq">
+    <dt>How do I view JSON data as a table online?</dt>
+    <dd>Open JSON Grid X, paste your JSON (or drop a <code>.json</code> file) into a cell, and an array of objects renders as a table — one row per item, one column per key. No upload, no signup.</dd>
+    <dt>Is there an online JSON viewer that looks like Excel?</dt>
+    <dd>Yes. JSON Grid X shows arrays of objects in a spreadsheet-style grid with column headers and rows, similar to Excel or Google Sheets, while keeping the raw JSON a click away.</dd>
+    <dt>How do I display a JSON array in a grid view?</dt>
+    <dd>Paste an array of objects into a cell and switch to the rendered view: each object becomes a row and each property becomes a column, so the array is shown as a readable grid instead of raw text.</dd>
+  </dl>
+
+  <h2>Related guides</h2>
+  <div class="related">
+    <a href="/guides/visualize-complex-json">Best way to visualize complex, nested JSON →</a>
+    <a href="/guides/large-json-file">How to open a large JSON file without crashing your browser →</a>
+  </div>
+
+  <a class="cta" href="https://jsongrid.trendx.uk/">Open JSON Grid X →</a>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>© 2026 XTools — free browser-based developer tools</span>
+    <a href="https://jsongrid.trendx.uk/">JSON Grid X</a>
+    <a href="/guides">All guides</a>
+    <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

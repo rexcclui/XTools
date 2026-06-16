@@ -15,6 +15,17 @@ const SCREENSHOT = {
   apexflow:  'sample-apexflow.jpg',
   apexdebug: 'sample-sf-debug-viewer.jpg',
 };
+// Content guides. They support the JSON tool, so they are canonical on the
+// jsongrid subdomain; every other subdomain 301s /guides/* there. Paths are
+// extensionless (the .html is served from assets and stripped from the URL).
+const GUIDE_HOST = 'jsongrid';
+const GUIDE_PATHS = [
+  '/guides',
+  '/guides/view-json-as-table',
+  '/guides/visualize-complex-json',
+  '/guides/large-json-file',
+];
+
 // Covers both /jsongrid.html and the extensionless /jsongrid that the old
 // asset html_handling used to redirect to (those URLs exist in the wild).
 const FILE_TO_SUBDOMAIN = {};
@@ -58,13 +69,32 @@ export default {
         // The portal (xtools) has no per-tool screenshot, so omit the image tag.
         const shot = SCREENSHOT[subdomain];
         const img = shot ? `<image:image><image:loc>${origin}/${shot}</image:loc></image:image>` : '';
+        let urls = `  <url><loc>${origin}/</loc>${img}</url>\n`;
+        // Guides are canonical on the jsongrid subdomain, so only list them there.
+        if (subdomain === GUIDE_HOST) {
+          for (const g of GUIDE_PATHS) urls += `  <url><loc>${origin}${g}</loc></url>\n`;
+        }
         return new Response(
           '<?xml version="1.0" encoding="UTF-8"?>\n' +
           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' +
-          `  <url><loc>${origin}/</loc>${img}</url>\n` +
+          urls +
           '</urlset>\n',
           { headers: { 'content-type': 'application/xml' } },
         );
+      }
+
+      // Content guides under /guides. Canonicalize onto the jsongrid subdomain,
+      // serve clean (extensionless) URLs, and 301 any .html hit to its clean form.
+      if (url.pathname === '/guides' || url.pathname.startsWith('/guides/')) {
+        if (subdomain !== GUIDE_HOST) {
+          return Response.redirect(`https://${GUIDE_HOST}.trendx.uk${url.pathname}${url.search}`, 301);
+        }
+        if (url.pathname.endsWith('.html')) {
+          return Response.redirect(`${origin}${url.pathname.replace(/\.html$/, '')}${url.search}`, 301);
+        }
+        const clean = url.pathname.replace(/\/+$/, '') || '/guides';
+        const asset = clean === '/guides' ? '/guides/index.html' : `${clean}.html`;
+        return env.ASSETS.fetch(new Request(new URL(asset, url), request));
       }
 
       // Every worker deploys all three HTML files, so each tool would be

@@ -74,19 +74,26 @@ function transformHtml(html, name) {
   });
 }
 
-fs.rmSync(OUT_DIR, { recursive: true, force: true });
-fs.mkdirSync(OUT_DIR);
-
-for (const entry of fs.readdirSync(SRC_DIR)) {
-  const srcPath = path.join(SRC_DIR, entry);
-  if (!fs.statSync(srcPath).isFile()) continue;
-  const destPath = path.join(OUT_DIR, entry);
-  if (entry.endsWith('.html')) {
-    console.log(entry + (OBFUSCATE ? '' : ' (no obfuscation)'));
-    fs.writeFileSync(destPath, transformHtml(fs.readFileSync(srcPath, 'utf8'), entry));
-  } else {
-    fs.copyFileSync(srcPath, destPath);
+// Walks public/ recursively, mirroring its tree into dist/. Subdirectories
+// (e.g. guides/) are preserved so content pages keep their /guides/... URLs.
+function build(srcDir, outDir, relPrefix) {
+  fs.mkdirSync(outDir, { recursive: true });
+  for (const entry of fs.readdirSync(srcDir)) {
+    const srcPath = path.join(srcDir, entry);
+    const destPath = path.join(outDir, entry);
+    const rel = relPrefix ? `${relPrefix}/${entry}` : entry;
+    if (fs.statSync(srcPath).isDirectory()) {
+      build(srcPath, destPath, rel);
+    } else if (entry.endsWith('.html')) {
+      console.log(rel + (OBFUSCATE ? '' : ' (no obfuscation)'));
+      fs.writeFileSync(destPath, transformHtml(fs.readFileSync(srcPath, 'utf8'), entry));
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
   }
 }
+
+fs.rmSync(OUT_DIR, { recursive: true, force: true });
+build(SRC_DIR, OUT_DIR, '');
 
 console.log(`Build complete -> ${path.relative(__dirname, OUT_DIR)}/`);

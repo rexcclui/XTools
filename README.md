@@ -109,8 +109,9 @@ The **readable source lives in `public/`** — the only place to edit. `npm run 
 
 ```
 public/        Readable source (jsongrid.html, apexflow.html, sf-debug-viewer.html) + sample screenshots
+public/guides/ SEO content pages (served at jsongrid.trendx.uk/guides/...)
 src/index.js   Cloudflare Worker — subdomain routing, robots.txt, sitemap.xml
-build.js       public/ -> dist/ obfuscation build
+build.js       public/ -> dist/ obfuscation build (recurses into subfolders)
 scripts/       Tooling (e.g. regenerate sample screenshots)
 wrangler*.jsonc  One deploy config per site
 ```
