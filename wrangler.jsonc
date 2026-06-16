@@ -3,15 +3,6 @@
 	"name": "jsongrid",
 	"compatibility_date": "2026-04-30",
 	"main": "src/index.js",
-	// Both hostnames this Worker serves are listed so a deploy never drops one.
-	// (Wrangler treats this list as authoritative for the Worker's custom domains.)
-	"routes": [
-		{ "pattern": "jsongrid.trendx.uk", "custom_domain": true },
-		{ "pattern": "xtools.trendx.uk", "custom_domain": true },
-		// Zone route (not a custom domain) so it reuses the apex's existing
-		// proxied DNS record; the Worker 301-redirects trendx.uk -> xtools.
-		{ "pattern": "trendx.uk/*", "zone_name": "trendx.uk" }
-	],
 	"build": {
 		"command": "npm run build"
 	},

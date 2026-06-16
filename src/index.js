@@ -28,13 +28,6 @@ export default {
     const url = new URL(request.url);
     const subdomain = url.hostname.split('.')[0];
 
-    // Bare apex (and www) has no content of its own — send visitors to the
-    // XTools portal hub, preserving the path/query. 301 so search engines
-    // consolidate ranking signals onto xtools.trendx.uk.
-    if (url.hostname === 'trendx.uk' || url.hostname === 'www.trendx.uk') {
-      return Response.redirect(`https://xtools.trendx.uk${url.pathname}${url.search}`, 301);
-    }
-
     if (url.pathname === '/api/visits') {
       return handleVisits(request, env, subdomain);
     }
