@@ -240,6 +240,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 <script>if(localStorage.getItem('tiDismiss'))document.getElementById('tool-intro').style.display='none';</script>
 <div id="toolbar">
   <span style="font-weight:600;margin-right:6px">⊞ JSON Grid X</span>
+  <button class="tbtn" style="background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600" onclick="loadSampleJson()" title="Fill the first cell with example JSON and render it as a grid">▶ Load sample</button>
   <span style="font-size:12px;color:var(--tx2)">Cols</span>
   <button class="tbtn" onclick="adj('cols',-1)" title="Remove a column">−</button>
   <span id="cv" style="font-weight:600;min-width:14px;text-align:center">1</span>
@@ -278,7 +279,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
       <div class="help-sec help-summary">
         <h4>At a Glance</h4>
         <p class="help-sum-desc">An online JSON parser and table viewer in a multi-cell workspace. Paste or drop data into any cell, pretty-print it into a navigable grid table, then search, expand, and compare or diff values across cells. Apex debug output is auto-converted to JSON, and every tab and cell is saved locally so your workspace persists.</p>
-        <p class="help-sum-desc" style="margin-top:10px"><button class="tbtn" style="background:#185fa5;color:#fff;border-color:#185fa5;font-weight:600" onclick="loadSampleJson()" title="Fill the first cell with example JSON and render it as a grid">▶ Load sample JSON</button> <span style="font-size:12px;opacity:.65">— see the grid in action instantly</span></p>
+        <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:.7">Tip: use the <strong>▶ Load sample</strong> button in the toolbar to see the grid in action instantly.</p>
         <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;opacity:.8">📷 Example screenshot — sample JSON rendered as a grid</summary><img src="sample-jsongrid.jpg" alt="JSON Grid X showing a JSON array rendered as a navigable grid table with nested objects" loading="lazy" style="max-width:100%;border:1px solid #ccc;border-radius:6px;margin-top:8px"></details>
         <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="help-sum-flow">

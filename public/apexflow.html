@@ -523,6 +523,7 @@ body.has-intro .btn-toggle{top:46px}
             </div>
         </div>
         <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="loadApexSample()" title="Load four linked example Apex classes plus an LWC component and render the architecture map">▶ Load sample</button>
             <button class="btn" id="copy-mermaid-btn" onclick="copyCurrentMermaid()" title="Copy Mermaid code">
                 <i class="fa-regular fa-copy"></i>
             </button>
@@ -4419,7 +4420,7 @@ export default class OrderDashboard extends LightningElement {
       <div class="hlp-sec hlp-summary">
         <h4>At a Glance</h4>
         <p class="hlp-sum-desc">Visualize how your Apex, Java, and LWC source connects. Loading files auto-builds a system-level dependency map; from there you can drill into a single class's call flow, expand referenced "ghost" nodes on demand, and read the underlying code without leaving the diagram.</p>
-        <p class="hlp-sum-desc" style="margin-top:10px"><button class="btn btn-primary" onclick="loadApexSample()" title="Load four linked example Apex classes plus an LWC component and render the architecture map">▶ Load sample Apex class, LWC/js</button> <span style="font-size:12px;opacity:.65">— renders an example architecture map instantly</span></p>
+        <p class="hlp-sum-desc" style="margin-top:10px;font-size:12px;opacity:.7">Tip: use the <strong>▶ Load sample</strong> button in the toolbar to render an example architecture map instantly.</p>
         <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;opacity:.8">📷 Example screenshot — sample Apex classes and LWC rendered as an architecture map</summary><img src="sample-apexflow.jpg" alt="Apex Flow X architecture map showing an LWC component calling Apex classes with labeled dependency edges" loading="lazy" style="max-width:100%;border:1px solid #334155;border-radius:6px;margin-top:8px"></details>
         <p class="hlp-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="hlp-sum-flow">

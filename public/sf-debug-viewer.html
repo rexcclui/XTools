@@ -363,7 +363,7 @@ const HTML = `
       <div class="help-s help-summary">
         <h4>At a Glance</h4>
         <p class="help-sum-desc">Turn a raw Salesforce debug log into an interactive call tree. The raw log and the tree stay in sync — click either side to jump to the other. Filter by event type, search across tabs, color-code lines, and (with a project folder open) jump straight to the Apex source.</p>
-        <p class="help-sum-desc" style="margin-top:10px"><button class="btn btn-primary" id="btn-helpSample" title="Fill the editor with an example Apex debug log and parse it">▶ Load Sample debug</button> <span style="font-size:12px;opacity:.65">— parses an example log instantly</span></p>
+        <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:.7">Tip: use the <strong>▶ Load sample</strong> button next to <strong>Parse Log</strong> to parse an example log instantly.</p>
       <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;opacity:.8">📷 Example screenshot — sample debug log parsed into a call tree</summary><img src="sample-sf-debug-viewer.jpg" alt="SF Debug Viewer X showing a parsed Salesforce Apex debug log with color-coded events and stats" loading="lazy" style="max-width:100%;border:1px solid #30363d;border-radius:6px;margin-top:8px"></details>
         <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="help-sum-flow">
@@ -1446,7 +1446,7 @@ function initAnalyzer(rootEl, fetchSource) {
     const parseBtn=document.createElement('button');parseBtn.className='btn btn-primary';
     parseBtn.textContent='Parse Log';parseBtn.title='Parse the pasted log into a call tree';parseBtn.addEventListener('click',parseActiveTab);
     const sampleBtn=document.createElement('button');sampleBtn.className='btn';
-    sampleBtn.textContent='Sample';sampleBtn.title='Fill the editor with an example Apex debug log';sampleBtn.addEventListener('click',loadSample);
+    sampleBtn.textContent='▶ Load sample';sampleBtn.title='Load an example Apex debug log and parse it instantly';sampleBtn.addEventListener('click',()=>{loadSample();parseActiveTab();});
     const status=document.createElement('span');status.id='parseStatus';
     status.style.cssText='font-size:11px;color:var(--dm)';
     if (tab.raw&&tab.raw.length>RAW_INLINE_LIMIT) status.textContent=`${(tab.raw.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
@@ -2376,7 +2376,6 @@ function initAnalyzer(rootEl, fetchSource) {
 
   $('btn-help').addEventListener('click',()=>$('helpModal').classList.add('open'));
   $('btn-closeHelp').addEventListener('click',()=>$('helpModal').classList.remove('open'));
-  $('btn-helpSample').addEventListener('click',()=>{loadSample();parseActiveTab();$('helpModal').classList.remove('open');});
   $('helpModal').addEventListener('click',e=>{if(e.target===$('helpModal'))$('helpModal').classList.remove('open');});
 
   renderHlSlots();
