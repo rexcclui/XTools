@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Salesforce Debug Log Guides — Read, Analyze &amp; Debug Limits | SF Debug Viewer X</title>
+<meta name="description" content="Guides for working with Salesforce Apex debug logs: read a log as a call tree, analyze it online, and track down SOQL/DML and governor-limit hotspots — free, in your browser, nothing uploaded."/>
+<link rel="canonical" href="https://apexdebug.trendx.uk/guides"/>
+<meta name="robots" content="index,follow"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="SF Debug Viewer X"/>
+<meta property="og:title" content="Salesforce Debug Log Guides"/>
+<meta property="og:description" content="Guides for reading and analyzing Salesforce Apex debug logs — free, in your browser."/>
+<meta property="og:url" content="https://apexdebug.trendx.uk/guides"/>
+<meta property="og:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"/>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[{"@type":"CollectionPage","name":"Salesforce Debug Log Guides","url":"https://apexdebug.trendx.uk/guides","description":"Guides for reading and analyzing Salesforce Apex debug logs in the browser."},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SF Debug Viewer X","item":"https://apexdebug.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexdebug.trendx.uk/guides"}]},{"@type":"ItemList","itemListElement":[{"@type":"ListItem","position":1,"url":"https://apexdebug.trendx.uk/guides/read-salesforce-debug-log","name":"How to read a Salesforce Apex debug log"},{"@type":"ListItem","position":2,"url":"https://apexdebug.trendx.uk/guides/apex-debug-log-analyzer","name":"Free online Apex debug log analyzer"},{"@type":"ListItem","position":3,"url":"https://apexdebug.trendx.uk/guides/debug-soql-limits","name":"Find SOQL, DML & governor-limit hotspots in a debug log"}]}]}
+</script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f6f8;--tx:#15181d;--tx2:#5b6470;--tx3:#8a94a2;--bd:rgba(0,0,0,.10);--bd2:rgba(0,0,0,.18);--accent:#2563eb;--accent2:#1d4ed8;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--bg2:#11161d;--tx:#e6edf3;--tx2:#9aa6b2;--tx3:#6b7682;--bd:rgba(255,255,255,.10);--bd2:rgba(255,255,255,.18);--accent:#60a5fa;--accent2:#3b82f6}}
+body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(10px);background:color-mix(in srgb,var(--bg) 85%,transparent);border-bottom:1px solid var(--bd)}
+.nav{display:flex;align-items:center;gap:14px;height:58px;max-width:760px;margin:0 auto;padding:0 20px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;letter-spacing:-.3px;color:var(--tx)}
+.brand .logo{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#111827;color:#60a5fa;font-weight:800}
+.nav .sp{flex:1}.nav a.ghost{color:var(--tx2);font-size:14px;font-weight:600}
+.crumb{font-size:13px;color:var(--tx3);margin:18px 0 2px}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.15;letter-spacing:-.6px;font-weight:800;margin:6px 0 10px}
+.lead{font-size:18px;color:var(--tx2);margin:0 0 18px}
+.cards{display:flex;flex-direction:column;gap:14px;margin:18px 0}
+.card{display:block;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px 20px;color:var(--tx)}
+.card:hover{border-color:var(--accent);text-decoration:none}
+.card h2{font-size:18px;font-weight:700;margin:0 0 4px}
+.card p{font-size:14.5px;color:var(--tx2);margin:0}
+footer{border-top:1px solid var(--bd);margin-top:40px;padding:26px 0;color:var(--tx2);font-size:14px}
+.foot{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
+    <span class="sp"></span>
+    <a class="ghost" href="/guides">Guides</a>
+    <a class="ghost" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="crumb"><a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a> › Guides</p>
+  <h1>Salesforce debug log guides</h1>
+  <p class="lead">Short, practical guides for making sense of Salesforce Apex debug logs — all using <a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a>, the free, in-browser Apex debug log analyzer.</p>
+
+  <div class="cards">
+    <a class="card" href="/guides/read-salesforce-debug-log">
+      <h2>How to read a Salesforce Apex debug log</h2>
+      <p>Turn thousands of raw lines into a navigable, color-coded call tree.</p>
+    </a>
+    <a class="card" href="/guides/apex-debug-log-analyzer">
+      <h2>Free online Apex debug log analyzer</h2>
+      <p>Stats, filters, multi-log tabs and search — all client-side, nothing uploaded.</p>
+    </a>
+    <a class="card" href="/guides/debug-soql-limits">
+      <h2>Find SOQL, DML &amp; governor-limit hotspots</h2>
+      <p>Track down the queries behind "Too many SOQL queries: 101" and other limits.</p>
+    </a>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>© 2026 XTools — free browser-based developer tools</span>
+    <a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a>
+    <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

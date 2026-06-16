@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>How to Read a Salesforce Apex Debug Log (Free Online Viewer) — SF Debug Viewer X</title>
+<meta name="description" content="Stop scrolling thousands of raw lines. Turn a Salesforce Apex debug log into a color-coded call tree you can search, filter and navigate — free, in your browser, nothing uploaded."/>
+<link rel="canonical" href="https://apexdebug.trendx.uk/guides/read-salesforce-debug-log"/>
+<meta name="robots" content="index,follow"/>
+<meta property="og:type" content="article"/>
+<meta property="og:site_name" content="SF Debug Viewer X"/>
+<meta property="og:title" content="How to Read a Salesforce Apex Debug Log"/>
+<meta property="og:description" content="Turn a raw Apex debug log into a navigable, color-coded call tree — free, in your browser."/>
+<meta property="og:url" content="https://apexdebug.trendx.uk/guides/read-salesforce-debug-log"/>
+<meta property="og:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"/>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"How to Read a Salesforce Apex Debug Log","description":"How to read a Salesforce Apex debug log by turning it into a color-coded, searchable call tree instead of scrolling thousands of raw lines.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexdebug.trendx.uk/guides/read-salesforce-debug-log","image":"https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SF Debug Viewer X","item":"https://apexdebug.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexdebug.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Read a Salesforce debug log","item":"https://apexdebug.trendx.uk/guides/read-salesforce-debug-log"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I read a Salesforce Apex debug log?","acceptedAnswer":{"@type":"Answer","text":"Paste or drop the log into SF Debug Viewer X and it parses the raw lines into a color-coded call tree of methods, SOQL, DML, callouts, flows and exceptions. Click any tree node to jump to its raw line and back, filter by event type, and search — all in the browser, with nothing uploaded."}},{"@type":"Question","name":"What do the events in an Apex debug log mean?","acceptedAnswer":{"@type":"Answer","text":"A debug log records execution events: method and constructor entry/exit, SOQL queries, DML, callouts, flow steps, variable assignments and exceptions. SF Debug Viewer X groups these into a nested call tree and color-codes them by type so you can follow execution top to bottom."}},{"@type":"Question","name":"Is the debug log uploaded to a server?","acceptedAnswer":{"@type":"Answer","text":"No. SF Debug Viewer X parses the log entirely in your browser, so even logs containing sensitive data never leave your machine."}}]}]}
+</script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f6f8;--tx:#15181d;--tx2:#5b6470;--tx3:#8a94a2;--bd:rgba(0,0,0,.10);--bd2:rgba(0,0,0,.18);--accent:#2563eb;--accent2:#1d4ed8;--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--bg2:#11161d;--tx:#e6edf3;--tx2:#9aa6b2;--tx3:#6b7682;--bd:rgba(255,255,255,.10);--bd2:rgba(255,255,255,.18);--accent:#60a5fa;--accent2:#3b82f6}}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(10px);background:color-mix(in srgb,var(--bg) 85%,transparent);border-bottom:1px solid var(--bd)}
+.nav{display:flex;align-items:center;gap:14px;height:58px;max-width:760px;margin:0 auto;padding:0 20px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;letter-spacing:-.3px;color:var(--tx)}
+.brand .logo{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#111827;color:#60a5fa;font-weight:800}
+.nav .sp{flex:1}.nav a.ghost{color:var(--tx2);font-size:14px;font-weight:600}
+main{padding:14px 0 10px}
+.crumb{font-size:13px;color:var(--tx3);margin:18px 0 2px}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.15;letter-spacing:-.6px;font-weight:800;margin:6px 0 14px}
+h2{font-size:22px;font-weight:800;letter-spacing:-.3px;margin:34px 0 10px}
+h3{font-size:17px;font-weight:700;margin:22px 0 6px}
+p{margin:12px 0}
+.lead{font-size:18px;color:var(--tx2);margin:0 0 10px}
+ul{margin:12px 0 12px 22px}li{margin:6px 0}
+ol.steps{list-style:none;counter-reset:s;margin:14px 0}
+ol.steps>li{counter-increment:s;position:relative;padding:12px 14px 12px 52px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;margin:10px 0}
+ol.steps>li::before{content:counter(s);position:absolute;left:12px;top:11px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.cta{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:16px;color:#fff;background:var(--accent);padding:12px 22px;border-radius:10px;margin:10px 0}
+.cta:hover{background:var(--accent2);text-decoration:none}
+.callout{background:var(--bg2);border:1px solid var(--bd);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin:18px 0;font-size:15px;color:var(--tx2)}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:1px 5px}
+img.shot{width:100%;height:auto;border-radius:10px;border:1px solid var(--bd2);margin:16px 0;display:block}
+.faq dt{font-weight:700;margin:20px 0 4px;font-size:16px}
+.faq dd{margin:0;color:var(--tx2)}
+.related{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.related a{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 14px;font-weight:600;color:var(--tx)}
+.related a:hover{border-color:var(--accent);text-decoration:none}
+footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(--tx2);font-size:14px}
+.foot{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
+    <span class="sp"></span>
+    <a class="ghost" href="/guides">Guides</a>
+    <a class="ghost" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="crumb"><a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a> › <a href="/guides">Guides</a> › Read a Salesforce debug log</p>
+  <h1>How to read a Salesforce Apex debug log</h1>
+  <p class="lead">A raw Apex debug log is thousands of timestamped lines — almost impossible to follow by scrolling. The trick is to turn it into a <strong>call tree</strong>: a nested, color-coded view of what executed, in order. Here's how to read one fast.</p>
+
+  <a class="cta" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X →</a>
+
+  <h2>Read the log in 3 steps</h2>
+  <ol class="steps">
+    <li><strong>Paste or drop the log.</strong> Open SF Debug Viewer X and paste the log text, or drag in a <code>.log</code>/<code>.txt</code> file. Click <strong>▶ Load sample</strong> to try it on an example first.</li>
+    <li><strong>Read the call tree.</strong> The log is parsed into a nested tree of methods, constructors, SOQL, DML, callouts, flows, exceptions and variable assignments — color-coded by type so execution reads top to bottom.</li>
+    <li><strong>Navigate and filter.</strong> Click a tree node to jump to its raw log line (and back), toggle event types on and off, hide noise like system methods, and search across the log.</li>
+  </ol>
+
+  <img class="shot" src="/sample-sf-debug-viewer.jpg" alt="SF Debug Viewer X showing a parsed Salesforce Apex debug log as a color-coded, collapsible call tree" loading="lazy"/>
+
+  <h2>What makes a log readable</h2>
+  <ul>
+    <li><strong>Call tree, not raw text</strong> — nesting shows what called what, in order.</li>
+    <li><strong>Synced raw view</strong> — jump between the tree and the exact log line either way.</li>
+    <li><strong>Type filters &amp; toggles</strong> — show only User Debug, hide system methods, variable assignments, or timing gaps.</li>
+    <li><strong>Namespace, log-tag and keyword filters</strong>, plus up to four highlight slots to spotlight what matters.</li>
+    <li><strong>Private</strong> — the log is parsed in your browser and never uploaded.</li>
+  </ul>
+
+  <div class="callout">Start broad, then narrow: read the tree top-down to find the area of interest, then turn on filters and highlights to isolate it. Use the synced raw view to confirm the exact line.</div>
+
+  <h2>Frequently asked questions</h2>
+  <dl class="faq">
+    <dt>How do I read a Salesforce Apex debug log?</dt>
+    <dd>Paste or drop it into SF Debug Viewer X; it parses the raw lines into a color-coded call tree of methods, SOQL, DML, callouts, flows and exceptions. Click a node to jump to its raw line, filter by type, and search — all in the browser.</dd>
+    <dt>What do the events in an Apex debug log mean?</dt>
+    <dd>The log records execution events — method/constructor entry and exit, SOQL, DML, callouts, flow steps, variable assignments and exceptions. They're grouped into a nested call tree and color-coded by type so you can follow execution in order.</dd>
+    <dt>Is the debug log uploaded to a server?</dt>
+    <dd>No — it's parsed entirely in your browser, so even logs with sensitive data never leave your machine.</dd>
+  </dl>
+
+  <h2>Related guides</h2>
+  <div class="related">
+    <a href="/guides/apex-debug-log-analyzer">Free online Apex debug log analyzer →</a>
+    <a href="/guides/debug-soql-limits">Find SOQL, DML &amp; governor-limit hotspots in a debug log →</a>
+  </div>
+
+  <a class="cta" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X →</a>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>© 2026 XTools — free browser-based developer tools</span>
+    <a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a>
+    <a href="/guides">All guides</a>
+    <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

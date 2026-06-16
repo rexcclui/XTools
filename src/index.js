@@ -15,16 +15,18 @@ const SCREENSHOT = {
   apexflow:  'sample-apexflow.jpg',
   apexdebug: 'sample-sf-debug-viewer.jpg',
 };
-// Content guides. They support the JSON tool, so they are canonical on the
-// jsongrid subdomain; every other subdomain 301s /guides/* there. Paths are
-// extensionless (the .html is served from assets and stripped from the URL).
-const GUIDE_HOST = 'jsongrid';
-const GUIDE_PATHS = [
-  '/guides',
-  '/guides/view-json-as-table',
-  '/guides/visualize-complex-json',
-  '/guides/large-json-file',
-];
+// Content guides, grouped by the tool they support. Each guide is canonical
+// on its tool's subdomain; hits on the wrong subdomain 301 to the owner. Asset
+// files live under /guides/<subdomain>/<slug>.html, but the public URL drops
+// the subdomain segment (e.g. apexflow.trendx.uk/guides/apex-class-diagram).
+const GUIDES = {
+  jsongrid:  ['view-json-as-table', 'visualize-complex-json', 'large-json-file'],
+  apexflow:  ['apex-class-diagram', 'apex-call-hierarchy', 'visualize-lwc-apex'],
+  apexdebug: ['read-salesforce-debug-log', 'apex-debug-log-analyzer', 'debug-soql-limits'],
+};
+// slug -> owning subdomain, so a guide requested anywhere lands on its owner.
+const GUIDE_OWNER = {};
+for (const [sub, slugs] of Object.entries(GUIDES)) for (const s of slugs) GUIDE_OWNER[s] = sub;
 
 // Covers both /jsongrid.html and the extensionless /jsongrid that the old
 // asset html_handling used to redirect to (those URLs exist in the wild).
@@ -70,9 +72,10 @@ export default {
         const shot = SCREENSHOT[subdomain];
         const img = shot ? `<image:image><image:loc>${origin}/${shot}</image:loc></image:image>` : '';
         let urls = `  <url><loc>${origin}/</loc>${img}</url>\n`;
-        // Guides are canonical on the jsongrid subdomain, so only list them there.
-        if (subdomain === GUIDE_HOST) {
-          for (const g of GUIDE_PATHS) urls += `  <url><loc>${origin}${g}</loc></url>\n`;
+        // Each tool lists its own guides (canonical on its own subdomain).
+        if (GUIDES[subdomain]) {
+          urls += `  <url><loc>${origin}/guides</loc></url>\n`;
+          for (const slug of GUIDES[subdomain]) urls += `  <url><loc>${origin}/guides/${slug}</loc></url>\n`;
         }
         return new Response(
           '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -83,18 +86,29 @@ export default {
         );
       }
 
-      // Content guides under /guides. Canonicalize onto the jsongrid subdomain,
-      // serve clean (extensionless) URLs, and 301 any .html hit to its clean form.
+      // Content guides under /guides. Serve clean (extensionless) URLs, 301 any
+      // .html hit to its clean form, and keep each guide canonical on its owner.
       if (url.pathname === '/guides' || url.pathname.startsWith('/guides/')) {
-        if (subdomain !== GUIDE_HOST) {
-          return Response.redirect(`https://${GUIDE_HOST}.trendx.uk${url.pathname}${url.search}`, 301);
-        }
         if (url.pathname.endsWith('.html')) {
           return Response.redirect(`${origin}${url.pathname.replace(/\.html$/, '')}${url.search}`, 301);
         }
         const clean = url.pathname.replace(/\/+$/, '') || '/guides';
-        const asset = clean === '/guides' ? '/guides/index.html' : `${clean}.html`;
-        return env.ASSETS.fetch(new Request(new URL(asset, url), request));
+        if (clean === '/guides') {
+          // Each tool has its own hub; the portal (no guides) points to jsongrid.
+          if (!GUIDES[subdomain]) {
+            return Response.redirect('https://jsongrid.trendx.uk/guides', 301);
+          }
+          return env.ASSETS.fetch(new Request(new URL(`/guides/${subdomain}/index.html`, url), request));
+        }
+        const slug = clean.slice('/guides/'.length);
+        const owner = GUIDE_OWNER[slug];
+        if (owner && owner !== subdomain) {
+          return Response.redirect(`https://${owner}.trendx.uk/guides/${slug}${url.search}`, 301);
+        }
+        if (owner) {
+          return env.ASSETS.fetch(new Request(new URL(`/guides/${owner}/${slug}.html`, url), request));
+        }
+        // Unknown guide slug — fall through to assets (404).
       }
 
       // Every worker deploys all three HTML files, so each tool would be
