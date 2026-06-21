@@ -260,11 +260,25 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 <div id="tab-bar"></div>
 <div id="ctx-menu">
   <div id="ctx-locate-other" class="ctx-item" onclick="ctxLocateOtherSide()" style="display:none"><span>⇆</span> Locate on other side</div>
+  <div id="ctx-edit-node" class="ctx-item" onclick="ctxEditNode()" style="display:none"><span>✎</span> Edit</div>
   <div id="ctx-copy-json" class="ctx-item" onclick="ctxCopyJSON()"><span>⎘</span> Copy node JSON</div>
   <div id="ctx-list-view" class="ctx-item" onclick="ctxToggleListView()" style="display:none"><span>▦</span> List items as a table</div>
   <div id="ctx-parse-json" class="ctx-item" onclick="ctxParseJSON()"><span>⊞</span> Convert string to JSON table</div>
   <div id="ctx-convert-encode" class="ctx-item" onclick="ctxConvertEncode()"><span>↵</span> Convert Encode (&amp;gt; &amp; \n)</div>
   <div id="ctx-compare" class="ctx-item" onclick="openCompare()"><span>⇄</span> Compare selected nodes</div>
+</div>
+<div id="edit-node-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:2000;align-items:center;justify-content:center;padding:30px">
+  <div style="background:var(--bg);border-radius:12px;width:100%;max-width:540px;border:1px solid var(--bd2);box-shadow:0 20px 50px rgba(0,0,0,0.3);display:flex;flex-direction:column">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bd2);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-radius:12px 12px 0 0">
+      <h3 style="font-size:13px;font-weight:600">✎ Edit node</h3>
+      <button class="tbtn" onclick="closeEditModal()" title="Cancel">✕ Cancel</button>
+    </div>
+    <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px" id="edit-modal-body"></div>
+    <div style="padding:10px 16px;border-top:1px solid var(--bd2);background:var(--bg2);border-radius:0 0 12px 12px;display:flex;justify-content:flex-end;gap:8px">
+      <button class="tbtn" onclick="closeEditModal()">Cancel</button>
+      <button class="tbtn accent" onclick="applyEditNode()" id="edit-modal-apply-btn">Apply</button>
+    </div>
+  </div>
 </div>
 <div id="node-popup"></div>
 <div id="cmp-modal"></div>
@@ -1414,6 +1428,171 @@ function ctxConvertEncode(){
   cs(cellId).parsedPaths[path]=converted;
   rebuildGP(cellId);
 }
+/* ══ EDIT NODE MODAL ══ */
+let _editTarget=null;
+
+function ctxEditNode(){
+  if(!_ctxTarget)return;
+  _editTarget={..._ctxTarget};
+  hideCtxMenu();
+  const {path,cid}=_editTarget;
+  const v=getAt(cid,path);
+  // Determine if this looks like a key (from rObj key cell) vs a value
+  const cellId=cellIdFromCid(cid);
+  const body=document.getElementById('edit-modal-body');
+  if(!body)return;
+
+  // Parse the path to get the key name for key-editing capability
+  const raw=String(path||'');
+  const rel=(raw.includes('::$')?raw.split('::$')[1]:raw).replace(/^\./,'');
+  // Key is the last segment, if it's an object key (not array index)
+  const keyMatch=rel.match(/\.([^.\[]+)$|^([^.\[]+)$/);
+  const isObjKey=keyMatch&&!/^\d+$/.test(keyMatch[1]||keyMatch[2]||'');
+  const keyName=isObjKey?(keyMatch[1]||keyMatch[2]||''):'';
+  const parentP=isObjKey?parentPath(path):null;
+  const parentVal=parentP?getAt(cid,parentP):null;
+  const parentIsObj=parentVal&&typeof parentVal==='object'&&!Array.isArray(parentVal);
+
+  let keySection='';
+  if(parentIsObj&&keyName){
+    keySection=`<div>
+      <label style="font-size:11px;color:var(--tx2);font-weight:600;display:block;margin-bottom:4px">Key</label>
+      <input id="edit-modal-key" style="width:100%;padding:6px 8px;border:1px solid var(--bd2);border-radius:6px;font-size:12px;font-family:var(--mono);background:var(--bg);color:var(--tx);outline:none" value="${escH(keyName)}"/>
+    </div>`;
+  }
+
+  const typeLabel=v===null?'null':typeof v;
+  const valStr=v===null?'null':(typeof v==='object'?JSON.stringify(v,null,2):String(v));
+  const isScalar=typeof v!=='object';
+
+  body.innerHTML=`
+    ${keySection}
+    <div>
+      <label style="font-size:11px;color:var(--tx2);font-weight:600;display:block;margin-bottom:4px">Value <span style="font-weight:400;color:var(--tx3)">(${typeLabel})</span></label>
+      <textarea id="edit-modal-val" spellcheck="false" style="width:100%;min-height:90px;padding:6px 8px;border:1px solid var(--bd2);border-radius:6px;font-size:12px;font-family:var(--mono);background:var(--bg);color:var(--tx);outline:none;resize:vertical;line-height:1.55">${escH(valStr)}</textarea>
+      <div style="font-size:10px;color:var(--tx3);margin-top:4px">Tip: strings need no quotes — they will be applied as-is. To set a number, boolean or null enter the literal value.</div>
+    </div>
+    <div id="edit-modal-err" style="color:var(--danger);font-size:11px;display:none"></div>`;
+
+  // Store extra info on element for apply
+  const modal=document.getElementById('edit-node-modal');
+  modal._editParentP=parentIsObj?parentP:null;
+  modal._editKeyName=keyName||'';
+  modal.style.display='flex';
+  const valTA=document.getElementById('edit-modal-val');
+  if(valTA){valTA.focus();valTA.select();}
+}
+
+function closeEditModal(){
+  const modal=document.getElementById('edit-node-modal');
+  if(modal)modal.style.display='none';
+  _editTarget=null;
+}
+
+function applyEditNode(){
+  if(!_editTarget)return;
+  const {path,cid}=_editTarget;
+  const modal=document.getElementById('edit-node-modal');
+  const errEl=document.getElementById('edit-modal-err');
+  if(errEl){errEl.style.display='none';errEl.textContent='';}
+
+  const valTA=document.getElementById('edit-modal-val');
+  const keyInp=document.getElementById('edit-modal-key');
+  if(!valTA)return;
+
+  const rawVal=valTA.value;
+  const newKeyName=keyInp?keyInp.value.trim():'';
+
+  // Determine new value: try to parse as JSON literal first for numbers/booleans/null/objects/arrays
+  let newVal;
+  const trimmed=rawVal.trim();
+  try{
+    // Try JSON parse if it looks like a non-string literal or JSON structure
+    if(trimmed==='null'||trimmed==='true'||trimmed==='false'
+       ||/^-?\d/.test(trimmed)||trimmed[0]==='{'||trimmed[0]==='['){
+      newVal=JSON.parse(trimmed);
+    } else {
+      newVal=rawVal; // treat as string
+    }
+  }catch(e){
+    newVal=rawVal; // fallback to string
+  }
+
+  // Get current full JSON from cell, mutate at path, write back
+  const cellId=cellIdFromCid(cid);
+  const s=cs(cellId);
+  let root;
+  try{root=JSON.parse(s.text);}catch(e){
+    if(errEl){errEl.textContent='Source is not valid JSON — cannot apply edit.';errEl.style.display='block';}
+    return;
+  }
+
+  // Walk the path to find parent and set new value (and optionally rename key)
+  const raw=String(path||'');
+  const rel=(raw.includes('::$')?raw.split('::$')[1]:raw).replace(/^\./,'');
+  const segments=rel.match(/(\[[0-9]+\]|[^.\[\]]+)/g)||[];
+
+  if(!segments.length){
+    // Root replacement
+    root=newVal;
+  } else {
+    let cur=root;
+    for(let i=0;i<segments.length-1;i++){
+      const seg=segments[i];
+      if(seg.startsWith('[')&&seg.endsWith(']'))cur=cur[parseInt(seg.slice(1,-1))];
+      else cur=cur[seg];
+      if(cur==null){
+        if(errEl){errEl.textContent='Path not found in source JSON.';errEl.style.display='block';}
+        return;
+      }
+    }
+    const last=segments[segments.length-1];
+    const lastKey=last.startsWith('[')&&last.endsWith(']')?parseInt(last.slice(1,-1)):last;
+
+    // Key rename
+    if(keyInp&&newKeyName&&typeof lastKey==='string'&&newKeyName!==lastKey&&cur&&typeof cur==='object'&&!Array.isArray(cur)){
+      if(newKeyName in cur&&newKeyName!==lastKey){
+        if(errEl){errEl.textContent=`Key "${newKeyName}" already exists.`;errEl.style.display='block';}
+        return;
+      }
+      // Rebuild object preserving insertion order with renamed key
+      const rebuilt={};
+      Object.keys(cur).forEach(k=>{rebuilt[k===lastKey?newKeyName:k]=k===lastKey?newVal:cur[k];});
+      const grandparent=segments.length>=2?_walkPath(root,segments.slice(0,-1)):null;
+      if(grandparent!==null){
+        const gpKey=segments[segments.length-2];
+        const gpLastKey=gpKey.startsWith('[')&&gpKey.endsWith(']')?parseInt(gpKey.slice(1,-1)):gpKey;
+        grandparent[gpLastKey]=rebuilt;
+      } else {
+        root=rebuilt;
+      }
+    } else {
+      cur[lastKey]=newVal;
+    }
+  }
+
+  const fmt=JSON.stringify(root,null,2);
+  s.text=fmt;
+  const ta=document.getElementById('ta-'+cellId);
+  if(ta)ta.value=fmt;
+  renderPretty(cellId);
+  rebuildGP(cellId);
+  lsSave(cellId);
+  saveAppState();
+  closeEditModal();
+}
+
+function _walkPath(root,segments){
+  let cur=root;
+  for(let i=0;i<segments.length;i++){
+    const seg=segments[i];
+    const key=seg.startsWith('[')&&seg.endsWith(']')?parseInt(seg.slice(1,-1)):seg;
+    if(cur==null)return null;
+    cur=cur[key];
+  }
+  return cur;
+}
+
 function parentPath(path){
   const p=String(path||'');
   if(!p)return null;
@@ -1677,7 +1856,9 @@ document.addEventListener('contextmenu',e=>{
   document.getElementById('ctx-parse-json').style.display=isJsonStr?'flex':'none';
   document.getElementById('ctx-convert-encode').style.display=hasEncoded?'flex':'none';
   document.getElementById('ctx-compare').style.display=_sel.length===2?'flex':'none';
-  if(!canLocate&&!hasSelection&&v===undefined&&!isJsonStr&&!hasEncoded&&!canToggleList&&_sel.length!==2){hideCtxMenu();return;}
+  const canEdit=inGrid&&v!==undefined&&(typeof v==='string'||typeof v==='number'||typeof v==='boolean'||v===null);
+  document.getElementById('ctx-edit-node').style.display=canEdit?'flex':'none';
+  if(!canLocate&&!hasSelection&&v===undefined&&!isJsonStr&&!hasEncoded&&!canToggleList&&_sel.length!==2&&!canEdit){hideCtxMenu();return;}
   const vw=window.innerWidth,vh=window.innerHeight;
   m.style.display='block';
   m.style.left=(e.clientX+220>vw?e.clientX-220:e.clientX)+'px';
@@ -1717,7 +1898,9 @@ function ctxLocateOtherSide(){
 document.addEventListener('click',e=>{if(!e.target.closest('#ctx-menu')){hideCtxMenu();_ctxTarget=null;}});
 document.getElementById('cmp-modal').addEventListener('click',e=>{if(e.target===document.getElementById('cmp-modal')){document.getElementById('cmp-modal').style.display='none';clearSel();}});
 document.getElementById('json-pick-modal').addEventListener('click',e=>{if(e.target===document.getElementById('json-pick-modal'))hideJsonPickModal();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')hideJsonPickModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideJsonPickModal();closeEditModal();}});
+document.getElementById('edit-node-modal').addEventListener('click',e=>{if(e.target===document.getElementById('edit-node-modal'))closeEditModal();});
+document.getElementById('edit-node-modal').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))applyEditNode();});
 
 /* ══ LOCALSTORAGE ══ */
 const LS_PRE='jgw::',LS_MAX=200;
