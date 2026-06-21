@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Free Online Apex Debug Log Analyzer (View Logs as a Call Tree) — SF Debug Viewer X</title>
+<title>Free Online Apex Debug Log Analyzer (View Logs as a Call Tree) — Salesforce Apex Debug Log Parser</title>
 <meta name="description" content="A free online Apex debug log analyzer that parses Salesforce logs into a color-coded call tree with stats, filters, multi-log tabs and search — all in your browser, nothing uploaded."/>
 <link rel="canonical" href="https://apexdebug.trendx.uk/guides/apex-debug-log-analyzer"/>
 <meta name="robots" content="index,follow"/>
 <meta property="og:type" content="article"/>
-<meta property="og:site_name" content="SF Debug Viewer X"/>
+<meta property="og:site_name" content="Salesforce Apex Debug Log Parser"/>
 <meta property="og:title" content="Free Online Apex Debug Log Analyzer"/>
 <meta property="og:description" content="Parse Salesforce Apex logs into a call tree with stats, filters and search — free, in your browser."/>
 <meta property="og:url" content="https://apexdebug.trendx.uk/guides/apex-debug-log-analyzer"/>
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"/>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"Free Online Apex Debug Log Analyzer","description":"An overview of analyzing Salesforce Apex debug logs online by parsing them into a color-coded call tree with stats, filters, multi-log tabs and search.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexdebug.trendx.uk/guides/apex-debug-log-analyzer","image":"https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SF Debug Viewer X","item":"https://apexdebug.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexdebug.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Apex debug log analyzer","item":"https://apexdebug.trendx.uk/guides/apex-debug-log-analyzer"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is there a free online Apex debug log analyzer?","acceptedAnswer":{"@type":"Answer","text":"Yes. SF Debug Viewer X is a free, in-browser Apex debug log analyzer. Paste a log and it parses it into a color-coded call tree with a stats bar, type filters, multi-log tabs and search. There is no signup and nothing is uploaded."}},{"@type":"Question","name":"Can I analyze more than one debug log at a time?","acceptedAnswer":{"@type":"Answer","text":"Yes. SF Debug Viewer X supports multiple log tabs at once with global search across them, so you can compare runs or keep several logs open while you investigate."}},{"@type":"Question","name":"What statistics does it show for a log?","acceptedAnswer":{"@type":"Answer","text":"A stats bar summarizes the run: number of methods, SOQL queries, DML statements, exceptions, total line count and execution duration, so you can size up a log before diving into the tree."}}]}]}
+{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"Free Online Apex Debug Log Analyzer","description":"An overview of analyzing Salesforce Apex debug logs online by parsing them into a color-coded call tree with stats, filters, multi-log tabs and search.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexdebug.trendx.uk/guides/apex-debug-log-analyzer","image":"https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Salesforce Apex Debug Log Parser","item":"https://apexdebug.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexdebug.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Apex debug log analyzer","item":"https://apexdebug.trendx.uk/guides/apex-debug-log-analyzer"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is there a free online Apex debug log analyzer?","acceptedAnswer":{"@type":"Answer","text":"Yes. Salesforce Apex Debug Log Parser is a free, in-browser Apex debug log analyzer. Paste a log and it parses it into a color-coded call tree with a stats bar, type filters, multi-log tabs and search. There is no signup and nothing is uploaded."}},{"@type":"Question","name":"Can I analyze more than one debug log at a time?","acceptedAnswer":{"@type":"Answer","text":"Yes. Salesforce Apex Debug Log Parser supports multiple log tabs at once with global search across them, so you can compare runs or keep several logs open while you investigate."}},{"@type":"Question","name":"What statistics does it show for a log?","acceptedAnswer":{"@type":"Answer","text":"A stats bar summarizes the run: number of methods, SOQL queries, DML statements, exceptions, total line count and execution duration, so you can size up a log before diving into the tree."}}]}]}
 </script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
 <style>
@@ -63,16 +63,16 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
     <span class="sp"></span>
     <a class="ghost" href="/guides">Guides</a>
-    <a class="ghost" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X</a>
+    <a class="ghost" href="https://apexdebug.trendx.uk/">Open Salesforce Apex Debug Log Parser</a>
   </div>
 </header>
 
 <main class="wrap">
-  <p class="crumb"><a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a> › <a href="/guides">Guides</a> › Apex debug log analyzer</p>
+  <p class="crumb"><a href="https://apexdebug.trendx.uk/">Salesforce Apex Debug Log Parser</a> › <a href="/guides">Guides</a> › Apex debug log analyzer</p>
   <h1>Free online Apex debug log analyzer</h1>
-  <p class="lead">You don't need to install a desktop log analyzer to make sense of a Salesforce debug log. SF Debug Viewer X is a free, in-browser analyzer that parses a log into a call tree, summarizes it with stats, and lets you filter and search — without uploading anything.</p>
+  <p class="lead">You don't need to install a desktop log analyzer to make sense of a Salesforce debug log. Salesforce Apex Debug Log Parser is a free, in-browser analyzer that parses a log into a call tree, summarizes it with stats, and lets you filter and search — without uploading anything.</p>
 
-  <a class="cta" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X →</a>
+  <a class="cta" href="https://apexdebug.trendx.uk/">Open Salesforce Apex Debug Log Parser →</a>
 
   <h2>Analyze a log in 3 steps</h2>
   <ol class="steps">
@@ -81,7 +81,7 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <li><strong>Investigate.</strong> Filter by event type, hide noise, add highlights, and use global search — across multiple log tabs if you're comparing runs.</li>
   </ol>
 
-  <img class="shot" src="/sample-sf-debug-viewer.jpg" alt="SF Debug Viewer X analyzing a Salesforce Apex debug log with a stats bar and color-coded call tree" loading="lazy"/>
+  <img class="shot" src="/sample-sf-debug-viewer.jpg" alt="Salesforce Apex Debug Log Parser analyzing a Salesforce Apex debug log with a stats bar and color-coded call tree" loading="lazy"/>
 
   <h2>What the analyzer gives you</h2>
   <ul>
@@ -97,7 +97,7 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
   <h2>Frequently asked questions</h2>
   <dl class="faq">
     <dt>Is there a free online Apex debug log analyzer?</dt>
-    <dd>Yes — SF Debug Viewer X. Paste a log and it parses it into a color-coded call tree with a stats bar, type filters, multi-log tabs and search. No signup, nothing uploaded.</dd>
+    <dd>Yes — Salesforce Apex Debug Log Parser. Paste a log and it parses it into a color-coded call tree with a stats bar, type filters, multi-log tabs and search. No signup, nothing uploaded.</dd>
     <dt>Can I analyze more than one debug log at a time?</dt>
     <dd>Yes. Multiple log tabs are supported with global search across them, so you can compare runs or keep several logs open at once.</dd>
     <dt>What statistics does it show for a log?</dt>
@@ -110,13 +110,13 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a href="/guides/debug-soql-limits">Find SOQL, DML &amp; governor-limit hotspots in a debug log →</a>
   </div>
 
-  <a class="cta" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X →</a>
+  <a class="cta" href="https://apexdebug.trendx.uk/">Open Salesforce Apex Debug Log Parser →</a>
 </main>
 
 <footer>
   <div class="wrap foot">
     <span>© 2026 XTools — free browser-based developer tools</span>
-    <a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a>
+    <a href="https://apexdebug.trendx.uk/">Salesforce Apex Debug Log Parser</a>
     <a href="/guides">All guides</a>
     <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
   </div>

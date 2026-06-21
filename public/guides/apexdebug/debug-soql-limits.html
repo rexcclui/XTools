@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Find SOQL, DML &amp; Governor-Limit Hotspots in an Apex Debug Log — SF Debug Viewer X</title>
+<title>Find SOQL, DML &amp; Governor-Limit Hotspots in an Apex Debug Log — Salesforce Apex Debug Log Parser</title>
 <meta name="description" content="Track down the SOQL queries, DML and slow methods behind Salesforce governor-limit errors. Use a debug log's stats and filters to find the hotspot — free, in your browser, nothing uploaded."/>
 <link rel="canonical" href="https://apexdebug.trendx.uk/guides/debug-soql-limits"/>
 <meta name="robots" content="index,follow"/>
 <meta property="og:type" content="article"/>
-<meta property="og:site_name" content="SF Debug Viewer X"/>
+<meta property="og:site_name" content="Salesforce Apex Debug Log Parser"/>
 <meta property="og:title" content="Find SOQL, DML &amp; Governor-Limit Hotspots in an Apex Debug Log"/>
 <meta property="og:description" content="Use a debug log's stats and type filters to track down SOQL/DML hotspots behind governor-limit errors — free, in your browser."/>
 <meta property="og:url" content="https://apexdebug.trendx.uk/guides/debug-soql-limits"/>
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"/>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"Find SOQL, DML and Governor-Limit Hotspots in an Apex Debug Log","description":"How to use a Salesforce Apex debug log's stats bar and type filters to locate the SOQL, DML and slow methods behind governor-limit errors.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexdebug.trendx.uk/guides/debug-soql-limits","image":"https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SF Debug Viewer X","item":"https://apexdebug.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexdebug.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Find SOQL & limit hotspots","item":"https://apexdebug.trendx.uk/guides/debug-soql-limits"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I find which SOQL queries caused a governor-limit error?","acceptedAnswer":{"@type":"Answer","text":"Open the log in SF Debug Viewer X and read the stats bar for the SOQL and DML counts. Then filter the call tree to SOQL (or DML) events to see each query in execution order and which method issued it — a query inside a loop usually shows up as the same SOQL repeated, which is the classic cause of the 'Too many SOQL queries: 101' limit."}},{"@type":"Question","name":"Can the viewer show how many SOQL and DML statements ran?","acceptedAnswer":{"@type":"Answer","text":"Yes. The stats bar reports the totals for methods, SOQL, DML and exceptions for the whole run, so you can immediately see whether you are near a limit before drilling into the tree."}},{"@type":"Question","name":"How do I spot a slow method in the log?","acceptedAnswer":{"@type":"Answer","text":"Use the execution duration in the stats bar together with the timing-gap toggle and the call tree to find where time is spent. Filtering out noise like system methods and variable assignments makes the expensive calls easier to see."}}]}]}
+{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"Find SOQL, DML and Governor-Limit Hotspots in an Apex Debug Log","description":"How to use a Salesforce Apex debug log's stats bar and type filters to locate the SOQL, DML and slow methods behind governor-limit errors.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexdebug.trendx.uk/guides/debug-soql-limits","image":"https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Salesforce Apex Debug Log Parser","item":"https://apexdebug.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexdebug.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Find SOQL & limit hotspots","item":"https://apexdebug.trendx.uk/guides/debug-soql-limits"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I find which SOQL queries caused a governor-limit error?","acceptedAnswer":{"@type":"Answer","text":"Open the log in Salesforce Apex Debug Log Parser and read the stats bar for the SOQL and DML counts. Then filter the call tree to SOQL (or DML) events to see each query in execution order and which method issued it — a query inside a loop usually shows up as the same SOQL repeated, which is the classic cause of the 'Too many SOQL queries: 101' limit."}},{"@type":"Question","name":"Can the viewer show how many SOQL and DML statements ran?","acceptedAnswer":{"@type":"Answer","text":"Yes. The stats bar reports the totals for methods, SOQL, DML and exceptions for the whole run, so you can immediately see whether you are near a limit before drilling into the tree."}},{"@type":"Question","name":"How do I spot a slow method in the log?","acceptedAnswer":{"@type":"Answer","text":"Use the execution duration in the stats bar together with the timing-gap toggle and the call tree to find where time is spent. Filtering out noise like system methods and variable assignments makes the expensive calls easier to see."}}]}]}
 </script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
 <style>
@@ -63,16 +63,16 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
     <span class="sp"></span>
     <a class="ghost" href="/guides">Guides</a>
-    <a class="ghost" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X</a>
+    <a class="ghost" href="https://apexdebug.trendx.uk/">Open Salesforce Apex Debug Log Parser</a>
   </div>
 </header>
 
 <main class="wrap">
-  <p class="crumb"><a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a> › <a href="/guides">Guides</a> › Find SOQL &amp; limit hotspots</p>
+  <p class="crumb"><a href="https://apexdebug.trendx.uk/">Salesforce Apex Debug Log Parser</a> › <a href="/guides">Guides</a> › Find SOQL &amp; limit hotspots</p>
   <h1>Find SOQL, DML &amp; governor-limit hotspots in a debug log</h1>
   <p class="lead">"Too many SOQL queries: 101" almost always means a query is running inside a loop. A debug log holds the answer — you just need to surface the counts and see which method is firing the queries. Here's how to find the hotspot.</p>
 
-  <a class="cta" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X →</a>
+  <a class="cta" href="https://apexdebug.trendx.uk/">Open Salesforce Apex Debug Log Parser →</a>
 
   <h2>Track down the hotspot in 3 steps</h2>
   <ol class="steps">
@@ -81,7 +81,7 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <li><strong>Look for repetition.</strong> The same query repeated many times under one method is the classic loop-query pattern. Use search and highlights to pin the offending call, then jump to the raw line to confirm.</li>
   </ol>
 
-  <img class="shot" src="/sample-sf-debug-viewer.jpg" alt="SF Debug Viewer X with the call tree filtered to SOQL events and a stats bar showing query counts" loading="lazy"/>
+  <img class="shot" src="/sample-sf-debug-viewer.jpg" alt="Salesforce Apex Debug Log Parser with the call tree filtered to SOQL events and a stats bar showing query counts" loading="lazy"/>
 
   <h2>Why this works</h2>
   <ul>
@@ -91,7 +91,7 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <li><strong>Highlights &amp; search</strong> pin a recurring query or method across a long log.</li>
   </ul>
 
-  <div class="callout">Honest scope: SF Debug Viewer X surfaces the counts, ordering and the method behind each event so you can <em>locate</em> the hotspot fast — fixing it (bulkifying the query, moving it out of the loop) is still a code change on your side.</div>
+  <div class="callout">Honest scope: Salesforce Apex Debug Log Parser surfaces the counts, ordering and the method behind each event so you can <em>locate</em> the hotspot fast — fixing it (bulkifying the query, moving it out of the loop) is still a code change on your side.</div>
 
   <h2>Frequently asked questions</h2>
   <dl class="faq">
@@ -109,13 +109,13 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a href="/guides/apex-debug-log-analyzer">Free online Apex debug log analyzer →</a>
   </div>
 
-  <a class="cta" href="https://apexdebug.trendx.uk/">Open SF Debug Viewer X →</a>
+  <a class="cta" href="https://apexdebug.trendx.uk/">Open Salesforce Apex Debug Log Parser →</a>
 </main>
 
 <footer>
   <div class="wrap foot">
     <span>© 2026 XTools — free browser-based developer tools</span>
-    <a href="https://apexdebug.trendx.uk/">SF Debug Viewer X</a>
+    <a href="https://apexdebug.trendx.uk/">Salesforce Apex Debug Log Parser</a>
     <a href="/guides">All guides</a>
     <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
   </div>
