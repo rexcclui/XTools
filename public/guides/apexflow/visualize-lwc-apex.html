@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>How to Map LWC → Apex Dependencies in a Salesforce Project — Apex Flow X</title>
+<title>How to Map LWC → Apex Dependencies in a Salesforce Project — Salesforce Apex, LWC and Java Flow Analyzer</title>
 <meta name="description" content="Visualize how Lightning Web Components depend on Apex. Map @salesforce/apex imports and LWC parent-child relationships as an interactive diagram — free, in your browser, nothing uploaded."/>
 <link rel="canonical" href="https://apexflow.trendx.uk/guides/visualize-lwc-apex"/>
 <meta name="robots" content="index,follow"/>
 <meta property="og:type" content="article"/>
-<meta property="og:site_name" content="Apex Flow X"/>
+<meta property="og:site_name" content="Salesforce Apex, LWC and Java Flow Analyzer"/>
 <meta property="og:title" content="How to Map LWC → Apex Dependencies"/>
 <meta property="og:description" content="See how LWCs depend on Apex via @salesforce/apex imports, as an interactive map — free, in your browser."/>
 <meta property="og:url" content="https://apexflow.trendx.uk/guides/visualize-lwc-apex"/>
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:image" content="https://apexflow.trendx.uk/sample-apexflow.jpg"/>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"How to Map LWC to Apex Dependencies in a Salesforce Project","description":"How to visualize Lightning Web Component dependencies on Apex, including @salesforce/apex imports and LWC parent-child relationships, as an interactive diagram.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexflow.trendx.uk/guides/visualize-lwc-apex","image":"https://apexflow.trendx.uk/sample-apexflow.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Apex Flow X","item":"https://apexflow.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexflow.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Map LWC to Apex","item":"https://apexflow.trendx.uk/guides/visualize-lwc-apex"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I see which Apex classes my LWC depends on?","acceptedAnswer":{"@type":"Answer","text":"Load your project in Apex Flow X. It reads each component's @salesforce/apex imports and draws an edge from the LWC to every Apex class it calls, so the dependencies are visible directly in the architecture map."}},{"@type":"Question","name":"Can I visualize LWC parent-child component structure?","acceptedAnswer":{"@type":"Answer","text":"Yes. Apex Flow X shows LWC components and their child components as distinct color-coded nodes, alongside Apex, Java and HTML, so you can see both component nesting and the Apex each component calls in one diagram."}},{"@type":"Question","name":"Does it work across Apex, LWC and Java at once?","acceptedAnswer":{"@type":"Answer","text":"Yes. All three render in a single diagram with cross-language links, so an LWC importing Apex, or Apex referenced by other Apex, appears as connected nodes rather than separate views."}}]}]}
+{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"How to Map LWC to Apex Dependencies in a Salesforce Project","description":"How to visualize Lightning Web Component dependencies on Apex, including @salesforce/apex imports and LWC parent-child relationships, as an interactive diagram.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexflow.trendx.uk/guides/visualize-lwc-apex","image":"https://apexflow.trendx.uk/sample-apexflow.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Salesforce Apex, LWC and Java Flow Analyzer","item":"https://apexflow.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexflow.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Map LWC to Apex","item":"https://apexflow.trendx.uk/guides/visualize-lwc-apex"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I see which Apex classes my LWC depends on?","acceptedAnswer":{"@type":"Answer","text":"Load your project in Salesforce Apex, LWC and Java Flow Analyzer. It reads each component's @salesforce/apex imports and draws an edge from the LWC to every Apex class it calls, so the dependencies are visible directly in the architecture map."}},{"@type":"Question","name":"Can I visualize LWC parent-child component structure?","acceptedAnswer":{"@type":"Answer","text":"Yes. Salesforce Apex, LWC and Java Flow Analyzer shows LWC components and their child components as distinct color-coded nodes, alongside Apex, Java and HTML, so you can see both component nesting and the Apex each component calls in one diagram."}},{"@type":"Question","name":"Does it work across Apex, LWC and Java at once?","acceptedAnswer":{"@type":"Answer","text":"Yes. All three render in a single diagram with cross-language links, so an LWC importing Apex, or Apex referenced by other Apex, appears as connected nodes rather than separate views."}}]}]}
 </script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
 <style>
@@ -63,25 +63,25 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
     <span class="sp"></span>
     <a class="ghost" href="/guides">Guides</a>
-    <a class="ghost" href="https://apexflow.trendx.uk/">Open Apex Flow X</a>
+    <a class="ghost" href="https://apexflow.trendx.uk/">Open Salesforce Apex, LWC and Java Flow Analyzer</a>
   </div>
 </header>
 
 <main class="wrap">
-  <p class="crumb"><a href="https://apexflow.trendx.uk/">Apex Flow X</a> › <a href="/guides">Guides</a> › Map LWC to Apex</p>
+  <p class="crumb"><a href="https://apexflow.trendx.uk/">Salesforce Apex, LWC and Java Flow Analyzer</a> › <a href="/guides">Guides</a> › Map LWC to Apex</p>
   <h1>How to map LWC → Apex dependencies</h1>
   <p class="lead">A Lightning Web Component rarely stands alone — it imports Apex methods and nests child components. To understand or refactor one safely, you need to see those dependencies. Here's how to map LWC-to-Apex relationships visually, straight from your project folder.</p>
 
-  <a class="cta" href="https://apexflow.trendx.uk/">Open Apex Flow X →</a>
+  <a class="cta" href="https://apexflow.trendx.uk/">Open Salesforce Apex, LWC and Java Flow Analyzer →</a>
 
   <h2>Map the dependencies in 3 steps</h2>
   <ol class="steps">
-    <li><strong>Open your project folder</strong> in Apex Flow X so both the LWC bundles and the Apex classes are indexed together.</li>
+    <li><strong>Open your project folder</strong> in Salesforce Apex, LWC and Java Flow Analyzer so both the LWC bundles and the Apex classes are indexed together.</li>
     <li><strong>Read the architecture map.</strong> Each component's <code>@salesforce/apex/...</code> imports become edges from the LWC to the Apex classes it calls, and LWC child components appear as their own linked nodes.</li>
     <li><strong>Drill in.</strong> Collapse nodes you don't need, expand ghost nodes for classes not yet loaded, and open any file's source to confirm exactly how it's wired.</li>
   </ol>
 
-  <img class="shot" src="/sample-apexflow.jpg" alt="Apex Flow X architecture map showing an LWC component linked to the Apex classes it imports" loading="lazy"/>
+  <img class="shot" src="/sample-apexflow.jpg" alt="Salesforce Apex, LWC and Java Flow Analyzer architecture map showing an LWC component linked to the Apex classes it imports" loading="lazy"/>
 
   <h2>What the map shows you</h2>
   <ul>
@@ -96,7 +96,7 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
   <h2>Frequently asked questions</h2>
   <dl class="faq">
     <dt>How do I see which Apex classes my LWC depends on?</dt>
-    <dd>Load your project; Apex Flow X reads each component's <code>@salesforce/apex</code> imports and draws an edge from the LWC to every Apex class it calls, visible directly in the architecture map.</dd>
+    <dd>Load your project; Salesforce Apex, LWC and Java Flow Analyzer reads each component's <code>@salesforce/apex</code> imports and draws an edge from the LWC to every Apex class it calls, visible directly in the architecture map.</dd>
     <dt>Can I visualize LWC parent-child component structure?</dt>
     <dd>Yes — LWC components and their children appear as distinct color-coded nodes alongside Apex, Java and HTML, so you see both nesting and the Apex each component calls in one diagram.</dd>
     <dt>Does it work across Apex, LWC and Java at once?</dt>
@@ -109,13 +109,13 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a href="/guides/apex-call-hierarchy">How to trace an Apex method call hierarchy →</a>
   </div>
 
-  <a class="cta" href="https://apexflow.trendx.uk/">Open Apex Flow X →</a>
+  <a class="cta" href="https://apexflow.trendx.uk/">Open Salesforce Apex, LWC and Java Flow Analyzer →</a>
 </main>
 
 <footer>
   <div class="wrap foot">
     <span>© 2026 XTools — free browser-based developer tools</span>
-    <a href="https://apexflow.trendx.uk/">Apex Flow X</a>
+    <a href="https://apexflow.trendx.uk/">Salesforce Apex, LWC and Java Flow Analyzer</a>
     <a href="/guides">All guides</a>
     <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
   </div>

@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>How to Trace an Apex Method Call Hierarchy (Call-Flow Charts) — Apex Flow X</title>
+<title>How to Trace an Apex Method Call Hierarchy (Call-Flow Charts) — Salesforce Apex, LWC and Java Flow Analyzer</title>
 <meta name="description" content="Trace how a Salesforce Apex method calls others with recursive call-flow charts. Drill into a class's methods and follow the call hierarchy several levels deep — free, in your browser."/>
 <link rel="canonical" href="https://apexflow.trendx.uk/guides/apex-call-hierarchy"/>
 <meta name="robots" content="index,follow"/>
 <meta property="og:type" content="article"/>
-<meta property="og:site_name" content="Apex Flow X"/>
+<meta property="og:site_name" content="Salesforce Apex, LWC and Java Flow Analyzer"/>
 <meta property="og:title" content="How to Trace an Apex Method Call Hierarchy"/>
 <meta property="og:description" content="Follow Apex method call flows with recursive call-flow charts, several levels deep — free, in your browser."/>
 <meta property="og:url" content="https://apexflow.trendx.uk/guides/apex-call-hierarchy"/>
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:image" content="https://apexflow.trendx.uk/sample-apexflow.jpg"/>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"How to Trace an Apex Method Call Hierarchy","description":"How to trace a Salesforce Apex method call hierarchy using recursive call-flow charts that follow method calls several levels deep.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexflow.trendx.uk/guides/apex-call-hierarchy","image":"https://apexflow.trendx.uk/sample-apexflow.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Apex Flow X","item":"https://apexflow.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexflow.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Apex call hierarchy","item":"https://apexflow.trendx.uk/guides/apex-call-hierarchy"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I trace an Apex method call hierarchy?","acceptedAnswer":{"@type":"Answer","text":"Load your project in Apex Flow X, open a class, and use Analyze Flow on a method. It builds a recursive call-flow chart that follows the calls that method makes, several levels deep, so you can see the full chain without jumping between files."}},{"@type":"Question","name":"How many levels deep can the Apex call flow go?","acceptedAnswer":{"@type":"Answer","text":"Apex Flow X follows recursive call chains up to six levels deep, expanding referenced methods and classes as it goes, and lets you hide or show the children of each edge to keep the chart readable."}},{"@type":"Question","name":"Can I see the source code while following the call flow?","acceptedAnswer":{"@type":"Answer","text":"Yes. Any node in the chart can be opened in a syntax-highlighted source modal, so you can read the method body without leaving the diagram, and copy the underlying Mermaid definition if you want to reuse it."}}]}]}
+{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","headline":"How to Trace an Apex Method Call Hierarchy","description":"How to trace a Salesforce Apex method call hierarchy using recursive call-flow charts that follow method calls several levels deep.","datePublished":"2026-06-16","dateModified":"2026-06-16","author":{"@type":"Organization","name":"XTools"},"publisher":{"@type":"Organization","name":"XTools","url":"https://xtools.trendx.uk/"},"mainEntityOfPage":"https://apexflow.trendx.uk/guides/apex-call-hierarchy","image":"https://apexflow.trendx.uk/sample-apexflow.jpg"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Salesforce Apex, LWC and Java Flow Analyzer","item":"https://apexflow.trendx.uk/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://apexflow.trendx.uk/guides"},{"@type":"ListItem","position":3,"name":"Apex call hierarchy","item":"https://apexflow.trendx.uk/guides/apex-call-hierarchy"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I trace an Apex method call hierarchy?","acceptedAnswer":{"@type":"Answer","text":"Load your project in Salesforce Apex, LWC and Java Flow Analyzer, open a class, and use Analyze Flow on a method. It builds a recursive call-flow chart that follows the calls that method makes, several levels deep, so you can see the full chain without jumping between files."}},{"@type":"Question","name":"How many levels deep can the Apex call flow go?","acceptedAnswer":{"@type":"Answer","text":"Salesforce Apex, LWC and Java Flow Analyzer follows recursive call chains up to six levels deep, expanding referenced methods and classes as it goes, and lets you hide or show the children of each edge to keep the chart readable."}},{"@type":"Question","name":"Can I see the source code while following the call flow?","acceptedAnswer":{"@type":"Answer","text":"Yes. Any node in the chart can be opened in a syntax-highlighted source modal, so you can read the method body without leaving the diagram, and copy the underlying Mermaid definition if you want to reuse it."}}]}]}
 </script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='700' fill='%2360a5fa' text-anchor='middle'%3EX%3C/text%3E%3C/svg%3E"/>
 <style>
@@ -63,25 +63,25 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a class="brand" href="https://xtools.trendx.uk/"><span class="logo">X</span>XTools</a>
     <span class="sp"></span>
     <a class="ghost" href="/guides">Guides</a>
-    <a class="ghost" href="https://apexflow.trendx.uk/">Open Apex Flow X</a>
+    <a class="ghost" href="https://apexflow.trendx.uk/">Open Salesforce Apex, LWC and Java Flow Analyzer</a>
   </div>
 </header>
 
 <main class="wrap">
-  <p class="crumb"><a href="https://apexflow.trendx.uk/">Apex Flow X</a> › <a href="/guides">Guides</a> › Apex call hierarchy</p>
+  <p class="crumb"><a href="https://apexflow.trendx.uk/">Salesforce Apex, LWC and Java Flow Analyzer</a> › <a href="/guides">Guides</a> › Apex call hierarchy</p>
   <h1>How to trace an Apex method call hierarchy</h1>
   <p class="lead">When you need to know what a method actually <em>does</em> — every method it calls, and what those call in turn — jumping between <code>.cls</code> files is slow and error-prone. A recursive call-flow chart follows the whole chain for you. Here's how to trace an Apex call hierarchy visually.</p>
 
-  <a class="cta" href="https://apexflow.trendx.uk/">Open Apex Flow X →</a>
+  <a class="cta" href="https://apexflow.trendx.uk/">Open Salesforce Apex, LWC and Java Flow Analyzer →</a>
 
   <h2>Trace a call flow in 3 steps</h2>
   <ol class="steps">
-    <li><strong>Load your project</strong> in Apex Flow X (Open Folder, or drop the relevant <code>.cls</code> files) so the classes are indexed.</li>
+    <li><strong>Load your project</strong> in Salesforce Apex, LWC and Java Flow Analyzer (Open Folder, or drop the relevant <code>.cls</code> files) so the classes are indexed.</li>
     <li><strong>Open a class and pick a method.</strong> Use <strong>Analyze Flow</strong> to start a call-flow chart rooted at that method.</li>
-    <li><strong>Follow the chain.</strong> Apex Flow X expands the methods it calls recursively — up to six levels deep — and you hide or show each edge's children to keep the picture focused on the path you care about.</li>
+    <li><strong>Follow the chain.</strong> Salesforce Apex, LWC and Java Flow Analyzer expands the methods it calls recursively — up to six levels deep — and you hide or show each edge's children to keep the picture focused on the path you care about.</li>
   </ol>
 
-  <img class="shot" src="/sample-apexflow.jpg" alt="Apex Flow X showing a recursive Apex method call-flow chart with expandable nodes" loading="lazy"/>
+  <img class="shot" src="/sample-apexflow.jpg" alt="Salesforce Apex, LWC and Java Flow Analyzer showing a recursive Apex method call-flow chart with expandable nodes" loading="lazy"/>
 
   <h2>What makes the call hierarchy readable</h2>
   <ul>
@@ -109,13 +109,13 @@ footer{border-top:1px solid var(--bd);margin-top:42px;padding:26px 0;color:var(-
     <a href="/guides/visualize-lwc-apex">How to map LWC → Apex dependencies →</a>
   </div>
 
-  <a class="cta" href="https://apexflow.trendx.uk/">Open Apex Flow X →</a>
+  <a class="cta" href="https://apexflow.trendx.uk/">Open Salesforce Apex, LWC and Java Flow Analyzer →</a>
 </main>
 
 <footer>
   <div class="wrap foot">
     <span>© 2026 XTools — free browser-based developer tools</span>
-    <a href="https://apexflow.trendx.uk/">Apex Flow X</a>
+    <a href="https://apexflow.trendx.uk/">Salesforce Apex, LWC and Java Flow Analyzer</a>
     <a href="/guides">All guides</a>
     <a href="https://github.com/rexcclui/XTools" target="_blank" rel="noopener">GitHub</a>
   </div>
