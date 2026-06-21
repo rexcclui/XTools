@@ -2287,12 +2287,15 @@ function closeHelp(){const m=document.getElementById('help-modal');if(m)m.style.
 function loadSampleJson(){
   const ta=document.querySelector('textarea.src-raw');
   if(!ta)return;
+  const id=ta.id.replace('ta-','');
   ta.value=JSON.stringify([
     {id:1,name:'Acme Corp',status:'Active',revenue:982000,contact:{email:'ceo@acme.com',phone:'555-0101'},tags:['enterprise','priority']},
     {id:2,name:'Globex',status:'Prospect',revenue:154000,contact:{email:'info@globex.com',phone:'555-0102'},tags:['smb']},
     {id:3,name:'Initech',status:'Churned',revenue:0,contact:{email:'bill@initech.com',phone:'555-0103'},tags:[]}
   ],null,2);
-  ta.dispatchEvent(new Event('input',{bubbles:true}));
+  cs(id).text=ta.value;
+  if(!cs(id).pretty)togPretty(id);
+  else{renderPretty(id);rebuildGP(id);}
   closeHelp();
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeHelp();});
