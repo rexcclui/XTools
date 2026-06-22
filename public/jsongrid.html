@@ -139,7 +139,7 @@ body{font-family:var(--sans);font-size:13px;background:var(--bg3);color:var(--tx
 .th-cell span{flex:1;overflow:hidden;text-overflow:ellipsis}
 .cr{position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;background:transparent;z-index:4}
 .cr:hover{background:rgba(55,138,221,0.45)}
-.jv{padding:4px 7px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;display:block;font-family:var(--mono);font-size:12px;color:var(--tx);cursor:default}
+.jv{padding:4px 7px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;display:block;font-family:var(--mono);font-size:12px;color:var(--tx);cursor:default}.jv:not(.jv-nu):hover{cursor:text}
 .jv-nu{color:var(--tx3);font-style:italic}.jv-t{color:#00ff88}.jv-f{color:#ff4444}.jv-n{color:#ff8c00}
 .nx{display:inline-flex;align-items:center;justify-content:center;min-width:14px;padding:0 4px;height:14px;border:0.5px solid var(--bd2);border-radius:3px;cursor:pointer;font-size:9px;font-weight:700;background:yellow;color:#1a1a18;user-select:none;flex-shrink:0;white-space:nowrap}
 .cp-btn{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:0.5px solid var(--bd2);border-radius:3px;cursor:pointer;font-size:9px;background:var(--bg2);color:var(--tx3);user-select:none;flex-shrink:0;opacity:0;transition:opacity .1s}
@@ -1177,6 +1177,14 @@ function setupSyncEvents(cellEl,id){
     });
     gp.addEventListener('mousemove',e=>moveNodePopup(e.clientX,e.clientY));
     gp.addEventListener('mouseleave',()=>{clearHighlight(cellEl);hideNodePopup();});
+    gp.addEventListener('dblclick',e=>{
+      if(e.target.closest('.nx,.cr,.cp-btn,.col-tog'))return;
+      const el=e.target.closest('.jv[data-p]');
+      if(!el||!el.dataset.p)return;
+      let cidEl=el;while(cidEl&&!cidEl.dataset.cid)cidEl=cidEl.parentElement;
+      const resolvedCid=cidEl?cidEl.dataset.cid:cid;
+      editInlineGrid(el,el.dataset.p,resolvedCid,id);
+    });
   }
   if(sp){
     sp.addEventListener('mouseover',e=>{
@@ -1193,6 +1201,75 @@ function setupSyncEvents(cellEl,id){
     };
     ta.addEventListener('keyup',syncH);ta.addEventListener('click',syncH);
   }
+}
+
+/* ══ INLINE GRID EDIT ══ */
+function editInlineGrid(el,path,cid,cellId){
+  const v=getAt(cid,path);
+  if(v===undefined||v===null&&false)return; // allow null editing
+  if(typeof v==='object')return; // only scalars
+  const raw=String(path||'');
+  const rel=(raw.includes('::$')?raw.split('::$')[1]:raw).replace(/^\./,'');
+  const segments=rel.match(/(\[[0-9]+\]|[^.\[\]]+)/g)||[];
+
+  // Build input sized to the cell
+  const inp=document.createElement('input');
+  inp.type='text';
+  inp.value=v===null?'null':String(v);
+  inp.style.cssText='width:100%;min-width:60px;padding:3px 6px;border:2px solid var(--accent-m);border-radius:4px;font-family:var(--mono);font-size:12px;background:var(--bg);color:var(--tx);outline:none;box-sizing:border-box;';
+  inp.dataset.editing='1';
+
+  let committed=false;
+  const commit=()=>{
+    if(committed)return;committed=true;
+    const raw2=inp.value;
+    let newVal;
+    const t=raw2.trim();
+    if(t==='null')newVal=null;
+    else if(t==='true')newVal=true;
+    else if(t==='false')newVal=false;
+    else if(/^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(t)){newVal=Number(t);}
+    else newVal=raw2;
+    writeGridValueBack(cellId,cid,segments,newVal);
+  };
+  const cancel=()=>{committed=true;const s=cs(cellId);rebuildGP(cellId);renderPretty(cellId);};
+  inp.onblur=commit;
+  inp.onkeydown=e=>{
+    if(e.key==='Enter'){e.preventDefault();inp.blur();}
+    if(e.key==='Escape'){e.preventDefault();inp.onblur=null;cancel();}
+    e.stopPropagation();
+  };
+
+  el.replaceWith(inp);
+  inp.focus();inp.select();
+}
+
+function writeGridValueBack(cellId,cid,segments,newVal){
+  const s=cs(cellId);
+  let root;
+  try{root=JSON.parse(s.text);}catch(e){rebuildGP(cellId);return;}
+  if(!segments.length){root=newVal;}
+  else{
+    let cur=root;
+    for(let i=0;i<segments.length-1;i++){
+      const seg=segments[i];
+      cur=seg.startsWith('[')?cur[parseInt(seg.slice(1,-1))]:cur[seg];
+      if(cur==null){rebuildGP(cellId);return;}
+    }
+    const last=segments[segments.length-1];
+    const key=last.startsWith('[')?parseInt(last.slice(1,-1)):last;
+    cur[key]=newVal;
+  }
+  const fmt=JSON.stringify(root,null,2);
+  s.text=fmt;
+  const ta=document.getElementById('ta-'+cellId);
+  if(ta)ta.value=fmt;
+  const datKey='t'+G.id+'_'+cellId;
+  _dat[datKey]=root;
+  renderPretty(cellId);
+  rebuildGP(cellId);
+  lsSave(cellId);
+  saveAppState();
 }
 
 function nodeLabelFromPath(path){
