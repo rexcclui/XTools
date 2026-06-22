@@ -558,9 +558,9 @@ function cellHTML(id,r,c,s){
     <span style="font-size:10px;color:var(--tx3)">${r+1},${c+1}</span>
     <button class="ib row-exp-btn" title="${G.cR.has(r)?'Expand row':'Collapse row'}" onclick="togCR(${r})">${G.cR.has(r)?'▶':'▼'}</button>
     <button id="btn-pr-${id}" class="ib${pr?' on':''}" title="${pr?'Back to raw editor':'Format + render table'}" onclick="togPretty('${id}')">{}</button>
-    <button class="ib" title="Copy cell JSON" onclick="copyCell('${id}')">⎘</button>
+    <button class="ib" title="Copy cell JSON" onclick="copyCell('${id}')">📋</button>
     <button class="ib dx" title="Clear cell" onclick="clearCell('${id}')">✕</button>
-    <input class="title-inp" value="${escH(s.title||'')}" oninput="G.cells['${id}'].title=this.value;lsSave('${id}');saveAppState();" placeholder="Untitled…"/>
+    <input class="title-inp" value="${escH(s.title||'')}" oninput="G.cells['${id}'].title=this.value;lsSave('${id}');saveAppState();" placeholder="Json Name"/>
     <div style="flex:1"></div>
   </div>
   <div class="cell-search-bar">
