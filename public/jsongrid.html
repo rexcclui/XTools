@@ -292,14 +292,14 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
     <div class="help-body">
       <div class="help-sec help-summary">
         <h4>At a Glance</h4>
-        <p class="help-sum-desc">An online JSON parser and table viewer in a multi-cell workspace. Paste or drop data into any cell, pretty-print it into a navigable grid table, then search, expand, and compare or diff values across cells. Apex debug output is auto-converted to JSON, and every tab and cell is saved locally so your workspace persists.</p>
+        <p class="help-sum-desc">An online JSON parser, table viewer, and editor in a multi-cell workspace. Paste or drop data into any cell, pretty-print it into a navigable grid table, then search, expand, edit values inline, and compare or diff values across cells. Apex debug output is auto-converted to JSON, and every tab and cell is saved locally so your workspace persists.</p>
         <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:.7">Tip: use the <strong>▶ Load sample</strong> button in the toolbar to see the grid in action instantly.</p>
         <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;opacity:.8">📷 Example screenshot — sample JSON rendered as a grid</summary><img src="sample-jsongrid.jpg" alt="JSON Grid X showing a JSON array rendered as a navigable grid table with nested objects" loading="lazy" style="max-width:100%;border:1px solid #ccc;border-radius:6px;margin-top:8px"></details>
         <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
         <div class="help-sum-flow">
           <span class="help-step">1. Paste / drop JSON into a cell</span> →
           <span class="help-step">2. Click {} to pretty-print</span> →
-          <span class="help-step">3. Navigate &amp; search</span> →
+          <span class="help-step">3. Navigate, search &amp; double-click to edit</span> →
           <span class="help-step">4. Select two values → Compare</span>
         </div>
       </div>
@@ -340,7 +340,14 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
         <div class="help-row"><span class="help-key">+N / −</span><span class="help-desc">Click the yellow badge to expand an array/object; − to collapse</span></div>
         <div class="help-row"><span class="help-key">col +/−</span><span class="help-desc">Toggle button in the table header expands or collapses all values in that column</span></div>
         <div class="help-row"><span class="help-key">⎘ node</span><span class="help-desc">Hover any nested node to reveal its copy button and copy that value as JSON</span></div>
-        <div class="help-row"><span class="help-key">Right-click</span><span class="help-desc">Copy node JSON, Convert string to JSON table, Convert Encode (decode &amp;gt; entities + \n), Compare selected nodes</span></div>
+        <div class="help-row"><span class="help-key">Right-click</span><span class="help-desc">✎ Edit (rename key / change value) · ⎘ Copy node JSON · ⊞ Convert string to JSON table · ↵ Convert Encode · ⇄ Compare selected nodes</span></div>
+      </div>
+      <div class="help-sec">
+        <h4>Editing (Bi-Directional Sync)</h4>
+        <div class="help-row"><span class="help-key">Dbl-click</span><span class="help-desc">Double-click any scalar value in the grid to edit it inline — changes write back to the source JSON instantly</span></div>
+        <div class="help-row"><span class="help-key">Enter</span><span class="help-desc">Commit the inline edit; strings stay as strings, numerics / true / false / null are auto-typed</span></div>
+        <div class="help-row"><span class="help-key">Escape</span><span class="help-desc">Cancel the inline edit with no change</span></div>
+        <div class="help-row"><span class="help-key">Right-click ✎</span><span class="help-desc">Edit modal: rename the key and/or change the value; use Ctrl+Enter to apply</span></div>
       </div>
       <div class="help-sec">
         <h4>Compare &amp; Diff</h4>

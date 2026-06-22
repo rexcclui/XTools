@@ -6,9 +6,9 @@ Includes an online **JSON viewer / formatter / beautifier / validator & diff** t
 
 | Tool | What it does | Open it |
 |---|---|---|
-| 🟦 **JSON Grid X** | View, format, beautify, validate & compare JSON in a grid | **[jsongrid.trendx.uk](https://jsongrid.trendx.uk/)** |
-| 🟪 **Apex Flow X** | Salesforce Apex & LWC class diagrams + call-flow charts | **[apexflow.trendx.uk](https://apexflow.trendx.uk/)** |
-| 🟦 **SF Debug Viewer X** | Salesforce Apex debug log analyzer | **[apexdebug.trendx.uk](https://apexdebug.trendx.uk/)** |
+| 🟦 **JSON Grid X** | View, format, beautify, validate, edit & compare JSON in a grid | **[jsongrid.trendx.uk](https://jsongrid.trendx.uk/)** |
+| 🟪 **Salesforce Apex, LWC and Java Flow Analyzer** | Salesforce Apex & LWC class diagrams + call-flow charts | **[apexflow.trendx.uk](https://apexflow.trendx.uk/)** |
+| 🟦 **Salesforce Apex Debug Log Parser** | Salesforce Apex debug log analyzer | **[apexdebug.trendx.uk](https://apexdebug.trendx.uk/)** |
 
 > **Free** · runs **100% in your browser** · works **offline** · automatic **dark mode** · zero dependencies
 
@@ -27,20 +27,22 @@ An interactive online JSON viewer, formatter, and editor for viewing, beautifyin
 - **Multi-cell grid** across configurable columns and rows, with multiple independent **tabs**
 - **Rendered table view** — arrays of objects become navigable tables; nested objects/arrays expand and collapse
 - **Pretty-print** with per-column and per-row expand/collapse
+- **Bi-directional editing** — double-click any scalar value in the grid to edit it inline; the change writes back to the source JSON instantly. Right-click a cell for more options: **Edit** (rename key + change value via modal), **Convert string to JSON table**, **Convert Encode**, and **Compare**
 - **Side-by-side diff** — select any two values to compare them with color-coded changes
 - **Search** — globally across all cells, or per-cell with matches highlighted in both panels
 - **Salesforce Apex debug parsing** — paste Apex object print-outs or noisy log lines and convert them to JSON tables
 - **Drag & drop** `.json` files, **copy** any node, and **auto-save** to local history
+- **Load sample** — instantly loads and renders an example JSON dataset with one click
 
 👉 **[Open JSON Grid X](https://jsongrid.trendx.uk/)** · full details in [`README-index.md`](README-index.md)
 
 ---
 
-## 🟪 Apex Flow X
+## 🟪 Salesforce Apex, LWC and Java Flow Analyzer
 
 Turn Salesforce Apex, Lightning Web Components (LWC), and Java source into interactive **class diagrams** and recursive **call-flow charts** — straight from a local project folder, no server or build step.
 
-![Apex Flow X architecture map: an LWC calling Apex classes with labeled dependency edges](public/sample-apexflow.jpg)
+![Salesforce Apex, LWC and Java Flow Analyzer architecture map: an LWC calling Apex classes with labeled dependency edges](public/sample-apexflow.jpg)
 
 **Highlights**
 
@@ -52,15 +54,15 @@ Turn Salesforce Apex, Lightning Web Components (LWC), and Java source into inter
 - **View source** in a syntax-highlighted modal; **pan & zoom**; **copy** the Mermaid definition
 - **Background indexing** with counts, **file history**, and folder handle remembered across visits
 
-👉 **[Open Apex Flow X](https://apexflow.trendx.uk/)** · full details in [`README-apexflow.md`](README-apexflow.md)
+👉 **[Open Salesforce Apex, LWC and Java Flow Analyzer](https://apexflow.trendx.uk/)** · full details in [`README-apexflow.md`](README-apexflow.md)
 
 ---
 
-## 🟦 SF Debug Viewer X
+## 🟦 Salesforce Apex Debug Log Parser
 
 Paste or drop a raw **Salesforce Apex debug log** and instantly explore it as a color-coded call tree with filtering, search, and history.
 
-![SF Debug Viewer X showing a parsed Apex debug log as a color-coded call tree](public/sample-sf-debug-viewer.jpg)
+![Salesforce Apex Debug Log Parser showing a parsed Apex debug log as a color-coded call tree](public/sample-sf-debug-viewer.jpg)
 
 **Highlights**
 
@@ -72,7 +74,7 @@ Paste or drop a raw **Salesforce Apex debug log** and instantly explore it as a 
 - **Stats bar** — methods, SOQL, DML, exceptions, line count, execution duration
 - **History** auto-saved locally; **drag & drop** `.log` / `.txt` files
 
-👉 **[Open SF Debug Viewer X](https://apexdebug.trendx.uk/)** · full details in [`README-sf-debug-viewer.md`](README-sf-debug-viewer.md)
+👉 **[Open Salesforce Apex Debug Log Parser](https://apexdebug.trendx.uk/)** · full details in [`README-sf-debug-viewer.md`](README-sf-debug-viewer.md)
 
 ---
 
