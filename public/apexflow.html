@@ -582,6 +582,11 @@ body.has-intro .btn-toggle{top:46px}
     let tooltipFontSize = 14; // Default font size in pixels
     let currentTooltipMode = 'code'; // 'code', 'js', or 'html'
     let referenceLookupData = { componentName: null, references: [] };
+    // Full js/html text scanned by the most recent Trace Parents run, keyed by
+    // bare component name — lets "Load Selected" load an ancestor that Trace
+    // Parents found via a raw tree walk even when it's absent from
+    // feState.lwcIndex (non-standard layout, stale index, etc).
+    let lastTraceFileIndex = null;
     let htmlReferenceIndex = new Map();
     let htmlReferenceIndexBuildPromise = null;
     let htmlReferenceIndexVersion = 0;
@@ -3586,6 +3591,28 @@ export default class OrderDashboard extends LightningElement {
         return true;
     }
 
+    // Loads a component by name for the reference-lookup / trace-parents modals.
+    // Tries the indexed LWC bundle first (fast, well-tested path); if the name
+    // isn't in feState.lwcIndex — e.g. Trace Parents found it via a raw
+    // directory walk that the index missed — falls back to the file text
+    // Trace Parents already read during its scan, so the load never silently
+    // no-ops just because the index is incomplete.
+    async function loadReferenceByName(componentName) {
+        if (registry[componentName]) return true;
+        const viaIndex = await loadLwcComponentByName(componentName);
+        if (viaIndex) return true;
+
+        const jsEntry = lastTraceFileIndex?.jsTextByName.get(componentName);
+        const htmlEntry = lastTraceFileIndex?.htmlTextByName.get(componentName);
+        if (!jsEntry && !htmlEntry) return false;
+
+        const folderPath = (jsEntry || htmlEntry).folderPath || null;
+        parseLwc(componentName, jsEntry?.text || '', htmlEntry?.text || '', folderPath);
+        feState.loadedNames.add(`${componentName}.js`);
+        if (htmlEntry) feState.loadedNames.add(`${componentName}.html`);
+        return true;
+    }
+
     async function loadSelectedReferences() {
         const selected = referenceLookupData.references.filter(r => r.selected);
         if (selected.length === 0) {
@@ -3595,7 +3622,7 @@ export default class OrderDashboard extends LightningElement {
 
         await showLoadingStatus(`Loading ${selected.length} referenced component${selected.length > 1 ? 's' : ''}…`);
         try {
-            await Promise.all(selected.map(ref => loadLwcComponentByName(ref.componentName)));
+            await Promise.all(selected.map(ref => loadReferenceByName(ref.componentName)));
         } finally {
             hideLoadingStatus();
         }
@@ -3626,48 +3653,111 @@ export default class OrderDashboard extends LightningElement {
         return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    // One hop: who directly references `componentName`? Scans every LWC bundle
-    // known to the file explorer index (loaded or not) since a parent may not
-    // have been opened in the diagram yet.
-    async function findDirectParents(componentName) {
-        const bare = bareComponentName(componentName);
-        const kebab = lwcNameToKebab(bare);
-        const importRe = new RegExp(`from\\s+['"]c/${escapeRegExpLiteral(bare)}['"]`, 'i');
-        const tagRe = new RegExp(`<c-${escapeRegExpLiteral(kebab)}(?![\\w-])`, 'i');
+    // Walks every .js/.html file in the opened project — not just the ones
+    // feState.lwcIndex happened to catalogue — and reads each one exactly once.
+    // Trace Parents needs this stronger guarantee than the index-based fast path
+    // used elsewhere: an incomplete/stale index would otherwise silently under-
+    // count parents (the very bug this exists to avoid), and a full pass up
+    // front lets every generation of the BFS reuse the same in-memory text
+    // instead of re-reading files from disk per hop.
+    async function collectSourceFilesFromDirHandle(dirHandle, extensions) {
+        const out = [];
+        if (!dirHandle || dirHandle.kind !== 'directory') return out;
+        const exts = extensions.map(e => e.toLowerCase());
 
-        const entries = feState.lwcIndex ? Array.from(feState.lwcIndex.entries()) : [];
-        const parents = [];
-        const total = entries.length;
+        async function walk(handle, curPath) {
+            for await (const [name, entry] of handle.entries()) {
+                const nextPath = curPath ? `${curPath}/${name}` : name;
+                if (entry.kind === 'file') {
+                    const lower = name.toLowerCase();
+                    if (exts.some(ext => lower.endsWith(ext))) out.push({ name, handle: entry, path: nextPath });
+                    continue;
+                }
+                if (LWC_SKIP_DIRS.has(name) || name.startsWith('.')) continue;
+                await walk(entry, nextPath);
+            }
+        }
+
+        await walk(dirHandle, dirHandle.name || '');
+        return out;
+    }
+
+    async function buildTraceParentsFileIndex() {
+        let files = [];
+        if (feState.dirHandle) {
+            try {
+                files = await collectSourceFilesFromDirHandle(feState.dirHandle, ['.js', '.html']);
+            } catch (e) {
+                console.warn('Trace Parents: live directory scan failed, falling back to cached tree', e);
+            }
+        }
+        if (!files.length && feState.tree) {
+            files = flatFiles(feState.tree).filter(f => /\.(js|html)$/i.test(f.name || ''));
+        }
+
+        const jsTextByName = new Map();   // bare component name -> { text, folderPath }
+        const htmlTextByName = new Map();
+        const total = files.length;
         let cursor = 0;
-        const concurrency = Math.min(20, total);
+        const concurrency = Math.min(24, total);
 
         const worker = async () => {
             while (true) {
                 const idx = cursor++;
                 if (idx >= total) return;
-                const [candidateName, lwc] = entries[idx];
-                if (bareComponentName(candidateName) === bare) continue; // skip self
+                const f = files[idx];
+                const isJs = /\.js$/i.test(f.name);
+                const base = f.name.replace(/\.(js|html)$/i, '');
+                const pathParts = (f.path || '').split('/').filter(Boolean);
+                const folderPath = pathParts.slice(0, -1).join('/') || null;
                 try {
-                    const [jsText, htmlText] = await Promise.all([
-                        lwc.jsHandle ? readHandleText(lwc.jsHandle, { priority: 'background', label: `${candidateName}.js` }) : Promise.resolve(''),
-                        lwc.htmlHandle ? readHandleText(lwc.htmlHandle, { priority: 'background', label: `${candidateName}.html` }) : Promise.resolve(''),
-                    ]);
-                    const importLine = jsText.split('\n').find(l => importRe.test(l));
-                    if (importLine) {
-                        parents.push({ componentName: candidateName, kind: 'js-import', snippet: importLine.trim() });
-                        continue;
-                    }
-                    const tagLine = htmlText.split('\n').find(l => tagRe.test(l));
-                    if (tagLine) {
-                        parents.push({ componentName: candidateName, kind: 'html-tag', snippet: tagLine.trim() });
-                    }
+                    const text = await readHandleText(f.handle, { priority: 'background', label: f.name });
+                    const map = isJs ? jsTextByName : htmlTextByName;
+                    // Same base name can legitimately appear in more than one folder
+                    // (rare, but concatenating is safer than overwriting a match).
+                    const existing = map.get(base);
+                    map.set(base, { text: existing ? `${existing.text}\n${text}` : text, folderPath: existing?.folderPath || folderPath });
                 } catch (e) {
-                    console.warn('Trace Parents scan failed for', candidateName, e);
+                    // unreadable file — skip, don't fail the whole scan
                 }
             }
         };
 
         await Promise.all(Array.from({ length: concurrency }, () => worker()));
+        return { jsTextByName, htmlTextByName };
+    }
+
+    // One hop: who directly references `componentName`, per the pre-built file
+    // index? Pure in-memory regex matching — no I/O — so it's cheap to call once
+    // per node per BFS generation.
+    function findDirectParentsFromIndex(componentName, fileIndex) {
+        const bare = bareComponentName(componentName);
+        const kebab = lwcNameToKebab(bare);
+        const importRe = new RegExp(`from\\s+['"]c/${escapeRegExpLiteral(bare)}['"]`, 'i');
+        const tagRe = new RegExp(`<c-${escapeRegExpLiteral(kebab)}(?![\\w-])`, 'i');
+        const parents = [];
+        const matchedBareNames = new Set();
+
+        fileIndex.jsTextByName.forEach((entry, candidateName) => {
+            const candidateBare = bareComponentName(candidateName);
+            if (candidateBare === bare || matchedBareNames.has(candidateBare)) return;
+            const importLine = entry.text.split('\n').find(l => importRe.test(l));
+            if (importLine) {
+                matchedBareNames.add(candidateBare);
+                parents.push({ componentName: candidateName, kind: 'js-import', snippet: importLine.trim() });
+            }
+        });
+
+        fileIndex.htmlTextByName.forEach((entry, candidateName) => {
+            const candidateBare = bareComponentName(candidateName);
+            if (candidateBare === bare || matchedBareNames.has(candidateBare)) return;
+            const tagLine = entry.text.split('\n').find(l => tagRe.test(l));
+            if (tagLine) {
+                matchedBareNames.add(candidateBare);
+                parents.push({ componentName: candidateName, kind: 'html-tag', snippet: tagLine.trim() });
+            }
+        });
+
         return parents;
     }
 
@@ -3676,6 +3766,10 @@ export default class OrderDashboard extends LightningElement {
     // runaway scans on very large projects.
     async function traceParentsToRoot(rootComponentName, options = {}) {
         const { maxNodes = 500, maxGenerations = 50 } = options;
+        await showLoadingStatus(`Tracing parents… scanning project files`);
+        const fileIndex = await buildTraceParentsFileIndex();
+        lastTraceFileIndex = fileIndex;
+
         const rootBare = bareComponentName(rootComponentName);
         const visited = new Set([rootBare]);
         let frontier = [rootComponentName];
@@ -3687,8 +3781,9 @@ export default class OrderDashboard extends LightningElement {
             generation++;
             await showLoadingStatus(`Tracing parents… generation ${generation} (${visited.size} found)`);
             const nextFrontier = [];
-            const results = await Promise.all(frontier.map(child => findDirectParents(child).then(parents => ({ child, parents }))));
-            for (const { child, parents } of results) {
+            outer:
+            for (const child of frontier) {
+                const parents = findDirectParentsFromIndex(child, fileIndex);
                 for (const p of parents) {
                     const pBare = bareComponentName(p.componentName);
                     edges.push({ parent: p.componentName, child, kind: p.kind, snippet: p.snippet });
@@ -3696,19 +3791,19 @@ export default class OrderDashboard extends LightningElement {
                         visited.add(pBare);
                         orderedParents.push(p.componentName);
                         nextFrontier.push(p.componentName);
-                        if (visited.size >= maxNodes) break;
+                        if (visited.size >= maxNodes) break outer;
                     }
                 }
-                if (visited.size >= maxNodes) break;
             }
             frontier = nextFrontier;
         }
 
-        return { rootComponentName, orderedParents, edges, generations: generation };
+        const filesScanned = fileIndex.jsTextByName.size + fileIndex.htmlTextByName.size;
+        return { rootComponentName, orderedParents, edges, generations: generation, filesScanned };
     }
 
     async function runTraceParents(componentName) {
-        if (!feState.lwcIndex || feState.lwcIndex.size === 0) {
+        if (!feState.dirHandle && !feState.tree) {
             alert('Open a project folder first so Trace Parents can search across all components.');
             return;
         }
@@ -3723,8 +3818,15 @@ export default class OrderDashboard extends LightningElement {
             hideLoadingStatus();
         }
 
+        console.info('[TraceParents]', result);
+
+        const debugEl = document.getElementById('reference-modal-debug');
+        if (debugEl) {
+            debugEl.textContent = `trace: ${componentName} | filesScanned=${result.filesScanned} | generations=${result.generations} | ancestors=${result.orderedParents.length}`;
+        }
+
         if (result.orderedParents.length === 0) {
-            alert(`No parent references found for "${componentName}" — it looks like a root component (nothing imports it or embeds it in a template).`);
+            alert(`No parent references found for "${componentName}" after scanning ${result.filesScanned} files — it looks like a root component (nothing imports it or embeds it in a template).`);
             return;
         }
 
