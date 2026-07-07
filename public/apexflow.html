@@ -787,6 +787,20 @@ body.has-intro .btn-toggle{top:46px}
         return result.text;
     }
 
+    // Reads a handle's text directly, bypassing queueFileRead/pumpFileReadQueue.
+    // That shared queue deliberately runs one file at a time app-wide so
+    // foreground loads stay responsive while background indexing runs — great
+    // for incremental work, but it serializes a bulk one-off scan like Trace
+    // Parents down to one file at a time regardless of how many concurrent
+    // callers ask for a read. This path is for exactly that case: a
+    // user-initiated, whole-project read where real concurrency is wanted and
+    // there's no competing foreground work to protect.
+    async function readHandleTextFast(handle) {
+        const file = await handle.getFile();
+        const buffer = await file.arrayBuffer();
+        return textFileDecoder.decode(buffer);
+    }
+
     async function persistHtmlReferenceIndex() {
         if (!htmlReferenceCacheKey) return;
         const payload = {
@@ -3699,7 +3713,11 @@ export default class OrderDashboard extends LightningElement {
         const htmlTextByName = new Map();
         const total = files.length;
         let cursor = 0;
-        const concurrency = Math.min(24, total);
+        // Bypasses the shared single-file-at-a-time read queue (see
+        // readHandleTextFast) so this scan gets real concurrency instead of
+        // serializing behind it — the difference between seconds and minutes
+        // on a project with thousands of files.
+        const concurrency = Math.min(64, total);
 
         const worker = async () => {
             while (true) {
@@ -3711,7 +3729,7 @@ export default class OrderDashboard extends LightningElement {
                 const pathParts = (f.path || '').split('/').filter(Boolean);
                 const folderPath = pathParts.slice(0, -1).join('/') || null;
                 try {
-                    const text = await readHandleText(f.handle, { priority: 'background', label: f.name });
+                    const text = await readHandleTextFast(f.handle);
                     const map = isJs ? jsTextByName : htmlTextByName;
                     // Same base name can legitimately appear in more than one folder
                     // (rare, but concatenating is safer than overwriting a match).
