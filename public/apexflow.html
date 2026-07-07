@@ -435,6 +435,7 @@ body.has-intro .btn-toggle{top:46px}
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-lookup-reference" style="display:none"><i class="fa-solid fa-magnifying-glass"></i><span>Lookup Reference</span></div>
+    <div class="ctx-item" id="ctx-trace-parents" style="display:none"><i class="fa-solid fa-sitemap"></i><span>Trace Parents</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
     <div class="ctx-item" id="ctx-view-source" style="display:none"><i class="fa-solid fa-file-lines"></i><span>Source</span></div>
 </div>
@@ -450,7 +451,7 @@ body.has-intro .btn-toggle{top:46px}
 
 <div id="reference-lookup-modal">
     <div id="reference-modal-header">
-        <span>Found References</span>
+        <span id="reference-modal-title">Found References</span>
         <button id="reference-modal-close" onclick="closeReferenceLookup()" title="Close reference lookup">✕</button>
     </div>
     <div id="reference-modal-debug">lookup: idle</div>
@@ -3477,46 +3478,15 @@ export default class OrderDashboard extends LightningElement {
         return { references, debug };
     }
 
-    async function showReferenceLookup(jsComponentName) {
-        await showLoadingStatus(`Searching references for ${jsComponentName}…`);
-        let references = [];
-        let debug = null;
-        try {
-            // Right-click action should return matches immediately and must not
-            // trigger a full global index build on the critical path.
-            const result = await findHtmlComponentReferences(jsComponentName, { allowIndexBuild: false });
-            references = result.references || [];
-            debug = result.debug || null;
-        } finally {
-            hideLoadingStatus();
-        }
-        const debugEl = document.getElementById('reference-modal-debug');
-        const debugText = debug
-            ? `lookup: ${debug.requested} | tags=${debug.tags.join(',')} | cache=${debug.cacheHits} registry=${debug.registryScanned} indexed=${debug.indexedHtmlScanned} tree=${debug.treeHtmlScanned} matches=${debug.matches}`
-            : 'lookup: no debug data';
-        if (debugEl) debugEl.textContent = debugText;
-        window.__apexflowLookupDebug = debug || { message: 'no debug data' };
-        console.info('[LookupReference]', debug || {});
-        
-        if (references.length === 0) {
-            const modal = document.getElementById('reference-lookup-modal');
-            const list = document.getElementById('reference-modal-list');
-            if (list) {
-                list.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:#94a3b8;line-height:1.6">No references found.<br>${debugText.replace(/</g, '&lt;')}</div>`;
-            }
-            if (modal) {
-                modal.classList.add('visible');
-                const windowW = window.innerWidth;
-                const windowH = window.innerHeight;
-                modal.style.left = (windowW / 2 - 250) + 'px';
-                modal.style.top = (windowH / 2 - 250) + 'px';
-            }
-            alert(`No HTML components found that reference "${jsComponentName}"`);
-            return;
-        }
-
-        referenceLookupData.componentName = jsComponentName;
+    // Renders `referenceLookupData` (already populated by the caller) into the
+    // shared reference-lookup modal, wiring up the same checkbox / Load Selected
+    // flow used by "Lookup Reference" and "Trace Parents".
+    function populateReferenceModal(title, componentName, references) {
+        referenceLookupData.componentName = componentName;
         referenceLookupData.references = references;
+
+        const titleEl = document.getElementById('reference-modal-title');
+        if (titleEl) titleEl.textContent = title;
 
         const modal = document.getElementById('reference-lookup-modal');
         const list = document.getElementById('reference-modal-list');
@@ -3528,7 +3498,7 @@ export default class OrderDashboard extends LightningElement {
             const icon = ref.kind === 'apex' ? 'fa-database' : ref.kind === 'html' ? 'fa-globe' : 'fa-code';
             const safeSnippet = String(ref.snippet || '').replace(/</g, '&lt;');
             item.innerHTML = `
-                <input type="checkbox" id="ref-${index}" onchange="toggleReferenceSelection(${index})">
+                <input type="checkbox" id="ref-${index}" ${ref.selected ? 'checked' : ''} onchange="toggleReferenceSelection(${index})">
                 <i class="fa-solid ${icon}" style="font-size:10px; flex-shrink:0;"></i>
                 <div class="reference-item-main">
                     <span class="reference-item-name">${ref.componentName}</span>
@@ -3550,6 +3520,49 @@ export default class OrderDashboard extends LightningElement {
         const windowH = window.innerHeight;
         modal.style.left = (windowW / 2 - 250) + 'px';
         modal.style.top = (windowH / 2 - 250) + 'px';
+    }
+
+    async function showReferenceLookup(jsComponentName) {
+        await showLoadingStatus(`Searching references for ${jsComponentName}…`);
+        let references = [];
+        let debug = null;
+        try {
+            // Right-click action should return matches immediately and must not
+            // trigger a full global index build on the critical path.
+            const result = await findHtmlComponentReferences(jsComponentName, { allowIndexBuild: false });
+            references = result.references || [];
+            debug = result.debug || null;
+        } finally {
+            hideLoadingStatus();
+        }
+        const debugEl = document.getElementById('reference-modal-debug');
+        const debugText = debug
+            ? `lookup: ${debug.requested} | tags=${debug.tags.join(',')} | cache=${debug.cacheHits} registry=${debug.registryScanned} indexed=${debug.indexedHtmlScanned} tree=${debug.treeHtmlScanned} matches=${debug.matches}`
+            : 'lookup: no debug data';
+        if (debugEl) debugEl.textContent = debugText;
+        window.__apexflowLookupDebug = debug || { message: 'no debug data' };
+        console.info('[LookupReference]', debug || {});
+
+        if (references.length === 0) {
+            const modal = document.getElementById('reference-lookup-modal');
+            const list = document.getElementById('reference-modal-list');
+            const titleEl = document.getElementById('reference-modal-title');
+            if (titleEl) titleEl.textContent = 'Found References';
+            if (list) {
+                list.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:#94a3b8;line-height:1.6">No references found.<br>${debugText.replace(/</g, '&lt;')}</div>`;
+            }
+            if (modal) {
+                modal.classList.add('visible');
+                const windowW = window.innerWidth;
+                const windowH = window.innerHeight;
+                modal.style.left = (windowW / 2 - 250) + 'px';
+                modal.style.top = (windowH / 2 - 250) + 'px';
+            }
+            alert(`No HTML components found that reference "${jsComponentName}"`);
+            return;
+        }
+
+        populateReferenceModal('Found References', jsComponentName, references);
     }
 
     function toggleReferenceSelection(index) {
@@ -3601,6 +3614,139 @@ export default class OrderDashboard extends LightningElement {
     function closeReferenceLookup() {
         document.getElementById('reference-lookup-modal').classList.remove('visible');
         referenceLookupData = { componentName: null, references: [] };
+    }
+
+    // ── TRACE PARENTS ───────────────────────────────────────────────────────
+    // Reverse-dependency walk: given a component, find every other component in
+    // the opened project that references it — as a JS `import … from 'c/<name>'`
+    // or as an `<c-name>` template tag — then repeat for each parent found,
+    // climbing generation by generation until no further parent exists.
+
+    function escapeRegExpLiteral(str) {
+        return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // One hop: who directly references `componentName`? Scans every LWC bundle
+    // known to the file explorer index (loaded or not) since a parent may not
+    // have been opened in the diagram yet.
+    async function findDirectParents(componentName) {
+        const bare = bareComponentName(componentName);
+        const kebab = lwcNameToKebab(bare);
+        const importRe = new RegExp(`from\\s+['"]c/${escapeRegExpLiteral(bare)}['"]`, 'i');
+        const tagRe = new RegExp(`<c-${escapeRegExpLiteral(kebab)}(?![\\w-])`, 'i');
+
+        const entries = feState.lwcIndex ? Array.from(feState.lwcIndex.entries()) : [];
+        const parents = [];
+        const total = entries.length;
+        let cursor = 0;
+        const concurrency = Math.min(20, total);
+
+        const worker = async () => {
+            while (true) {
+                const idx = cursor++;
+                if (idx >= total) return;
+                const [candidateName, lwc] = entries[idx];
+                if (bareComponentName(candidateName) === bare) continue; // skip self
+                try {
+                    const [jsText, htmlText] = await Promise.all([
+                        lwc.jsHandle ? readHandleText(lwc.jsHandle, { priority: 'background', label: `${candidateName}.js` }) : Promise.resolve(''),
+                        lwc.htmlHandle ? readHandleText(lwc.htmlHandle, { priority: 'background', label: `${candidateName}.html` }) : Promise.resolve(''),
+                    ]);
+                    const importLine = jsText.split('\n').find(l => importRe.test(l));
+                    if (importLine) {
+                        parents.push({ componentName: candidateName, kind: 'js-import', snippet: importLine.trim() });
+                        continue;
+                    }
+                    const tagLine = htmlText.split('\n').find(l => tagRe.test(l));
+                    if (tagLine) {
+                        parents.push({ componentName: candidateName, kind: 'html-tag', snippet: tagLine.trim() });
+                    }
+                } catch (e) {
+                    console.warn('Trace Parents scan failed for', candidateName, e);
+                }
+            }
+        };
+
+        await Promise.all(Array.from({ length: concurrency }, () => worker()));
+        return parents;
+    }
+
+    // Climbs the reference chain generation by generation from `rootComponentName`
+    // up to every ancestor that has no further parent, guarding against cycles and
+    // runaway scans on very large projects.
+    async function traceParentsToRoot(rootComponentName, options = {}) {
+        const { maxNodes = 500, maxGenerations = 50 } = options;
+        const rootBare = bareComponentName(rootComponentName);
+        const visited = new Set([rootBare]);
+        let frontier = [rootComponentName];
+        const edges = []; // { parent, child, kind, snippet }
+        const orderedParents = []; // unique ancestor names, in discovery order
+        let generation = 0;
+
+        while (frontier.length && generation < maxGenerations && visited.size < maxNodes) {
+            generation++;
+            await showLoadingStatus(`Tracing parents… generation ${generation} (${visited.size} found)`);
+            const nextFrontier = [];
+            const results = await Promise.all(frontier.map(child => findDirectParents(child).then(parents => ({ child, parents }))));
+            for (const { child, parents } of results) {
+                for (const p of parents) {
+                    const pBare = bareComponentName(p.componentName);
+                    edges.push({ parent: p.componentName, child, kind: p.kind, snippet: p.snippet });
+                    if (!visited.has(pBare)) {
+                        visited.add(pBare);
+                        orderedParents.push(p.componentName);
+                        nextFrontier.push(p.componentName);
+                        if (visited.size >= maxNodes) break;
+                    }
+                }
+                if (visited.size >= maxNodes) break;
+            }
+            frontier = nextFrontier;
+        }
+
+        return { rootComponentName, orderedParents, edges, generations: generation };
+    }
+
+    async function runTraceParents(componentName) {
+        if (!feState.lwcIndex || feState.lwcIndex.size === 0) {
+            alert('Open a project folder first so Trace Parents can search across all components.');
+            return;
+        }
+        let result;
+        try {
+            result = await traceParentsToRoot(componentName);
+        } catch (err) {
+            console.error('Trace Parents failed', err);
+            alert(`Trace Parents failed for "${componentName}". Open console and share the error.`);
+            return;
+        } finally {
+            hideLoadingStatus();
+        }
+
+        if (result.orderedParents.length === 0) {
+            alert(`No parent references found for "${componentName}" — it looks like a root component (nothing imports it or embeds it in a template).`);
+            return;
+        }
+
+        const snippetByParent = new Map();
+        result.edges.forEach(e => { if (!snippetByParent.has(e.parent)) snippetByParent.set(e.parent, e); });
+
+        const references = result.orderedParents.map(name => {
+            const edge = snippetByParent.get(name);
+            return {
+                componentName: name,
+                kind: registry[name]?.kind === 'apex' ? 'apex' : (edge?.kind === 'html-tag' ? 'html' : 'js'),
+                snippet: edge ? edge.snippet : '',
+                loaded: !!registry[name],
+                selected: true,
+            };
+        });
+
+        populateReferenceModal(
+            `Ancestors of ${componentName} — ${result.orderedParents.length} found across ${result.generations} generation${result.generations === 1 ? '' : 's'}`,
+            componentName,
+            references
+        );
     }
 
     function hideCodeTooltip() {
@@ -4281,6 +4427,17 @@ export default class OrderDashboard extends LightningElement {
             };
         }
 
+        // Trace Parents option — same eligibility as Lookup Reference: walk the
+        // reverse-dependency chain (JS `c/` imports + HTML <c-…> tags) up to the root.
+        const traceParentsEl = document.getElementById('ctx-trace-parents');
+        traceParentsEl.style.display = isJsComponent ? 'flex' : 'none';
+        if (isJsComponent) {
+            traceParentsEl.onclick = () => {
+                hideNodeContextMenu();
+                runTraceParents(lookupTarget);
+            };
+        }
+
         // View Code option — only if method body exists
         const hasCode = className && methodName && registry[className]?.methods?.[methodName];
         document.getElementById('ctx-view-code').style.display = hasCode ? 'flex' : 'none';
@@ -4453,6 +4610,8 @@ export default class OrderDashboard extends LightningElement {
         <h4>Node Right-click Menu</h4>
         <div class="hlp-row"><span class="hlp-key">Analyze Flow</span><span class="hlp-desc">Switch to a focused call-flow diagram for this class (up to 6 levels deep)</span></div>
         <div class="hlp-row"><span class="hlp-key">Load Class</span><span class="hlp-desc">Load an unloaded ghost node from the file index or a file picker</span></div>
+        <div class="hlp-row"><span class="hlp-key">Lookup Reference</span><span class="hlp-desc">Find HTML components that embed this one via a &lt;c-…&gt; tag</span></div>
+        <div class="hlp-row"><span class="hlp-key">Trace Parents</span><span class="hlp-desc">Climb every JS `c/` import and HTML &lt;c-…&gt; reference up to the root, generation by generation, and offer to load the whole ancestor chain into the diagram</span></div>
         <div class="hlp-row"><span class="hlp-key">Hide Children</span><span class="hlp-desc">Hide or reveal this node's outgoing edges and destination nodes without a full re-render</span></div>
         <div class="hlp-row"><span class="hlp-key">Hide JS/Apex/HTML</span><span class="hlp-desc">Peel off child edges by type — e.g. hide Apex callouts while keeping JS imports visible</span></div>
         <div class="hlp-row"><span class="hlp-key">View Code</span><span class="hlp-desc">Open the method body in a draggable, resizable code panel with syntax highlighting</span></div>
