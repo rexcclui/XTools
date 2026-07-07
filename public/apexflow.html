@@ -3733,15 +3733,22 @@ export default class OrderDashboard extends LightningElement {
     function findDirectParentsFromIndex(componentName, fileIndex) {
         const bare = bareComponentName(componentName);
         const kebab = lwcNameToKebab(bare);
-        const importRe = new RegExp(`from\\s+['"]c/${escapeRegExpLiteral(bare)}['"]`, 'i');
-        const tagRe = new RegExp(`<c-${escapeRegExpLiteral(kebab)}(?![\\w-])`, 'i');
+        const bareEsc = escapeRegExpLiteral(bare);
+        const kebabEsc = escapeRegExpLiteral(kebab);
+        // Namespace prefix is a wildcard (\w+), not hardcoded to `c` — managed /
+        // custom namespaces (e.g. `pse/…`, `<pse-…>`) reference components the
+        // same way `c/…` does. Static `import … from '<ns>/Name'` AND dynamic
+        // `import('<ns>/Name')` both count as a JS reference.
+        const staticImportRe = new RegExp(`\\bfrom\\s+['"][\\w]+/${bareEsc}['"]`, 'i');
+        const dynamicImportRe = new RegExp(`\\bimport\\(\\s*['"][\\w]+/${bareEsc}['"]`, 'i');
+        const tagRe = new RegExp(`<[\\w]+-${kebabEsc}(?![\\w-])`, 'i');
         const parents = [];
         const matchedBareNames = new Set();
 
         fileIndex.jsTextByName.forEach((entry, candidateName) => {
             const candidateBare = bareComponentName(candidateName);
             if (candidateBare === bare || matchedBareNames.has(candidateBare)) return;
-            const importLine = entry.text.split('\n').find(l => importRe.test(l));
+            const importLine = entry.text.split('\n').find(l => staticImportRe.test(l) || dynamicImportRe.test(l));
             if (importLine) {
                 matchedBareNames.add(candidateBare);
                 parents.push({ componentName: candidateName, kind: 'js-import', snippet: importLine.trim() });
@@ -3798,8 +3805,16 @@ export default class OrderDashboard extends LightningElement {
             frontier = nextFrontier;
         }
 
-        const filesScanned = fileIndex.jsTextByName.size + fileIndex.htmlTextByName.size;
-        return { rootComponentName, orderedParents, edges, generations: generation, filesScanned };
+        return {
+            rootComponentName,
+            orderedParents,
+            edges,
+            generations: generation,
+            filesScanned: fileIndex.jsTextByName.size + fileIndex.htmlTextByName.size,
+            jsFilesScanned: fileIndex.jsTextByName.size,
+            htmlFilesScanned: fileIndex.htmlTextByName.size,
+            scannedRoot: feState.dirHandle?.name || feState.tree?.name || '(unknown)',
+        };
     }
 
     async function runTraceParents(componentName) {
@@ -3822,11 +3837,11 @@ export default class OrderDashboard extends LightningElement {
 
         const debugEl = document.getElementById('reference-modal-debug');
         if (debugEl) {
-            debugEl.textContent = `trace: ${componentName} | filesScanned=${result.filesScanned} | generations=${result.generations} | ancestors=${result.orderedParents.length}`;
+            debugEl.textContent = `trace: ${componentName} | root="${result.scannedRoot}" | js=${result.jsFilesScanned} html=${result.htmlFilesScanned} | generations=${result.generations} | ancestors=${result.orderedParents.length}`;
         }
 
         if (result.orderedParents.length === 0) {
-            alert(`No parent references found for "${componentName}" after scanning ${result.filesScanned} files — it looks like a root component (nothing imports it or embeds it in a template).`);
+            alert(`No parent references found for "${componentName}" after scanning ${result.jsFilesScanned} JS + ${result.htmlFilesScanned} HTML files under "${result.scannedRoot}".\n\nIf you expected a parent, double-check that the folder you opened in ApexFlow actually contains that parent's source (e.g. a sibling package directory) — Trace Parents only searches the folder that was opened here.`);
             return;
         }
 
