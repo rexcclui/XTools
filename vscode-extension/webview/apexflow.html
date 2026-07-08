@@ -2992,7 +2992,11 @@ export default class OrderDashboard extends LightningElement {
             return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
         }
 
-        if (traceChainMode) {
+        // focusedClass wins over traceChainMode: "Analyze Flow" on a node in
+        // the trace-chain view sets focusedClass, and the user expects the
+        // flow diagram to take over — the chain is still there to come back
+        // to (exitAnalyzeFlow returns to it in one step, overview in two).
+        if (traceChainMode && !focusedClass) {
             document.getElementById('view-title').innerText =
                 `Trace Parents: ${bareName(traceChainMode.rootComponentName)} — ${traceChainMode.nodes.size - 1} ancestor${traceChainMode.nodes.size - 1 === 1 ? '' : 's'} across ${traceChainMode.generations} generation${traceChainMode.generations === 1 ? '' : 's'}`;
             document.getElementById('reset-btn').style.display = "inline-block";
@@ -5209,9 +5213,16 @@ export default class OrderDashboard extends LightningElement {
         render();
     }
 
+    // Steps back one view level at a time: Analyze Flow entered from a trace
+    // chain returns to that chain first (the chain is why the class was on
+    // screen at all); pressing again — or exiting from a chain directly —
+    // returns to the full Architecture Map.
     function exitAnalyzeFlow() {
-        focusedClass = null;
-        traceChainMode = null;
+        if (focusedClass) {
+            focusedClass = null;
+        } else {
+            traceChainMode = null;
+        }
         activeMethods = new Set();
         collapsedMethods = new Set();
         collapsedNodes = new Set();
