@@ -305,6 +305,38 @@
         }
         #drop-overlay.show { display: flex; }
 
+        /* FOLDER LOAD OVERLAY — shown for the full duration of opening / re-opening /
+           re-indexing a project folder, since that can take several seconds on a large
+           repo and the small toolbar pill (#loading-indicator) is too easy to miss. */
+        #folder-load-overlay {
+            position: fixed; inset: 0; z-index: 9998;
+            background: rgba(15, 23, 42, 0.72);
+            display: none; align-items: center; justify-content: center;
+        }
+        #folder-load-overlay.visible { display: flex; }
+        #folder-load-box {
+            background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 12px;
+            padding: 28px 34px; min-width: 320px; max-width: 460px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; align-items: center; gap: 14px;
+        }
+        #folder-load-box i { font-size: 26px; color: var(--primary); }
+        #folder-load-text { font-size: 13px; color: var(--text-main); text-align: center; word-break: break-word; }
+        #folder-load-progress-track {
+            width: 100%; height: 6px; border-radius: 3px; overflow: hidden;
+            background: rgba(148, 163, 184, 0.2);
+        }
+        #folder-load-progress-bar {
+            height: 100%; width: 40%; border-radius: 3px;
+            background: var(--primary);
+            animation: folder-load-indeterminate 1.1s ease-in-out infinite;
+        }
+        @keyframes folder-load-indeterminate {
+            0%   { margin-left: -40%; width: 40%; }
+            50%  { margin-left: 30%;  width: 55%; }
+            100% { margin-left: 100%; width: 40%; }
+        }
+
         /* REFERENCE LOOKUP MODAL */
         #reference-lookup-modal {
             position: fixed; z-index: 1100; background: var(--bg-sidebar); border: 1px solid var(--border);
@@ -407,6 +439,14 @@ body.has-intro .btn-toggle{top:46px}
 </div>
 <script>if(localStorage.getItem('tiDismiss')){document.getElementById('tool-intro').style.display='none';document.body.classList.remove('has-intro');}</script>
 <div id="drop-overlay">Drop .cls / .java / .js / .html files anywhere</div>
+
+<div id="folder-load-overlay">
+    <div id="folder-load-box">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <div id="folder-load-text">Opening folder…</div>
+        <div id="folder-load-progress-track"><div id="folder-load-progress-bar"></div></div>
+    </div>
+</div>
 
 <div id="code-tooltip">
     <div id="code-tooltip-header">
@@ -1174,78 +1214,83 @@ export default class OrderDashboard extends LightningElement {
     }
 
     async function loadDirHandle(dirHandle, isReopen = false, forceReindex = false) {
-        feState.dirHandle = dirHandle;
-        feState.lwcIndex = new Map();
-        feState.apexIndex = new Map();
-        feState.disableAutoLoadForSlowReads = false;
-        invalidateHtmlReferenceIndex();
+        showFolderLoadOverlay(`Opening "${dirHandle.name}"…`);
+        try {
+            feState.dirHandle = dirHandle;
+            feState.lwcIndex = new Map();
+            feState.apexIndex = new Map();
+            feState.disableAutoLoadForSlowReads = false;
+            invalidateHtmlReferenceIndex();
 
-        const cacheKey = dirHandle.name;
-        htmlReferenceCacheKey = cacheKey;
-        const cached = (!forceReindex) ? await idbLoadTreeCache(cacheKey) : null;
+            const cacheKey = dirHandle.name;
+            htmlReferenceCacheKey = cacheKey;
+            const cached = (!forceReindex) ? await idbLoadTreeCache(cacheKey) : null;
 
-        if (cached?.tree && cached?.lwcIndex && cached?.apexIndex) {
-            await showLoadingStatus(`Restoring index for "${dirHandle.name}"…`);
-            feState.tree = cached.tree;
-            feState.lwcIndex = new Map(cached.lwcIndex);
-            feState.apexIndex = new Map(cached.apexIndex);
-            hideLoadingStatus();
-        } else {
-            await showLoadingStatus(`Indexing "${dirHandle.name}"…`);
-            try {
-                feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
-                if (feState.tree) {
-                    await showLoadingStatus('Indexing LWC components…');
-                    indexLwcFromTree(feState.tree);
-                    await showLoadingStatus('Indexing Apex classes…');
-                    indexApexFromTree(feState.tree);
-                    // Persist for next session — fire-and-forget so we don't block.
-                    idbSaveTreeCache(cacheKey, {
-                        ts: Date.now(),
-                        tree: feState.tree,
-                        lwcIndex: [...feState.lwcIndex.entries()],
-                        apexIndex: [...feState.apexIndex.entries()],
-                    });
-                }
-            } finally {
+            if (cached?.tree && cached?.lwcIndex && cached?.apexIndex) {
+                await showLoadingStatus(`Restoring index for "${dirHandle.name}"…`);
+                feState.tree = cached.tree;
+                feState.lwcIndex = new Map(cached.lwcIndex);
+                feState.apexIndex = new Map(cached.apexIndex);
                 hideLoadingStatus();
-            }
-        }
-
-        if (!isReopen) localStorage.removeItem(LS_PATH_KEY);
-        showFolderPath(dirHandle.name, !isReopen);
-        updateIndexBadges();
-        renderFileTree();
-        scheduleSmallFolderPrefetch();
-
-        // Reuse persisted HTML reference index if it matches the current LWC set size.
-        const refCached = (!forceReindex)
-            ? (lsLoadHtmlRefCache(cacheKey) || await idbLoadHtmlRefCache(cacheKey))
-            : null;
-        if (refCached?.index && refCached.lwcCount === (feState.lwcIndex?.size || 0)) {
-            const normalized = new Map();
-            (refCached.index || []).forEach(([k, v]) => {
-                const key = normalizeComponentRefKey(k);
-                if (!key) return;
-                const arr = Array.isArray(v) ? v : [];
-                const prev = normalized.get(key) || [];
-                arr.forEach(item => {
-                    if (!item?.componentName) return;
-                    if (!prev.some(p => p.componentName === item.componentName)) {
-                        prev.push({ componentName: item.componentName, snippet: item.snippet || '' });
+            } else {
+                await showLoadingStatus(`Scanning "${dirHandle.name}"…`);
+                try {
+                    feState.tree = await buildHandleTree(dirHandle, dirHandle.name);
+                    if (feState.tree) {
+                        await showLoadingStatus('Indexing LWC components…');
+                        indexLwcFromTree(feState.tree);
+                        await showLoadingStatus('Indexing Apex classes…');
+                        indexApexFromTree(feState.tree);
+                        // Persist for next session — fire-and-forget so we don't block.
+                        idbSaveTreeCache(cacheKey, {
+                            ts: Date.now(),
+                            tree: feState.tree,
+                            lwcIndex: [...feState.lwcIndex.entries()],
+                            apexIndex: [...feState.apexIndex.entries()],
+                        });
                     }
-                });
-                normalized.set(key, prev);
-            });
-            htmlReferenceIndex = normalized;
-            // Miss cache is intentionally session-only; persisted misses can become stale.
-            htmlReferenceMissCache = new Set();
-            setHtmlIndexStatus('ready', `HTML Ref Cache: Ready (${htmlReferenceIndex.size})`);
-        } else {
-            warmupHtmlReferenceIndex();
-        }
+                } finally {
+                    hideLoadingStatus();
+                }
+            }
 
-        await idbSaveHandle(dirHandle);
+            if (!isReopen) localStorage.removeItem(LS_PATH_KEY);
+            showFolderPath(dirHandle.name, !isReopen);
+            updateIndexBadges();
+            renderFileTree();
+            scheduleSmallFolderPrefetch();
+
+            // Reuse persisted HTML reference index if it matches the current LWC set size.
+            const refCached = (!forceReindex)
+                ? (lsLoadHtmlRefCache(cacheKey) || await idbLoadHtmlRefCache(cacheKey))
+                : null;
+            if (refCached?.index && refCached.lwcCount === (feState.lwcIndex?.size || 0)) {
+                const normalized = new Map();
+                (refCached.index || []).forEach(([k, v]) => {
+                    const key = normalizeComponentRefKey(k);
+                    if (!key) return;
+                    const arr = Array.isArray(v) ? v : [];
+                    const prev = normalized.get(key) || [];
+                    arr.forEach(item => {
+                        if (!item?.componentName) return;
+                        if (!prev.some(p => p.componentName === item.componentName)) {
+                            prev.push({ componentName: item.componentName, snippet: item.snippet || '' });
+                        }
+                    });
+                    normalized.set(key, prev);
+                });
+                htmlReferenceIndex = normalized;
+                // Miss cache is intentionally session-only; persisted misses can become stale.
+                htmlReferenceMissCache = new Set();
+                setHtmlIndexStatus('ready', `HTML Ref Cache: Ready (${htmlReferenceIndex.size})`);
+            } else {
+                warmupHtmlReferenceIndex();
+            }
+
+            await idbSaveHandle(dirHandle);
+        } finally {
+            hideFolderLoadOverlay();
+        }
     }
 
     async function reindexFolder() {
@@ -1293,16 +1338,23 @@ export default class OrderDashboard extends LightningElement {
     async function buildHandleTree(handle, name, ctx, parentPath = '') {
         const path = parentPath ? `${parentPath}/${name}` : name;
         if (handle.kind === 'file') {
-            return isSourceFile(name) ? { kind: 'file', name, handle, path } : null;
+            if (!isSourceFile(name)) return null;
+            if (ctx) ctx.files++;
+            return { kind: 'file', name, handle, path };
         }
         if (LWC_SKIP_DIRS.has(name) || name.startsWith('.')) return null;
 
-        ctx = ctx || { dirs: 0, lastReport: 0 };
+        ctx = ctx || { dirs: 0, files: 0, lastReportAt: 0 };
         ctx.dirs++;
-        if (ctx.dirs - ctx.lastReport >= 250) {
-            ctx.lastReport = ctx.dirs;
+        // Time-based throttle (not a fixed dir-count threshold) so small and
+        // medium projects still see live updates instead of one static message
+        // for the whole scan — a fixed "every 250 dirs" never fires at all on a
+        // project with fewer than 250 folders.
+        const now = performance.now();
+        if (now - ctx.lastReportAt >= 150) {
+            ctx.lastReportAt = now;
             // Don't block on UI updates; let them paint when the browser can.
-            showLoadingStatus(`Scanned ${ctx.dirs.toLocaleString()} folders…`);
+            showLoadingStatus(`Scanning… ${ctx.dirs.toLocaleString()} folders, ${ctx.files.toLocaleString()} files found`);
         }
 
         // Snapshot entries first so the recursion can fan out via Promise.all.
@@ -1518,9 +1570,14 @@ export default class OrderDashboard extends LightningElement {
 
     async function showLoadingStatus(msg) {
         const el = document.getElementById('loading-indicator');
-        if (!el) return;
-        el.querySelector('.loading-text').textContent = msg;
-        el.classList.add('visible');
+        if (el) {
+            el.querySelector('.loading-text').textContent = msg;
+            el.classList.add('visible');
+        }
+        // Mirror into the big folder-load overlay too, if it's the active one —
+        // every showLoadingStatus() call along the folder-open path (indexing,
+        // scanning, etc.) then updates it for free without touching each call site.
+        updateFolderLoadOverlay(msg);
         // Yield so the new message paints before sync work continues.
         await new Promise(r => setTimeout(r, 0));
     }
@@ -1528,6 +1585,27 @@ export default class OrderDashboard extends LightningElement {
     function hideLoadingStatus() {
         const el = document.getElementById('loading-indicator');
         if (el) el.classList.remove('visible');
+    }
+
+    // Prominent, hard-to-miss progress overlay for the folder open / reopen /
+    // re-index flow, which can take several seconds to tens of seconds on a
+    // large project — the small toolbar pill (#loading-indicator) is too easy
+    // to overlook, which read as "no response" even though indexing was running.
+    function showFolderLoadOverlay(msg) {
+        const el = document.getElementById('folder-load-overlay');
+        if (!el) return;
+        document.getElementById('folder-load-text').textContent = msg;
+        el.classList.add('visible');
+    }
+
+    function updateFolderLoadOverlay(msg) {
+        const el = document.getElementById('folder-load-overlay');
+        if (!el || !el.classList.contains('visible')) return;
+        document.getElementById('folder-load-text').textContent = msg;
+    }
+
+    function hideFolderLoadOverlay() {
+        document.getElementById('folder-load-overlay')?.classList.remove('visible');
     }
 
     function updateIndexBadges() {
