@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const path = require('path');
 const { FileIndex } = require('./traceParents');
 const { TraceParentsProvider } = require('./parentsTreeProvider');
+const { activateFullWebview } = require('./fullWebview');
 
 function activate(context) {
     const fileIndexHolder = { current: null };
@@ -15,6 +16,12 @@ function activate(context) {
 
     const output = vscode.window.createOutputChannel('ApexFlow Trace Parents');
     context.subscriptions.push(output);
+
+    // Full ApexFlow experience — architecture map, Analyze Flow, Trace
+    // Parents, and every context-menu action, reusing the same webview UI as
+    // the browser tool (public/apexflow.html) with its File System Access /
+    // IndexedDB layer swapped for a bridge to this Node.js extension host.
+    activateFullWebview(context, output);
 
     function getWorkspaceRootFor(fsPath) {
         if (fsPath) {

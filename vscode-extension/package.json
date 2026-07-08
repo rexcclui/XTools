@@ -1,8 +1,8 @@
 {
-  "name": "apexflow-trace-parents",
-  "displayName": "ApexFlow: Trace Parents",
-  "description": "Reverse-dependency tracer for Salesforce LWC components — find every component that references a given one, climbing the ancestor chain up to the root.",
-  "version": "0.1.0",
+  "name": "apexflow",
+  "displayName": "ApexFlow",
+  "description": "Full ApexFlow experience inside VS Code — architecture map, Analyze Flow call graphs, and Trace Parents for Salesforce Apex/LWC/Java projects, backed by direct Node.js filesystem access instead of the browser's sandboxed File System Access API.",
+  "version": "0.2.0",
   "publisher": "apexflow",
   "private": true,
   "engines": {
@@ -15,6 +15,10 @@
   "activationEvents": [],
   "contributes": {
     "commands": [
+      {
+        "command": "apexflowFull.open",
+        "title": "ApexFlow: Open Diagram"
+      },
       {
         "command": "apexflowTraceParents.traceFromFile",
         "title": "ApexFlow: Trace Parents (this component)"
@@ -56,14 +60,14 @@
       "explorer": [
         {
           "id": "apexflowTraceParentsView",
-          "name": "ApexFlow: Trace Parents"
+          "name": "ApexFlow: Trace Parents (quick view)"
         }
       ]
     },
     "viewsWelcome": [
       {
         "view": "apexflowTraceParentsView",
-        "contents": "Right-click a `.js` or `.html` LWC file and choose **ApexFlow: Trace Parents (this component)**.\n[Trace by name instead](command:apexflowTraceParents.traceByName)\nExpand a node in the tree to climb one generation further up the ancestor chain."
+        "contents": "For the full architecture map, Analyze Flow, and every diagram feature, run **ApexFlow: Open Diagram** from the Command Palette.\n[Open full diagram](command:apexflowFull.open)\n\nOr, for a quick lightweight lookup right here: right-click a `.js`/`.html` LWC file and choose **ApexFlow: Trace Parents (this component)**.\n[Trace by name](command:apexflowTraceParents.traceByName)"
       }
     ]
   }
