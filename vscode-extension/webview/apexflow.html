@@ -517,7 +517,14 @@ body.has-intro .btn-toggle{top:46px}
 
 <div id="sidebar">
     <div class="sidebar-header"><h2 style="margin:0; margin-left: 45px; color:var(--primary); font-size:1.1rem;">Apex / Java / LWC Class Diagram</h2></div>
-    <div id="file-explorer">
+    <!-- File Explorer (folder picker / search / browse tree) is hidden in the
+         VS Code extension: VS Code's own Explorer already shows the project
+         file structure, and the workspace root auto-loads on open — the
+         underlying index (feState.tree/lwcIndex/apexIndex) this UI would have
+         browsed is still built and used, just not shown as a second, redundant
+         file tree. Drag a file from VS Code's real Explorer onto the diagram
+         instead (see the 'drop' handler) to load and trace it. -->
+    <div id="file-explorer" style="display:none">
         <div id="file-explorer-header">
             <span>File Explorer</span>
             <button id="fe-open-btn" title="Pick your project folder (e.g. an SFDX project root). Salesforce Apex, LWC and Java Flow Analyzer scans it for Apex classes and LWC components to build the architecture map and call-flow diagrams. Files are read locally — nothing is uploaded."><i class="fa-solid fa-folder-open"></i> Open Folder</button>
@@ -540,7 +547,10 @@ body.has-intro .btn-toggle{top:46px}
     </div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>
-        <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()" title="Reload the page and clear every loaded class and component"><i class="fa-solid fa-broom"></i> Clear All</button></div>
+        <div style="padding:15px; display:flex; gap:8px;">
+            <button class="btn" style="flex:1" onclick="reindexFolder()" title="Re-scan the project — pick this up if files changed on disk since the diagram opened"><i class="fa-solid fa-rotate"></i> Reindex</button>
+            <button class="btn" style="flex:1" onclick="location.reload()" title="Reload the page and clear every loaded class and component"><i class="fa-solid fa-broom"></i> Clear All</button>
+        </div>
     </div>
     <div id="method-picker">
         <div id="method-picker-header">
@@ -1056,6 +1066,48 @@ body.has-intro .btn-toggle{top:46px}
     document.addEventListener('dragleave', e => {
         if (!e.relatedTarget) dropOverlay.classList.remove('show');
     });
+    // Dragging a file from VS Code's real Explorer (or an editor tab) sets
+    // text/uri-list — a newline-separated list of file:// URIs — rather than
+    // e.dataTransfer.files, which is only populated when dragging an actual
+    // OS file in from outside VS Code entirely. This is what makes "drag a
+    // file from the project tree straight onto the diagram" work now that
+    // the in-app file browser is gone.
+    function fileUriToPath(uri) {
+        try {
+            const u = new URL(uri);
+            if (u.protocol !== 'file:') return null;
+            let p = decodeURIComponent(u.pathname);
+            if (/^\/[A-Za-z]:\//.test(p)) p = p.slice(1); // file:///C:/foo -> C:/foo on Windows
+            return p;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function loadDroppedFilePaths(absPaths) {
+        await showLoadingStatus(`Loading ${absPaths.length} dropped file${absPaths.length > 1 ? 's' : ''}…`);
+        let lastBase = null;
+        try {
+            for (const absPath of absPaths) {
+                const fileName = absPath.split(/[\\/]/).pop();
+                const base = fileName.replace(/\.(js|html|cls|java)$/i, '');
+                if (!registry[base]) {
+                    const relPath = feState.dirHandle?.__vfsRootPath
+                        ? computeRelativeVfsPath(feState.dirHandle.__vfsRootPath, absPath, feState.dirHandle.name)
+                        : fileName;
+                    const syntheticNode = { name: fileName, path: relPath, handle: makeFileHandle(absPath, fileName) };
+                    await loadFileNode(syntheticNode, null);
+                }
+                lastBase = base;
+            }
+        } finally {
+            hideLoadingStatus();
+        }
+        await render();
+        renderFileTree();
+        if (lastBase) focusAndHighlight(lastBase);
+    }
+
     document.addEventListener('drop', async e => {
         e.preventDefault();
         dropOverlay.classList.remove('show');
@@ -1067,6 +1119,20 @@ body.has-intro .btn-toggle{top:46px}
             renderFileTree();
             window._feDragNode = null;
             return;
+        }
+
+        // Drag from VS Code's Explorer / an editor tab.
+        const uriList = e.dataTransfer.getData('text/uri-list');
+        if (uriList) {
+            const droppedPaths = uriList.split(/\r?\n/)
+                .map(l => l.trim())
+                .filter(l => l && !l.startsWith('#'))
+                .map(fileUriToPath)
+                .filter(p => p && /\.(js|html|cls|java)$/i.test(p));
+            if (droppedPaths.length) {
+                await loadDroppedFilePaths(droppedPaths);
+                return;
+            }
         }
 
         const files = Array.from(e.dataTransfer.files).filter(f => {
@@ -5176,12 +5242,9 @@ export default class OrderDashboard extends LightningElement {
       </div>
       <div class="hlp-sec">
         <h4>Loading Files</h4>
-        <div class="hlp-row"><span class="hlp-key">Open Folder</span><span class="hlp-desc">Click "Open Folder" to pick a project root; the handle is remembered across sessions via IndexedDB</span></div>
-        <div class="hlp-row"><span class="hlp-key">Drop files</span><span class="hlp-desc">Drag .cls, .java, .js, or .html files anywhere onto the page; a green overlay confirms the drop target</span></div>
-        <div class="hlp-row"><span class="hlp-key">File explorer</span><span class="hlp-desc">Browse the folder tree in the sidebar and click any file to load it into the diagram</span></div>
-        <div class="hlp-row"><span class="hlp-key">↺ Reopen</span><span class="hlp-desc">Reopen the last-used folder without re-picking it in the browser dialog</span></div>
-        <div class="hlp-row"><span class="hlp-key">⟲ Re-index</span><span class="hlp-desc">Force a fresh scan of the folder when files have changed since the last session</span></div>
-        <div class="hlp-row"><span class="hlp-key">🕐 History</span><span class="hlp-desc">Recently opened files appear in the history popover for quick reload</span></div>
+        <div class="hlp-row"><span class="hlp-key">Auto-loaded</span><span class="hlp-desc">Your workspace folder loads automatically — right-click a file → "ApexFlow: Open Diagram" to also load that specific file</span></div>
+        <div class="hlp-row"><span class="hlp-key">Drag &amp; drop</span><span class="hlp-desc">Drag a .cls/.java/.js/.html file from VS Code's own Explorer (or an editor tab) straight onto the diagram to load it</span></div>
+        <div class="hlp-row"><span class="hlp-key">Reindex</span><span class="hlp-desc">Force a fresh scan of the workspace if files changed on disk since the diagram opened</span></div>
       </div>
       <div class="hlp-sec">
         <h4>Architecture Map</h4>
