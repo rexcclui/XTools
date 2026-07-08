@@ -685,6 +685,17 @@ body.has-intro .btn-toggle{top:46px}
             async requestPermission() { return 'granted'; },
         };
         await loadDirHandle(rootHandle, true);
+
+        // Right-clicking a file to open the diagram should show that file by
+        // default, not just the folder it happens to live in.
+        if (msg.openFile) {
+            const base = String(msg.openFile).split(/[\\/]/).pop().replace(/\.(js|html|cls|java)$/i, '');
+            if (base) {
+                if (!registry[base]) await loadClassByName(base);
+                await render();
+                focusAndHighlight(base);
+            }
+        }
     }
 
     // Tell the extension host we're ready to receive the workspace root —
@@ -694,6 +705,10 @@ body.has-intro .btn-toggle{top:46px}
     const registry = {};
     const innerClassNames = new Set(); // inner class names found inside loaded files
     let focusedClass = null;
+    // Set by Trace Parents to render a dedicated, isolated ancestor-chain
+    // diagram instead of the registry-wide Architecture Map — see render()
+    // and runTraceParents(). { rootComponentName, nodes: Set, edges, depthByNode, generations }
+    let traceChainMode = null;
     let panZoomInstance = null;
     let selectedClassName = null;
     let tooltipGlobalHandlersBound = false;
@@ -2847,7 +2862,45 @@ export default class OrderDashboard extends LightningElement {
             return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
         }
 
-        if (!focusedClass) {
+        if (traceChainMode) {
+            document.getElementById('view-title').innerText =
+                `Trace Parents: ${bareName(traceChainMode.rootComponentName)} — ${traceChainMode.nodes.size - 1} ancestor${traceChainMode.nodes.size - 1 === 1 ? '' : 's'} across ${traceChainMode.generations} generation${traceChainMode.generations === 1 ? '' : 's'}`;
+            document.getElementById('reset-btn').style.display = "inline-block";
+            // TD (top-down): edges are parent --> child, so ancestors land
+            // above the target — same "who uses what sits below it" shape as
+            // a console tree, and isolated to just this chain so nothing else
+            // in the project pulls the layout apart.
+            def = "graph TD\n";
+
+            const seenChainEdges = new Set();
+            traceChainMode.edges.forEach(edge => {
+                if (!traceChainMode.nodes.has(edge.parent) || !traceChainMode.nodes.has(edge.child)) return;
+                const key = `${edge.parent}=>${edge.child}`;
+                if (seenChainEdges.has(key)) return;
+                seenChainEdges.add(key);
+                const label = edge.kind === 'html-tag' ? 'html' : 'js';
+                def += `  ${safeId(edge.parent)} -- "${label}" --> ${safeId(edge.child)}\n`;
+                currentEdgeMeta.push({ source: safeId(edge.parent), target: safeId(edge.child) });
+                linkCounter++;
+            });
+
+            traceChainMode.nodes.forEach(n => {
+                // Mirrors the overview branch: a ghost (unloaded — e.g. its
+                // load failed) node gets exactly one definition, from the
+                // shared ghost-node block below, not a regular one here too.
+                if (!registry[n] && !innerClassNames.has(n)) {
+                    ghostNodes.add(n);
+                    return;
+                }
+                def += `  ${safeId(n)}["${prefixForName(n)}${bareName(n)}"]\n`;
+                const style = styleForName(n);
+                if (style) def += `  style ${safeId(n)} ${style}\n`;
+            });
+            // The traced target itself gets highlighted via the existing
+            // .node-focused mechanism (see focusAndHighlight, called after
+            // this view renders), same as clicking any class card — no need
+            // for a separate style directive here.
+        } else if (!focusedClass) {
             document.getElementById('view-title').innerText = "System Architecture Map";
             document.getElementById('reset-btn').style.display = "none";
             // LR (Left-Right) for rightward cascading flow
@@ -3994,6 +4047,7 @@ export default class OrderDashboard extends LightningElement {
         let frontier = [rootComponentName];
         const edges = []; // { parent, child, kind, snippet }
         const orderedParents = []; // unique ancestor names, in discovery order
+        const depthByNode = new Map([[rootBare, 0]]); // bare name -> generations from root (0 = root itself)
         let generation = 0;
 
         while (frontier.length && generation < maxGenerations && visited.size < maxNodes) {
@@ -4010,6 +4064,7 @@ export default class OrderDashboard extends LightningElement {
                         visited.add(pBare);
                         orderedParents.push(p.componentName);
                         nextFrontier.push(p.componentName);
+                        depthByNode.set(pBare, generation);
                         if (visited.size >= maxNodes) break outer;
                     }
                 }
@@ -4028,6 +4083,7 @@ export default class OrderDashboard extends LightningElement {
             scannedRoot: feState.dirHandle?.name || feState.tree?.name || '(unknown)',
             fromCache: !!fileIndex.fromCache,
             scanTiming: fileIndex.timing || null,
+            depthByNode,
         };
     }
 
@@ -4064,27 +4120,31 @@ export default class OrderDashboard extends LightningElement {
             return;
         }
 
-        const snippetByParent = new Map();
-        result.edges.forEach(e => { if (!snippetByParent.has(e.parent)) snippetByParent.set(e.parent, e); });
+        // Load the target itself (in case it was only a ghost) plus every
+        // ancestor found, straight into a dedicated chain view — no
+        // confirmation step. Isolated from the main registry-wide Architecture
+        // Map on purpose: that view lays out every loaded class together, which
+        // scatters a long ancestor chain across whatever else happens to be
+        // loaded. This renders ONLY the traced nodes/edges, so it reads as a
+        // compact top-down chain instead.
+        await showLoadingStatus(`Loading ${componentName} + ${result.orderedParents.length} ancestor(s)…`);
+        try {
+            await Promise.all([componentName, ...result.orderedParents].map(name => loadReferenceByName(name)));
+        } finally {
+            hideLoadingStatus();
+        }
 
-        const references = result.orderedParents.map(name => {
-            const edge = snippetByParent.get(name);
-            return {
-                componentName: name,
-                kind: registry[name]?.kind === 'apex' ? 'apex' : (edge?.kind === 'html-tag' ? 'html' : 'js'),
-                snippet: edge ? edge.snippet : '',
-                loaded: !!registry[name],
-                selected: true,
-            };
-        });
-
-        lastTraceEdges = result.edges;
-        populateReferenceModal(
-            `Ancestors of ${componentName} — ${result.orderedParents.length} found across ${result.generations} generation${result.generations === 1 ? '' : 's'}`,
-            componentName,
-            references,
-            'trace-parents'
-        );
+        traceChainMode = {
+            rootComponentName: componentName,
+            nodes: new Set([componentName, ...result.orderedParents]),
+            edges: result.edges,
+            depthByNode: result.depthByNode,
+            generations: result.generations,
+        };
+        focusedClass = null;
+        await render();
+        renderFileTree();
+        focusAndHighlight(componentName);
     }
 
     function hideCodeTooltip() {
@@ -4861,6 +4921,7 @@ export default class OrderDashboard extends LightningElement {
 
     function exitAnalyzeFlow() {
         focusedClass = null;
+        traceChainMode = null;
         activeMethods = new Set();
         collapsedMethods = new Set();
         collapsedNodes = new Set();
