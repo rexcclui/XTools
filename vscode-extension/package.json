@@ -25,6 +25,10 @@
         "title": "ApexFlow: Open Diagram"
       },
       {
+        "command": "apexflowFull.addFile",
+        "title": "ApexFlow: Add to Diagram"
+      },
+      {
         "command": "apexflowTraceParents.traceFromFile",
         "title": "ApexFlow: Trace Parents (this component)"
       },
@@ -48,6 +52,11 @@
           "command": "apexflowFull.open",
           "when": "resourceExtname == .js || resourceExtname == .html || resourceExtname == .cls || resourceExtname == .java",
           "group": "apexflow@1"
+        },
+        {
+          "command": "apexflowFull.addFile",
+          "when": "resourceExtname == .js || resourceExtname == .html || resourceExtname == .cls || resourceExtname == .java",
+          "group": "apexflow@2"
         }
       ],
       "editor/context": [
@@ -57,14 +66,19 @@
           "group": "apexflow@1"
         },
         {
+          "command": "apexflowFull.addFile",
+          "when": "resourceExtname == .js || resourceExtname == .html || resourceExtname == .cls || resourceExtname == .java",
+          "group": "apexflow@2"
+        },
+        {
           "command": "apexflowTraceParents.traceSelection",
           "when": "editorHasSelection && (resourceExtname == .js || resourceExtname == .html)",
-          "group": "apexflow@2"
+          "group": "apexflow@3"
         },
         {
           "command": "apexflowTraceParents.traceFromFile",
           "when": "!editorHasSelection && (resourceExtname == .js || resourceExtname == .html)",
-          "group": "apexflow@2"
+          "group": "apexflow@3"
         }
       ],
       "view/title": [

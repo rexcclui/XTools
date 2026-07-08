@@ -629,8 +629,24 @@ body.has-intro .btn-toggle{top:46px}
     window.addEventListener('message', (event) => {
         const msg = event.data;
         if (!msg) return;
+        console.info('[ApexFlow bridge] received', msg.type || '(reply)', msg);
         if (msg.type === 'init') {
             onWorkspaceRootReady(msg);
+            return;
+        }
+        if (msg.type === 'addFile') {
+            // "ApexFlow: Add to Diagram" — a reliable alternative to dragging
+            // a file in. Dragging onto this webview is a webview *panel*,
+            // which lives in the editor tab area — VS Code's own editor-group
+            // drop handling can intercept a file drag there as "open this
+            // file as a tab" before it ever reaches this page's drop event,
+            // which is the "it flips to another editor" symptom. This command
+            // does the same thing (load one file, no full folder rescan)
+            // without depending on that drop ever arriving.
+            loadDroppedFilePaths([msg.path]).catch(err => {
+                console.error('ApexFlow: Add to Diagram failed', err);
+                alert(`ApexFlow: Add to Diagram failed: ${err.message || err}`);
+            });
             return;
         }
         if (msg.reqId && __vfsPending.has(msg.reqId)) {
@@ -697,8 +713,10 @@ body.has-intro .btn-toggle{top:46px}
     // directory handle from IndexedDB" flow, since VS Code always already
     // knows the workspace folder (no picker/permission dance needed).
     async function onWorkspaceRootReady(msg) {
+        console.info('[ApexFlow] onWorkspaceRootReady', msg);
         if (!msg.path) {
             document.getElementById('fe-empty').textContent = 'Open a folder or workspace in VS Code to get started.';
+            console.warn('[ApexFlow] no workspace root path in init message — nothing to load');
             return;
         }
         try {
@@ -708,7 +726,9 @@ body.has-intro .btn-toggle{top:46px}
                 __vfsRootPath: msg.path,
                 async requestPermission() { return 'granted'; },
             };
+            console.info('[ApexFlow] loadDirHandle starting for', msg.path);
             await loadDirHandle(rootHandle, true);
+            console.info('[ApexFlow] loadDirHandle done. lwcIndex size=', feState.lwcIndex?.size, 'apexIndex size=', feState.apexIndex?.size);
 
             // Right-clicking a file to open the diagram should show that file
             // by default, not just the folder it happens to live in. Loads
@@ -720,13 +740,19 @@ body.has-intro .btn-toggle{top:46px}
             if (msg.openFile) {
                 const fileName = String(msg.openFile).split(/[\\/]/).pop();
                 const base = fileName.replace(/\.(js|html|cls|java)$/i, '');
+                console.info('[ApexFlow] auto-loading right-clicked file', { openFile: msg.openFile, fileName, base, alreadyLoaded: !!registry[base] });
                 if (base && !registry[base]) {
                     const relPath = computeRelativeVfsPath(msg.path, msg.openFile, msg.name);
                     const syntheticNode = { name: fileName, path: relPath, handle: makeFileHandle(msg.openFile, fileName) };
+                    console.info('[ApexFlow] calling loadFileNode with synthetic node', syntheticNode);
                     await loadFileNode(syntheticNode, null);
+                    console.info('[ApexFlow] loadFileNode returned. registry now has base?', !!registry[base], 'registry keys:', Object.keys(registry));
                 }
                 await render();
-                if (base) focusAndHighlight(base);
+                if (base) {
+                    console.info('[ApexFlow] focusing', base, '- present in registry:', !!registry[base]);
+                    focusAndHighlight(base);
+                }
             }
         } catch (err) {
             console.error('ApexFlow: failed to open folder / auto-load file', err);
@@ -1085,6 +1111,7 @@ body.has-intro .btn-toggle{top:46px}
     }
 
     async function loadDroppedFilePaths(absPaths) {
+        console.info('[ApexFlow] loadDroppedFilePaths', absPaths);
         await showLoadingStatus(`Loading ${absPaths.length} dropped file${absPaths.length > 1 ? 's' : ''}…`);
         let lastBase = null;
         try {
@@ -1096,7 +1123,11 @@ body.has-intro .btn-toggle{top:46px}
                         ? computeRelativeVfsPath(feState.dirHandle.__vfsRootPath, absPath, feState.dirHandle.name)
                         : fileName;
                     const syntheticNode = { name: fileName, path: relPath, handle: makeFileHandle(absPath, fileName) };
+                    console.info('[ApexFlow] loading dropped/added file', syntheticNode);
                     await loadFileNode(syntheticNode, null);
+                    console.info('[ApexFlow] done. registry now has base?', !!registry[base]);
+                } else {
+                    console.info('[ApexFlow]', base, 'already loaded, skipping');
                 }
                 lastBase = base;
             }
@@ -1111,6 +1142,7 @@ body.has-intro .btn-toggle{top:46px}
     document.addEventListener('drop', async e => {
         e.preventDefault();
         dropOverlay.classList.remove('show');
+        console.info('[ApexFlow] drop event fired. dataTransfer.types:', e.dataTransfer ? Array.from(e.dataTransfer.types) : null);
 
         // Drag from internal file explorer
         if (window._feDragNode) {
@@ -1123,6 +1155,7 @@ body.has-intro .btn-toggle{top:46px}
 
         // Drag from VS Code's Explorer / an editor tab.
         const uriList = e.dataTransfer.getData('text/uri-list');
+        console.info('[ApexFlow] drop text/uri-list:', JSON.stringify(uriList));
         if (uriList) {
             const droppedPaths = uriList.split(/\r?\n/)
                 .map(l => l.trim())

@@ -143,6 +143,31 @@ function activateFullWebview(context, output) {
             panel.onDidDispose(() => { panel = null; pendingInvocation = null; });
         })
     );
+
+    // Reliable alternative to dragging a file onto the diagram. The diagram
+    // is a webview *panel*, which occupies an editor-group slot — VS Code's
+    // own editor-group drop handling can intercept a file drag there as
+    // "open this file as a tab" before the drop event ever reaches the
+    // webview's content, which is what "it flips to another editor" is.
+    // This does the same thing (load one file into whatever's already open,
+    // no full folder rescan) via a direct message instead of a drop event.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('apexflowFull.addFile', (uri) => {
+            const targetUri = uri instanceof vscode.Uri ? uri : (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri);
+            if (!targetUri) {
+                vscode.window.showWarningMessage('ApexFlow: select or open a file first.');
+                return;
+            }
+            if (panel) {
+                panel.reveal(vscode.ViewColumn.Active);
+                panel.webview.postMessage({ type: 'addFile', path: targetUri.fsPath });
+                return;
+            }
+            // No diagram open yet — nothing to "add" to, so open one scoped
+            // to this file instead (same as "Open Diagram" would do).
+            vscode.commands.executeCommand('apexflowFull.open', targetUri);
+        })
+    );
 }
 
 module.exports = { activateFullWebview };
