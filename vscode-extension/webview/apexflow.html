@@ -476,6 +476,7 @@ body.has-intro .btn-toggle{top:46px}
     <div class="ctx-item" id="ctx-load-class" style="display:none"><i class="fa-solid fa-file-import"></i><span>Load Class</span></div>
     <div class="ctx-item" id="ctx-lookup-reference" style="display:none"><i class="fa-solid fa-magnifying-glass"></i><span>Lookup Reference</span></div>
     <div class="ctx-item" id="ctx-trace-parents" style="display:none"><i class="fa-solid fa-sitemap"></i><span>Trace Parents</span></div>
+    <div class="ctx-item" id="ctx-show-trace-children" style="display:none"><i class="fa-solid fa-diagram-project"></i><span>Show Children</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
     <div class="ctx-item" id="ctx-view-source" style="display:none"><i class="fa-solid fa-file-lines"></i><span>Source</span></div>
 </div>
@@ -669,6 +670,18 @@ body.has-intro .btn-toggle{top:46px}
         };
     }
 
+    // Builds the same root-name-prefixed relative path convention
+    // buildHandleTree/walkTree use (e.g. "myProject/force-app/.../Foo.js"),
+    // so a synthetic file node plugs into findFileNodeByPath the same way a
+    // real tree-walked one would.
+    function computeRelativeVfsPath(rootAbsPath, fileAbsPath, rootName) {
+        const normRoot = String(rootAbsPath || '').replace(/[\\/]+$/, '');
+        let rel = String(fileAbsPath || '');
+        if (normRoot && rel.startsWith(normRoot)) rel = rel.slice(normRoot.length);
+        rel = rel.replace(/^[\\/]+/, '').replace(/\\/g, '/');
+        return rel ? `${rootName}/${rel}` : rootName;
+    }
+
     // Fired once per webview load, right after the extension host confirms
     // which workspace folder is open — replaces the old "restore last picked
     // directory handle from IndexedDB" flow, since VS Code always already
@@ -678,23 +691,36 @@ body.has-intro .btn-toggle{top:46px}
             document.getElementById('fe-empty').textContent = 'Open a folder or workspace in VS Code to get started.';
             return;
         }
-        const rootHandle = {
-            kind: 'directory',
-            name: msg.name,
-            __vfsRootPath: msg.path,
-            async requestPermission() { return 'granted'; },
-        };
-        await loadDirHandle(rootHandle, true);
+        try {
+            const rootHandle = {
+                kind: 'directory',
+                name: msg.name,
+                __vfsRootPath: msg.path,
+                async requestPermission() { return 'granted'; },
+            };
+            await loadDirHandle(rootHandle, true);
 
-        // Right-clicking a file to open the diagram should show that file by
-        // default, not just the folder it happens to live in.
-        if (msg.openFile) {
-            const base = String(msg.openFile).split(/[\\/]/).pop().replace(/\.(js|html|cls|java)$/i, '');
-            if (base) {
-                if (!registry[base]) await loadClassByName(base);
+            // Right-clicking a file to open the diagram should show that file
+            // by default, not just the folder it happens to live in. Loads
+            // directly from the known path (via a synthetic file node) rather
+            // than searching feState.lwcIndex by name — that search depends
+            // on the file living in a strict <folder>/<folder>.js bundle
+            // layout, and silently finding nothing left this looking like
+            // "nothing happened" with no indication of why.
+            if (msg.openFile) {
+                const fileName = String(msg.openFile).split(/[\\/]/).pop();
+                const base = fileName.replace(/\.(js|html|cls|java)$/i, '');
+                if (base && !registry[base]) {
+                    const relPath = computeRelativeVfsPath(msg.path, msg.openFile, msg.name);
+                    const syntheticNode = { name: fileName, path: relPath, handle: makeFileHandle(msg.openFile, fileName) };
+                    await loadFileNode(syntheticNode, null);
+                }
                 await render();
-                focusAndHighlight(base);
+                if (base) focusAndHighlight(base);
             }
+        } catch (err) {
+            console.error('ApexFlow: failed to open folder / auto-load file', err);
+            alert(`ApexFlow failed to load: ${err.message || err}\n\nOpen Help > Toggle Developer Tools for the full error.`);
         }
     }
 
@@ -4147,6 +4173,38 @@ export default class OrderDashboard extends LightningElement {
         focusAndHighlight(componentName);
     }
 
+    // Pulls a single node's own forward dependencies (its children — the
+    // direction Trace Parents deliberately skips) into the current chain
+    // view. New children appear as ghost nodes if not already loaded, same
+    // as anywhere else in the app — right-click → Load Class to load them.
+    function expandTraceChainChildren(className) {
+        if (!traceChainMode) return;
+        const entry = registry[className];
+        if (!entry) return;
+
+        const flows = aggregateFlows(entry.raw, entry.varMap, className);
+        const targets = Object.keys(flows).filter(t => t !== className);
+        if (!targets.length) {
+            alert(`"${bareComponentName(className)}" has no further children to show.`);
+            return;
+        }
+
+        let added = 0;
+        targets.forEach(target => {
+            if (!traceChainMode.nodes.has(target)) added++;
+            traceChainMode.nodes.add(target);
+            const alreadyEdge = traceChainMode.edges.some(e => e.parent === className && e.child === target);
+            if (!alreadyEdge) {
+                traceChainMode.edges.push({ parent: className, child: target, kind: 'child-expand', snippet: '' });
+            }
+        });
+
+        render();
+        if (added === 0) {
+            console.info(`[TraceParents] "${className}"'s children were already shown in this view.`);
+        }
+    }
+
     function hideCodeTooltip() {
         document.getElementById('code-tooltip').style.display = 'none';
     }
@@ -4834,6 +4892,21 @@ export default class OrderDashboard extends LightningElement {
                 hideNodeContextMenu();
                 runTraceParents(lookupTarget);
             };
+        }
+
+        // Show Children — Trace Parents chain view only. That view deliberately
+        // renders just the traced ancestor edges, skipping each node's own
+        // forward dependencies; this pulls a specific node's children in on
+        // demand instead of switching back to the full Architecture Map.
+        const showChildrenEl = document.getElementById('ctx-show-trace-children');
+        if (traceChainMode && resolvedClassName && registry[resolvedClassName]) {
+            showChildrenEl.style.display = 'flex';
+            showChildrenEl.onclick = () => {
+                hideNodeContextMenu();
+                expandTraceChainChildren(resolvedClassName);
+            };
+        } else {
+            showChildrenEl.style.display = 'none';
         }
 
         // View Code option — only if method body exists
