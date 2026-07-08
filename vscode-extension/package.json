@@ -45,21 +45,31 @@
     "menus": {
       "explorer/context": [
         {
+          "command": "apexflowFull.open",
+          "when": "resourceExtname == .js || resourceExtname == .html || resourceExtname == .cls || resourceExtname == .java",
+          "group": "apexflow@1"
+        },
+        {
           "command": "apexflowTraceParents.traceFromFile",
           "when": "resourceExtname == .js || resourceExtname == .html",
-          "group": "apexflow"
+          "group": "apexflow@2"
         }
       ],
       "editor/context": [
         {
+          "command": "apexflowFull.open",
+          "when": "resourceExtname == .js || resourceExtname == .html || resourceExtname == .cls || resourceExtname == .java",
+          "group": "apexflow@1"
+        },
+        {
           "command": "apexflowTraceParents.traceSelection",
           "when": "editorHasSelection && (resourceExtname == .js || resourceExtname == .html)",
-          "group": "apexflow"
+          "group": "apexflow@2"
         },
         {
           "command": "apexflowTraceParents.traceFromFile",
           "when": "!editorHasSelection && (resourceExtname == .js || resourceExtname == .html)",
-          "group": "apexflow"
+          "group": "apexflow@2"
         }
       ],
       "view/title": [
