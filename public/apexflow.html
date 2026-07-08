@@ -631,6 +631,13 @@ body.has-intro .btn-toggle{top:46px}
     // every OTHER dependency of a newly-loaded ancestor so the diagram shows
     // only the traced chain, not each ancestor's full unrelated dependency set.
     let lastTraceEdges = null;
+    // Session cache of the full js/html text scan Trace Parents needs, keyed by
+    // folder name. Reading every file's content is the one unavoidably slow
+    // step (bounded by the browser's File System Access API, which has real
+    // per-file overhead a native script doesn't) — this makes that cost a
+    // one-time charge per folder instead of paying it again on every trace.
+    let traceFileIndexCache = null;
+    let traceFileIndexCacheKey = null;
     let htmlReferenceIndex = new Map();
     let htmlReferenceIndexBuildPromise = null;
     let htmlReferenceIndexVersion = 0;
@@ -1221,6 +1228,11 @@ export default class OrderDashboard extends LightningElement {
             feState.apexIndex = new Map();
             feState.disableAutoLoadForSlowReads = false;
             invalidateHtmlReferenceIndex();
+            // A (re)open means the on-disk contents may have changed — don't
+            // let Trace Parents reuse a file-text cache from a previous folder
+            // or a previous version of this one.
+            traceFileIndexCache = null;
+            traceFileIndexCacheKey = null;
 
             const cacheKey = dirHandle.name;
             htmlReferenceCacheKey = cacheKey;
@@ -3827,6 +3839,14 @@ export default class OrderDashboard extends LightningElement {
     }
 
     async function buildTraceParentsFileIndex() {
+        const cacheKey = feState.dirHandle?.name || feState.tree?.name || null;
+        if (traceFileIndexCache && cacheKey && traceFileIndexCacheKey === cacheKey) {
+            console.info('[TraceParents] reusing cached file index for', cacheKey,
+                `(${traceFileIndexCache.jsTextByName.size + traceFileIndexCache.htmlTextByName.size} files, no re-scan)`);
+            return { ...traceFileIndexCache, fromCache: true };
+        }
+
+        const listStart = performance.now();
         // feState.tree is already a complete walk of the project (built once
         // when the folder was opened, and cached in IndexedDB across sessions)
         // — reuse it instead of re-walking the live directory handle, which
@@ -3839,6 +3859,7 @@ export default class OrderDashboard extends LightningElement {
                 console.warn('Trace Parents: live directory scan failed', e);
             }
         }
+        const listMs = performance.now() - listStart;
 
         const jsTextByName = new Map();   // bare component name -> { text, folderPath }
         const htmlTextByName = new Map();
@@ -3848,10 +3869,15 @@ export default class OrderDashboard extends LightningElement {
         let lastReportAt = 0;
         // Bypasses the shared single-file-at-a-time read queue (see
         // readHandleTextFast) so this scan gets real concurrency instead of
-        // serializing behind it — the difference between seconds and minutes
-        // on a project with thousands of files.
+        // serializing behind it. Note: this concurrency number is a JS-side
+        // request count, not a guarantee — the browser's own File System Access
+        // implementation may cap real parallel disk operations well below it,
+        // and each call carries sandbox/IPC overhead a native script never pays.
+        // That per-file cost is the one thing this app cannot eliminate, only
+        // amortize (see the cache above, and the reindex-only invalidation).
         const concurrency = Math.min(64, total);
 
+        const readStart = performance.now();
         const worker = async () => {
             while (true) {
                 const idx = cursor++;
@@ -3881,7 +3907,21 @@ export default class OrderDashboard extends LightningElement {
         };
 
         await Promise.all(Array.from({ length: concurrency }, () => worker()));
-        return { jsTextByName, htmlTextByName };
+        const readMs = performance.now() - readStart;
+
+        const msPerFile = total ? +(readMs / total).toFixed(2) : 0;
+        console.info('[TraceParents] file scan timing', {
+            totalFiles: total,
+            listMs: Math.round(listMs),
+            readMs: Math.round(readMs),
+            msPerFile,
+            concurrency,
+        });
+
+        const result = { jsTextByName, htmlTextByName, fromCache: false, timing: { totalFiles: total, listMs: Math.round(listMs), readMs: Math.round(readMs), msPerFile } };
+        traceFileIndexCache = result;
+        traceFileIndexCacheKey = cacheKey;
+        return result;
     }
 
     // One hop: who directly references `componentName`, per the pre-built file
@@ -3971,6 +4011,8 @@ export default class OrderDashboard extends LightningElement {
             jsFilesScanned: fileIndex.jsTextByName.size,
             htmlFilesScanned: fileIndex.htmlTextByName.size,
             scannedRoot: feState.dirHandle?.name || feState.tree?.name || '(unknown)',
+            fromCache: !!fileIndex.fromCache,
+            scanTiming: fileIndex.timing || null,
         };
     }
 
@@ -3994,7 +4036,12 @@ export default class OrderDashboard extends LightningElement {
 
         const debugEl = document.getElementById('reference-modal-debug');
         if (debugEl) {
-            debugEl.textContent = `trace: ${componentName} | root="${result.scannedRoot}" | js=${result.jsFilesScanned} html=${result.htmlFilesScanned} | generations=${result.generations} | ancestors=${result.orderedParents.length}`;
+            const timingText = result.fromCache
+                ? 'file cache: reused (instant)'
+                : result.scanTiming
+                    ? `file scan: ${result.scanTiming.readMs}ms / ${result.scanTiming.totalFiles} files (${result.scanTiming.msPerFile}ms/file avg)`
+                    : '';
+            debugEl.textContent = `trace: ${componentName} | root="${result.scannedRoot}" | js=${result.jsFilesScanned} html=${result.htmlFilesScanned} | generations=${result.generations} | ancestors=${result.orderedParents.length} | ${timingText}`;
         }
 
         if (result.orderedParents.length === 0) {
