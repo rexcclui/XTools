@@ -2910,6 +2910,11 @@ export default class OrderDashboard extends LightningElement {
                 linkCounter++;
             });
 
+            // This view is about the parent relationship, not component kind
+            // — override the usual apex/lwc/html coloring with just two
+            // colors: the original traced component vs. everything above it.
+            const TARGET_STYLE = 'fill:#78350f,stroke:#fbbf24,stroke-width:3px,color:#fef3c7';
+            const ANCESTOR_STYLE = 'fill:#164e63,stroke:#22d3ee,stroke-width:2px,color:#cffafe';
             traceChainMode.nodes.forEach(n => {
                 // Mirrors the overview branch: a ghost (unloaded — e.g. its
                 // load failed) node gets exactly one definition, from the
@@ -2919,10 +2924,10 @@ export default class OrderDashboard extends LightningElement {
                     return;
                 }
                 def += `  ${safeId(n)}["${prefixForName(n)}${bareName(n)}"]\n`;
-                const style = styleForName(n);
-                if (style) def += `  style ${safeId(n)} ${style}\n`;
+                const isTarget = n === traceChainMode.rootComponentName;
+                def += `  style ${safeId(n)} ${isTarget ? TARGET_STYLE : ANCESTOR_STYLE}\n`;
             });
-            // The traced target itself gets highlighted via the existing
+            // The traced target itself also gets highlighted via the existing
             // .node-focused mechanism (see focusAndHighlight, called after
             // this view renders), same as clicking any class card — no need
             // for a separate style directive here.
