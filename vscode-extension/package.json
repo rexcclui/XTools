@@ -2,7 +2,7 @@
   "name": "apexflow",
   "displayName": "ApexFlow",
   "description": "Full ApexFlow experience inside VS Code — architecture map, Analyze Flow call graphs, and Trace Parents for Salesforce Apex/LWC/Java projects, backed by direct Node.js filesystem access instead of the browser's sandboxed File System Access API.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "apexflow",
   "private": true,
   "repository": {

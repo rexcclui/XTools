@@ -89,9 +89,30 @@ No build step — plain CommonJS, zero dependencies.
    workspace) and run **ApexFlow: Open Diagram**, or use the Trace Parents
    commands directly.
 
-To install it permanently without publishing, copy this folder into your VS
-Code extensions directory (`~/.vscode/extensions/apexflow` on macOS/Linux,
-`%USERPROFILE%\.vscode\extensions\apexflow` on Windows) and restart VS Code.
+To install it permanently without publishing, package a VSIX and install it:
+
+```bash
+npx @vscode/vsce package --no-dependencies
+code --install-extension apexflow-<version>.vsix --force
+```
+
+**Updating an installed build — do all three, in order:**
+
+1. **Bump `version` in `package.json` before packaging.** VS Code identifies
+   extensions as `publisher.name-version`; reinstalling a VSIX with the same
+   version as what's already installed can silently reuse the cached old code.
+   This is the #1 cause of "I reinstalled but nothing changed."
+2. **Run "Developer: Reload Window"** after installing — the old code keeps
+   running in the existing extension-host process until the window reloads.
+3. **Close and reopen any open ApexFlow tab** — a webview panel runs the
+   HTML/JS it was created with; a tab restored from before the update still
+   runs the old code even after a reload.
+
+Avoid also copying this folder into `~/.vscode/extensions/` manually — a
+folder copy and a VSIX install of the same extension ID coexist as two
+installs, and which one VS Code loads is effectively arbitrary. If you ever
+used the folder-copy method, delete that folder
+(`~/.vscode/extensions/apexflow`) and keep only the VSIX-managed one.
 
 ## What's verified vs. what to check when you try it
 
