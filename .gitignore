@@ -4,3 +4,5 @@
 node_modules/
 dist/
 .wrangler/
+vscode-extension/.sfdx/**
+vscode-extension/*.vsix

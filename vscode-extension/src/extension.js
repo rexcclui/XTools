@@ -50,10 +50,10 @@ function activate(context) {
     });
     context.subscriptions.push(treeView);
 
-    const output = vscode.window.createOutputChannel('ApexFlow Trace Parents');
+    const output = vscode.window.createOutputChannel('CodeGraph Apex/LWC Trace Parents');
     context.subscriptions.push(output);
 
-    // Full ApexFlow experience — architecture map, Analyze Flow, Trace
+    // Full CodeGraph Apex/LWC experience — architecture map, Analyze Flow, Trace
     // Parents, and every context-menu action, reusing the same webview UI as
     // the browser tool (public/apexflow.html) with its File System Access /
     // IndexedDB layer swapped for a bridge to this Node.js extension host.
@@ -81,7 +81,7 @@ function activate(context) {
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: 'ApexFlow: scanning workspace files',
+                title: 'CodeGraph Apex/LWC: scanning workspace files',
                 cancellable: false,
             },
             async (progressReporter) => {
@@ -107,13 +107,13 @@ function activate(context) {
             return;
         }
         if (!root) {
-            vscode.window.showWarningMessage('ApexFlow: open a project folder/workspace first.');
+            vscode.window.showWarningMessage('CodeGraph Apex/LWC: open a project folder/workspace first.');
             return;
         }
         try {
             await ensureIndex(root, false);
         } catch (e) {
-            vscode.window.showErrorMessage(`ApexFlow Trace Parents failed: ${e.message || e}`);
+            vscode.window.showErrorMessage(`CodeGraph Apex/LWC Trace Parents failed: ${e.message || e}`);
             return;
         }
         provider.setRoot(componentName, filePath || null);
@@ -129,7 +129,7 @@ function activate(context) {
         vscode.commands.registerCommand('apexflowTraceParents.traceFromFile', async (uri) => {
             const target = uri instanceof vscode.Uri ? uri : vscode.window.activeTextEditor?.document.uri;
             if (!target) {
-                vscode.window.showWarningMessage('ApexFlow: open or right-click a .js/.html file first.');
+                vscode.window.showWarningMessage('CodeGraph Apex/LWC: open or right-click a .js/.html file first.');
                 return;
             }
             const base = path.basename(target.fsPath).replace(/\.(js|html)$/i, '');
@@ -146,12 +146,12 @@ function activate(context) {
             const editor = vscode.window.activeTextEditor;
             const raw = editor ? editor.document.getText(editor.selection).trim() : '';
             if (!raw) {
-                vscode.window.showWarningMessage('ApexFlow: highlight a component name first, then right-click.');
+                vscode.window.showWarningMessage('CodeGraph Apex/LWC: highlight a component name first, then right-click.');
                 return;
             }
             const name = normalizeSelectedComponentName(raw);
             if (!name) {
-                vscode.window.showWarningMessage(`ApexFlow: couldn't find a component name in "${raw}".`);
+                vscode.window.showWarningMessage(`CodeGraph Apex/LWC: couldn't find a component name in "${raw}".`);
                 return;
             }
             await traceFrom(name, editor.document.uri.fsPath);
@@ -173,7 +173,7 @@ function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand('apexflowTraceParents.refresh', async () => {
             if (!provider.rootNode) {
-                vscode.window.showInformationMessage('ApexFlow: nothing traced yet — run "Trace Parents…" first.');
+                vscode.window.showInformationMessage('CodeGraph Apex/LWC: nothing traced yet — run "Trace Parents…" first.');
                 return;
             }
             const root = getWorkspaceRootFor(provider.rootNode.filePath);
@@ -181,7 +181,7 @@ function activate(context) {
             try {
                 await ensureIndex(root, true);
             } catch (e) {
-                vscode.window.showErrorMessage(`ApexFlow rescan failed: ${e.message || e}`);
+                vscode.window.showErrorMessage(`CodeGraph Apex/LWC rescan failed: ${e.message || e}`);
                 return;
             }
             provider.refresh();

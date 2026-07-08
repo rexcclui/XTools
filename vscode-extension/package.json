@@ -1,8 +1,8 @@
 {
-  "name": "apexflow",
-  "displayName": "ApexFlow",
-  "description": "Full ApexFlow experience inside VS Code — architecture map, Analyze Flow call graphs, and Trace Parents for Salesforce Apex/LWC/Java projects, backed by direct Node.js filesystem access instead of the browser's sandboxed File System Access API.",
-  "version": "0.2.2",
+  "name": "codegraph-apex-lwc",
+  "displayName": "CodeGraph Apex/LWC",
+  "description": "Full CodeGraph Apex/LWC experience inside VS Code — architecture map, Analyze Flow call graphs, and Trace Parents for Salesforce Apex/LWC/Java projects, backed by direct Node.js filesystem access instead of the browser's sandboxed File System Access API.",
+  "version": "0.2.3",
   "publisher": "xer100001",
   "repository": {
     "type": "git",
@@ -21,27 +21,27 @@
     "commands": [
       {
         "command": "apexflowFull.open",
-        "title": "ApexFlow: Open Diagram"
+        "title": "CodeGraph Apex/LWC: Open Diagram"
       },
       {
         "command": "apexflowFull.addFile",
-        "title": "ApexFlow: Add to Diagram"
+        "title": "CodeGraph Apex/LWC: Add to Diagram"
       },
       {
         "command": "apexflowTraceParents.traceFromFile",
-        "title": "ApexFlow: Trace Parents (this component)"
+        "title": "CodeGraph Apex/LWC: Trace Parents (this component)"
       },
       {
         "command": "apexflowTraceParents.traceSelection",
-        "title": "ApexFlow: Trace Parents (selected name)"
+        "title": "CodeGraph Apex/LWC: Trace Parents (selected name)"
       },
       {
         "command": "apexflowTraceParents.traceByName",
-        "title": "ApexFlow: Trace Parents…"
+        "title": "CodeGraph Apex/LWC: Trace Parents…"
       },
       {
         "command": "apexflowTraceParents.refresh",
-        "title": "ApexFlow: Rescan Workspace Files",
+        "title": "CodeGraph Apex/LWC: Rescan Workspace Files",
         "icon": "$(refresh)"
       }
     ],
@@ -92,14 +92,15 @@
       "explorer": [
         {
           "id": "apexflowTraceParentsView",
-          "name": "ApexFlow: Trace Parents (quick view)"
+          "name": "CodeGraph Apex/LWC: Trace Parents (quick view)",
+          "icon": "media/trace-parents-dark.svg"
         }
       ]
     },
     "viewsWelcome": [
       {
         "view": "apexflowTraceParentsView",
-        "contents": "For the full architecture map, Analyze Flow, and every diagram feature, run **ApexFlow: Open Diagram** from the Command Palette.\n[Open full diagram](command:apexflowFull.open)\n\nOr, for a quick lightweight lookup right here: right-click inside an open `.js`/`.html` file (with nothing selected) and choose **ApexFlow: Trace Parents (this component)**.\n[Trace by name](command:apexflowTraceParents.traceByName)"
+        "contents": "For the full architecture map, Analyze Flow, and every diagram feature, run **CodeGraph Apex/LWC: Open Diagram** from the Command Palette.\n[Open full diagram](command:apexflowFull.open)\n\nOr, for a quick lightweight lookup right here: right-click inside an open `.js`/`.html` file (with nothing selected) and choose **CodeGraph Apex/LWC: Trace Parents (this component)**.\n[Trace by name](command:apexflowTraceParents.traceByName)"
       }
     ]
   }
