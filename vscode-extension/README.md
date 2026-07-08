@@ -1,6 +1,6 @@
 # ApexFlow (VS Code extension)
 
-The full [ApexFlow](../public/apexflow.html) experience — architecture map,
+The full [ApexFlow](https://github.com/rexcclui/XTools/blob/main/public/apexflow.html) experience — architecture map,
 Analyze Flow call-graphs, Trace Parents, and every context-menu action —
 running inside VS Code instead of a browser tab, plus a lightweight
 Trace-Parents-only tree view for quick lookups without opening the diagram.

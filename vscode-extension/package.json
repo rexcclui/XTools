@@ -5,6 +5,11 @@
   "version": "0.2.0",
   "publisher": "apexflow",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rexcclui/XTools.git",
+    "directory": "vscode-extension"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
