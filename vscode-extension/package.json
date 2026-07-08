@@ -1,0 +1,70 @@
+{
+  "name": "apexflow-trace-parents",
+  "displayName": "ApexFlow: Trace Parents",
+  "description": "Reverse-dependency tracer for Salesforce LWC components — find every component that references a given one, climbing the ancestor chain up to the root.",
+  "version": "0.1.0",
+  "publisher": "apexflow",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "apexflowTraceParents.traceFromFile",
+        "title": "ApexFlow: Trace Parents (this component)"
+      },
+      {
+        "command": "apexflowTraceParents.traceByName",
+        "title": "ApexFlow: Trace Parents…"
+      },
+      {
+        "command": "apexflowTraceParents.refresh",
+        "title": "ApexFlow: Rescan Workspace Files",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "apexflowTraceParents.traceFromFile",
+          "when": "resourceExtname == .js || resourceExtname == .html",
+          "group": "apexflow"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "apexflowTraceParents.traceFromFile",
+          "when": "resourceExtname == .js || resourceExtname == .html",
+          "group": "apexflow"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "apexflowTraceParents.refresh",
+          "when": "view == apexflowTraceParentsView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "apexflowTraceParentsView",
+          "name": "ApexFlow: Trace Parents"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "apexflowTraceParentsView",
+        "contents": "Right-click a `.js` or `.html` LWC file and choose **ApexFlow: Trace Parents (this component)**.\n[Trace by name instead](command:apexflowTraceParents.traceByName)\nExpand a node in the tree to climb one generation further up the ancestor chain."
+      }
+    ]
+  }
+}
