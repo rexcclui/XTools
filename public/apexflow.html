@@ -581,12 +581,16 @@ body.has-intro .btn-toggle{top:46px}
     let tooltipInteractionGuardUntil = 0;
     let tooltipFontSize = 14; // Default font size in pixels
     let currentTooltipMode = 'code'; // 'code', 'js', or 'html'
-    let referenceLookupData = { componentName: null, references: [] };
+    let referenceLookupData = { componentName: null, references: [], source: null };
     // Full js/html text scanned by the most recent Trace Parents run, keyed by
     // bare component name — lets "Load Selected" load an ancestor that Trace
     // Parents found via a raw tree walk even when it's absent from
     // feState.lwcIndex (non-standard layout, stale index, etc).
     let lastTraceFileIndex = null;
+    // parent/child edges from the most recent Trace Parents run — used to hide
+    // every OTHER dependency of a newly-loaded ancestor so the diagram shows
+    // only the traced chain, not each ancestor's full unrelated dependency set.
+    let lastTraceEdges = null;
     let htmlReferenceIndex = new Map();
     let htmlReferenceIndexBuildPromise = null;
     let htmlReferenceIndexVersion = 0;
@@ -3499,10 +3503,13 @@ export default class OrderDashboard extends LightningElement {
 
     // Renders `referenceLookupData` (already populated by the caller) into the
     // shared reference-lookup modal, wiring up the same checkbox / Load Selected
-    // flow used by "Lookup Reference" and "Trace Parents".
-    function populateReferenceModal(title, componentName, references) {
+    // flow used by "Lookup Reference" and "Trace Parents". `source` tags which
+    // caller populated it so loadSelectedReferences knows whether to prune a
+    // freshly-loaded ancestor's unrelated edges afterward (Trace Parents only).
+    function populateReferenceModal(title, componentName, references, source = null) {
         referenceLookupData.componentName = componentName;
         referenceLookupData.references = references;
+        referenceLookupData.source = source;
 
         const titleEl = document.getElementById('reference-modal-title');
         if (titleEl) titleEl.textContent = title;
@@ -3542,6 +3549,9 @@ export default class OrderDashboard extends LightningElement {
     }
 
     async function showReferenceLookup(jsComponentName) {
+        // A plain reference lookup, not a trace — don't let a leftover trace
+        // chain from an earlier Trace Parents run affect what gets pruned below.
+        lastTraceEdges = null;
         await showLoadingStatus(`Searching references for ${jsComponentName}…`);
         let references = [];
         let debug = null;
@@ -3627,12 +3637,44 @@ export default class OrderDashboard extends LightningElement {
         return true;
     }
 
+    // After Trace Parents loads its ancestors, hide every edge/ghost-node from
+    // each newly-loaded ancestor EXCEPT the one that's actually part of the
+    // traced chain — otherwise the normal architecture-map rendering would also
+    // draw that ancestor's other, unrelated dependencies, cluttering the
+    // diagram with things the user never asked to explore. Reuses the same
+    // per-parent edge-hide mechanism as the right-click "Hide Children" action.
+    function pruneNonTraceEdges(edges) {
+        if (!edges || !edges.length) return;
+
+        const keepByParent = new Map(); // parentName -> Set(bare child names to keep)
+        edges.forEach(e => {
+            if (!registry[e.parent]) return; // ancestor wasn't (or couldn't be) loaded
+            if (!keepByParent.has(e.parent)) keepByParent.set(e.parent, new Set());
+            keepByParent.get(e.parent).add(bareComponentName(e.child));
+        });
+
+        keepByParent.forEach((keepSet, parentName) => {
+            const buckets = getChildrenByKind(parentName);
+            const allChildren = [...buckets.js, ...buckets.apex, ...buckets.html];
+            const keptChildren = allChildren.filter(c => keepSet.has(bareComponentName(c)));
+            // If the traced edge isn't among this parent's recognized children
+            // (e.g. an import style the core parser doesn't classify as an LWC
+            // edge), don't hide anything — better to show extra edges than to
+            // accidentally hide the one edge the trace was for.
+            if (keptChildren.length === 0) return;
+            const toHide = allChildren.filter(c => !keepSet.has(bareComponentName(c)));
+            if (toHide.length) toggleChildEdges(parentName, toHide, true);
+        });
+    }
+
     async function loadSelectedReferences() {
         const selected = referenceLookupData.references.filter(r => r.selected);
         if (selected.length === 0) {
             alert('Please select at least one component to load');
             return;
         }
+
+        const isTraceLoad = referenceLookupData.source === 'trace-parents';
 
         await showLoadingStatus(`Loading ${selected.length} referenced component${selected.length > 1 ? 's' : ''}…`);
         try {
@@ -3647,14 +3689,15 @@ export default class OrderDashboard extends LightningElement {
             }
         });
 
-        render();
+        await render();
+        if (isTraceLoad) pruneNonTraceEdges(lastTraceEdges);
         renderFileTree();
         closeReferenceLookup();
     }
 
     function closeReferenceLookup() {
         document.getElementById('reference-lookup-modal').classList.remove('visible');
-        referenceLookupData = { componentName: null, references: [] };
+        referenceLookupData = { componentName: null, references: [], source: null };
     }
 
     // ── TRACE PARENTS ───────────────────────────────────────────────────────
@@ -3877,10 +3920,12 @@ export default class OrderDashboard extends LightningElement {
             };
         });
 
+        lastTraceEdges = result.edges;
         populateReferenceModal(
             `Ancestors of ${componentName} — ${result.orderedParents.length} found across ${result.generations} generation${result.generations === 1 ? '' : 's'}`,
             componentName,
-            references
+            references,
+            'trace-parents'
         );
     }
 
