@@ -3795,13 +3795,21 @@ export default class OrderDashboard extends LightningElement {
     // count parents (the very bug this exists to avoid), and a full pass up
     // front lets every generation of the BFS reuse the same in-memory text
     // instead of re-reading files from disk per hop.
+    // Only used as a fallback when feState.tree isn't available (buildTraceParentsFileIndex
+    // prefers the tree already built by loadDirHandle). Mirrors buildHandleTree's approach —
+    // snapshot a directory's entries, then fan its subdirectories out via Promise.all — instead
+    // of recursing into one subdirectory at a time, which serializes the whole walk.
     async function collectSourceFilesFromDirHandle(dirHandle, extensions) {
         const out = [];
         if (!dirHandle || dirHandle.kind !== 'directory') return out;
         const exts = extensions.map(e => e.toLowerCase());
 
         async function walk(handle, curPath) {
-            for await (const [name, entry] of handle.entries()) {
+            const entries = [];
+            for await (const entry of handle.entries()) entries.push(entry);
+
+            const subWalks = [];
+            for (const [name, entry] of entries) {
                 const nextPath = curPath ? `${curPath}/${name}` : name;
                 if (entry.kind === 'file') {
                     const lower = name.toLowerCase();
@@ -3809,8 +3817,9 @@ export default class OrderDashboard extends LightningElement {
                     continue;
                 }
                 if (LWC_SKIP_DIRS.has(name) || name.startsWith('.')) continue;
-                await walk(entry, nextPath);
+                subWalks.push(walk(entry, nextPath));
             }
+            await Promise.all(subWalks);
         }
 
         await walk(dirHandle, dirHandle.name || '');
@@ -3818,22 +3827,25 @@ export default class OrderDashboard extends LightningElement {
     }
 
     async function buildTraceParentsFileIndex() {
-        let files = [];
-        if (feState.dirHandle) {
+        // feState.tree is already a complete walk of the project (built once
+        // when the folder was opened, and cached in IndexedDB across sessions)
+        // — reuse it instead of re-walking the live directory handle, which
+        // just repeats that same work, slower, on every single trace.
+        let files = feState.tree ? flatFiles(feState.tree).filter(f => /\.(js|html)$/i.test(f.name || '')) : [];
+        if (!files.length && feState.dirHandle) {
             try {
                 files = await collectSourceFilesFromDirHandle(feState.dirHandle, ['.js', '.html']);
             } catch (e) {
-                console.warn('Trace Parents: live directory scan failed, falling back to cached tree', e);
+                console.warn('Trace Parents: live directory scan failed', e);
             }
-        }
-        if (!files.length && feState.tree) {
-            files = flatFiles(feState.tree).filter(f => /\.(js|html)$/i.test(f.name || ''));
         }
 
         const jsTextByName = new Map();   // bare component name -> { text, folderPath }
         const htmlTextByName = new Map();
         const total = files.length;
         let cursor = 0;
+        let completed = 0;
+        let lastReportAt = 0;
         // Bypasses the shared single-file-at-a-time read queue (see
         // readHandleTextFast) so this scan gets real concurrency instead of
         // serializing behind it — the difference between seconds and minutes
@@ -3858,6 +3870,12 @@ export default class OrderDashboard extends LightningElement {
                     map.set(base, { text: existing ? `${existing.text}\n${text}` : text, folderPath: existing?.folderPath || folderPath });
                 } catch (e) {
                     // unreadable file — skip, don't fail the whole scan
+                }
+                completed++;
+                const now = performance.now();
+                if (now - lastReportAt >= 150) {
+                    lastReportAt = now;
+                    showLoadingStatus(`Tracing parents… reading files ${completed.toLocaleString()}/${total.toLocaleString()}`);
                 }
             }
         };
