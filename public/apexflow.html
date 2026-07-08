@@ -1747,7 +1747,10 @@ export default class OrderDashboard extends LightningElement {
 
     function scheduleSmallFolderPrefetch() {
         if (feState.disableAutoLoadForSlowReads || !feState.tree) return;
-        const files = flatFiles(feState.tree).filter(isSourceFile);
+        // flatFiles returns node objects, isSourceFile expects a name string —
+        // passing the bare function to filter threw "name.toLowerCase is not a
+        // function" and silently aborted the tail of the folder-open flow.
+        const files = flatFiles(feState.tree).filter(f => isSourceFile(f.name || ''));
         if (files.length === 0 || files.length > 10) return;
         scheduleTextCachePrefetch(files, 1600);
     }
