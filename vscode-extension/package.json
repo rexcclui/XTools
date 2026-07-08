@@ -48,11 +48,6 @@
           "command": "apexflowFull.open",
           "when": "resourceExtname == .js || resourceExtname == .html || resourceExtname == .cls || resourceExtname == .java",
           "group": "apexflow@1"
-        },
-        {
-          "command": "apexflowTraceParents.traceFromFile",
-          "when": "resourceExtname == .js || resourceExtname == .html",
-          "group": "apexflow@2"
         }
       ],
       "editor/context": [
@@ -91,7 +86,7 @@
     "viewsWelcome": [
       {
         "view": "apexflowTraceParentsView",
-        "contents": "For the full architecture map, Analyze Flow, and every diagram feature, run **ApexFlow: Open Diagram** from the Command Palette.\n[Open full diagram](command:apexflowFull.open)\n\nOr, for a quick lightweight lookup right here: right-click a `.js`/`.html` LWC file and choose **ApexFlow: Trace Parents (this component)**.\n[Trace by name](command:apexflowTraceParents.traceByName)"
+        "contents": "For the full architecture map, Analyze Flow, and every diagram feature, run **ApexFlow: Open Diagram** from the Command Palette.\n[Open full diagram](command:apexflowFull.open)\n\nOr, for a quick lightweight lookup right here: right-click inside an open `.js`/`.html` file (with nothing selected) and choose **ApexFlow: Trace Parents (this component)**.\n[Trace by name](command:apexflowTraceParents.traceByName)"
       }
     ]
   }
