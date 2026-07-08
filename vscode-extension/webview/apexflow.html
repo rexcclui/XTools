@@ -540,7 +540,7 @@ body.has-intro .btn-toggle{top:46px}
     </div>
     <div id="class-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
         <div id="registry-list"></div>
-        <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()" title="Reload the page and clear every loaded class and component">Clear All</button></div>
+        <div style="padding:15px;"><button class="btn" style="width:100%" onclick="location.reload()" title="Reload the page and clear every loaded class and component"><i class="fa-solid fa-broom"></i> Clear All</button></div>
     </div>
     <div id="method-picker">
         <div id="method-picker-header">
@@ -2336,6 +2336,7 @@ export default class OrderDashboard extends LightningElement {
             if(panZoomInstance) {
                 panZoomInstance.resize();
                 panZoomInstance.fit();
+                if (panZoomInstance.getZoom() > 3) panZoomInstance.zoom(3); // see render()'s svgPanZoom init for why
                 panZoomInstance.center();
             }
         }, 410);
@@ -3125,7 +3126,14 @@ export default class OrderDashboard extends LightningElement {
                     zoomEnabled: true,
                     dblClickZoomEnabled: false,
                     fit: false,
-                    center: false
+                    center: false,
+                    // fit() below zooms a diagram up to fill the whole panel
+                    // regardless of how few nodes it has — fine for a big
+                    // Architecture Map, but a small diagram (e.g. a short
+                    // Trace Parents chain) would get blown up to fill the
+                    // same space, magnifying node text along with it. Cap how
+                    // far fit() is allowed to zoom in.
+                    maxZoom: 3
                 });
                 requestAnimationFrame(() => {
                     if (!panZoomInstance) return;
@@ -3135,6 +3143,9 @@ export default class OrderDashboard extends LightningElement {
                         panZoomInstance.pan(savedPanZoom.pan);
                     } else {
                         panZoomInstance.fit();
+                        // Belt-and-suspenders: some svg-pan-zoom versions don't
+                        // clamp fit() to maxZoom, only interactive zooming.
+                        if (panZoomInstance.getZoom() > 3) panZoomInstance.zoom(3);
                         panZoomInstance.center();
                     }
                 });
@@ -3293,6 +3304,78 @@ export default class OrderDashboard extends LightningElement {
             }
         }
         return null;
+    }
+
+    function getApexFilePath(className) {
+        const rec = feState.apexIndex?.get(className);
+        return rec?.handle?.__vfsPath || null;
+    }
+
+    function getLwcFilePath(componentName, which) {
+        const lwc = feState.lwcIndex?.get(componentName) || feState.lwcIndex?.get(bareComponentName(componentName));
+        if (!lwc) return null;
+        const handle = which === 'html' ? lwc.htmlHandle : lwc.jsHandle;
+        return handle?.__vfsPath || null;
+    }
+
+    // Best-effort: resolve the real file(s) (and 0-indexed line, if known)
+    // backing a loaded class/component, so View Code / View Source can open
+    // it directly in a VS Code editor tab instead of the in-page viewer that
+    // was built for the browser tool (which has no such option). Returns null
+    // when it can't be resolved — e.g. an auto-loaded relative-import child
+    // (kind 'lwcChild') isn't in feState.lwcIndex, only top-level bundles
+    // discovered during the folder walk are — so callers can fall back to the
+    // original modal/tooltip rather than silently doing nothing.
+    function resolveOpenTarget(className, methodName) {
+        const entry = registry[className];
+        if (!entry) return null;
+
+        if (entry.kind === 'apex') {
+            const filePath = getApexFilePath(className);
+            if (!filePath) return null;
+            let line = null;
+            if (methodName && entry.methods?.[methodName]) {
+                const idx = entry.raw.indexOf(entry.methods[methodName]);
+                if (idx >= 0) line = entry.raw.slice(0, idx).split('\n').length - 1;
+            }
+            return { files: [{ path: filePath, line }] };
+        }
+
+        // LWC / lwcChild
+        const jsPath = getLwcFilePath(className, 'js');
+        const htmlPath = getLwcFilePath(className, 'html');
+        if (!jsPath && !htmlPath) return null;
+
+        if (!methodName) {
+            // View Source: open every file that exists — JS first, HTML beside it.
+            const files = [];
+            if (jsPath) files.push({ path: jsPath, line: null });
+            if (htmlPath) files.push({ path: htmlPath, line: null });
+            return { files };
+        }
+
+        // View Code for a specific method/import — figure out which file it's
+        // actually in (a JS import/usage vs. an HTML template reference).
+        const body = entry.methods?.[methodName];
+        if (body) {
+            if (jsPath && entry.jsContent && entry.jsContent.includes(body)) {
+                const idx = entry.jsContent.indexOf(body);
+                return { files: [{ path: jsPath, line: entry.jsContent.slice(0, idx).split('\n').length - 1 }] };
+            }
+            if (htmlPath && entry.htmlContent && entry.htmlContent.includes(body)) {
+                const idx = entry.htmlContent.indexOf(body);
+                return { files: [{ path: htmlPath, line: entry.htmlContent.slice(0, idx).split('\n').length - 1 }] };
+            }
+        }
+        // Fall back to just opening whichever file exists, no specific line.
+        return { files: [{ path: jsPath || htmlPath, line: null }] };
+    }
+
+    async function openResolvedTarget(resolved) {
+        for (let i = 0; i < resolved.files.length; i++) {
+            const f = resolved.files[i];
+            await vfsRequest('openFile', { path: f.path, line: f.line, viewColumn: i === 0 ? 'active' : 'beside' });
+        }
     }
 
     // Open the loaded node's full source in the existing draggable code panel,
@@ -4914,11 +4997,23 @@ export default class OrderDashboard extends LightningElement {
             showChildrenEl.style.display = 'none';
         }
 
-        // View Code option — only if method body exists
+        // View Code option — only if method body exists. Opens the real file
+        // at the right line in a VS Code editor tab when it can be resolved;
+        // falls back to the original in-page code panel otherwise (e.g. an
+        // auto-loaded relative-import child with no indexed file path).
         const hasCode = className && methodName && registry[className]?.methods?.[methodName];
         document.getElementById('ctx-view-code').style.display = hasCode ? 'flex' : 'none';
-        document.getElementById('ctx-view-code').onclick = () => {
+        document.getElementById('ctx-view-code').onclick = async () => {
             hideNodeContextMenu();
+            const resolved = resolveOpenTarget(className, methodName);
+            if (resolved) {
+                try {
+                    await openResolvedTarget(resolved);
+                    return;
+                } catch (err) {
+                    console.warn('ApexFlow: failed to open in VS Code, falling back to inline viewer', err);
+                }
+            }
             document.getElementById('tooltip-title').textContent = `${className}.${methodName}()`;
             document.getElementById('tooltip-code').textContent = registry[className].methods[methodName];
             Prism.highlightElement(document.getElementById('tooltip-code'));
@@ -4929,12 +5024,26 @@ export default class OrderDashboard extends LightningElement {
             tooltipInteractionGuardUntil = Date.now() + 300; // prevent immediate dismiss
         };
 
-        // Source option — only for loaded nodes. Opens the full file in the big modal.
+        // Source option — only for loaded nodes. Opens the real file(s) (both
+        // .js and .html for LWC) in VS Code editor tabs when resolvable,
+        // falling back to the original big in-page modal otherwise.
         const sourceTarget = resolvedClassName && registry[resolvedClassName]?.raw !== undefined ? resolvedClassName : null;
         const ctxViewSource = document.getElementById('ctx-view-source');
         if (sourceTarget) {
             ctxViewSource.style.display = 'flex';
-            ctxViewSource.onclick = () => { hideNodeContextMenu(); showSourceModal(sourceTarget); };
+            ctxViewSource.onclick = async () => {
+                hideNodeContextMenu();
+                const resolved = resolveOpenTarget(sourceTarget, null);
+                if (resolved) {
+                    try {
+                        await openResolvedTarget(resolved);
+                        return;
+                    } catch (err) {
+                        console.warn('ApexFlow: failed to open source in VS Code, falling back to modal', err);
+                    }
+                }
+                showSourceModal(sourceTarget);
+            };
         } else {
             ctxViewSource.style.display = 'none';
         }

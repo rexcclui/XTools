@@ -87,6 +87,24 @@ function activateFullWebview(context, output) {
                     reply({ path: picked[0].fsPath, name: path.basename(picked[0].fsPath) });
                     break;
                 }
+                case 'openFile': {
+                    // View Code / View Source: open the real file in a genuine
+                    // VS Code editor tab instead of the in-page code viewer —
+                    // that viewer was built for the browser tool, which has no
+                    // such option; here we do, so use it.
+                    const doc = await vscode.workspace.openTextDocument(msg.path);
+                    const editor = await vscode.window.showTextDocument(doc, {
+                        viewColumn: msg.viewColumn === 'beside' ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active,
+                        preview: true,
+                    });
+                    if (typeof msg.line === 'number' && msg.line >= 0) {
+                        const pos = new vscode.Position(msg.line, 0);
+                        editor.selection = new vscode.Selection(pos, pos);
+                        editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+                    }
+                    reply(true);
+                    break;
+                }
                 default:
                     reply(null);
             }
