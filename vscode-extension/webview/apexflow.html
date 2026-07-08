@@ -549,7 +549,7 @@ body.has-intro .btn-toggle{top:46px}
         <div id="registry-list"></div>
         <div style="padding:15px; display:flex; gap:8px;">
             <button class="btn" style="flex:1" onclick="reindexFolder()" title="Re-scan the project — pick this up if files changed on disk since the diagram opened"><i class="fa-solid fa-rotate"></i> Reindex</button>
-            <button class="btn" style="flex:1" onclick="location.reload()" title="Reload the page and clear every loaded class and component"><i class="fa-solid fa-broom"></i> Clear All</button>
+            <button class="btn" style="flex:1" onclick="clearAllComponents()" title="Remove every loaded class and component from the diagram (the folder index is kept)"><i class="fa-solid fa-broom"></i> Clear All</button>
         </div>
     </div>
     <div id="method-picker">
@@ -1982,6 +1982,32 @@ export default class OrderDashboard extends LightningElement {
             feState.loadedNames.delete(`${name}.cls`);
             feState.loadedNames.delete(`${name}.java`);
         }
+    }
+
+    // Clears every loaded component and all per-diagram view state, without
+    // reloading the page. In this webview a location.reload() (the browser
+    // tool's approach) would re-run the init handshake and immediately
+    // auto-load the workspace + right-clicked file back in — the opposite of
+    // clearing. The folder index (feState.tree/lwcIndex/apexIndex) is kept:
+    // it describes what's on disk, not what's loaded into the diagram.
+    function clearAllComponents() {
+        Object.keys(registry).forEach(name => delete registry[name]);
+        innerClassNames.clear();
+        feState.loadedNames = new Set();
+        hiddenClasses = new Set();
+        hiddenChildEdges = new Set();
+        collapsedMethods = new Set();
+        collapsedNodes = new Set();
+        activeMethods = new Set();
+        focusedClass = null;
+        selectedClassName = null;
+        traceChainMode = null;
+        lastTraceEdges = null;
+        document.getElementById('class-panel').style.display = '';
+        document.getElementById('method-picker').classList.remove('visible');
+        hideCodeTooltip();
+        render();
+        renderFileTree();
     }
 
     function renderFileTree() {
@@ -5340,7 +5366,7 @@ export default class OrderDashboard extends LightningElement {
         <div class="hlp-row"><span class="hlp-key">Search files</span><span class="hlp-desc">Type in the "Search files…" box to filter the file tree; ↑↓ to navigate, Enter to load</span></div>
         <div class="hlp-row"><span class="hlp-key">Drag file</span><span class="hlp-desc">Drag a file from the explorer to the diagram area to load it without clicking</span></div>
         <div class="hlp-row"><span class="hlp-key">Esc</span><span class="hlp-desc">Close this help panel, the code viewer, or any open context menu</span></div>
-        <div class="hlp-row"><span class="hlp-key">Clear All</span><span class="hlp-desc">The "Clear All" button in the sidebar reloads the page and resets all loaded classes</span></div>
+        <div class="hlp-row"><span class="hlp-key">Clear All</span><span class="hlp-desc">The "Clear All" button in the sidebar removes every loaded class/component from the diagram; the folder index is kept so files can be re-loaded instantly</span></div>
       </div>
     </div>
   </div>
