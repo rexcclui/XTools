@@ -24,6 +24,10 @@
         "title": "ApexFlow: Trace Parents (this component)"
       },
       {
+        "command": "apexflowTraceParents.traceSelection",
+        "title": "ApexFlow: Trace Parents (selected name)"
+      },
+      {
         "command": "apexflowTraceParents.traceByName",
         "title": "ApexFlow: Trace Parents…"
       },
@@ -43,8 +47,13 @@
       ],
       "editor/context": [
         {
+          "command": "apexflowTraceParents.traceSelection",
+          "when": "editorHasSelection && (resourceExtname == .js || resourceExtname == .html)",
+          "group": "apexflow"
+        },
+        {
           "command": "apexflowTraceParents.traceFromFile",
-          "when": "resourceExtname == .js || resourceExtname == .html",
+          "when": "!editorHasSelection && (resourceExtname == .js || resourceExtname == .html)",
           "group": "apexflow"
         }
       ],

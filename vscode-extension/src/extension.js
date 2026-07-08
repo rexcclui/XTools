@@ -6,6 +6,42 @@ const { FileIndex } = require('./traceParents');
 const { TraceParentsProvider } = require('./parentsTreeProvider');
 const { activateFullWebview } = require('./fullWebview');
 
+function kebabToCamel(s) {
+    return s.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
+}
+
+// A user might highlight any of several shapes and expect the same result:
+//   rm_resourceAvailabilityTile                       (bare name)
+//   'c/rm_resourceAvailabilityTile'                    (quoted import path)
+//   <c-rm_resource-availability-tile>                  (copied template tag)
+//   rm_resource-availability-tile                      (just the kebab part)
+// Falls back to the raw trimmed selection if none of these patterns match,
+// so an unrecognized-but-plausible selection still gets tried as-is.
+function normalizeSelectedComponentName(raw) {
+    let s = String(raw || '').trim();
+    if (!s) return null;
+
+    const importMatch = s.match(/['"][\w]+\/([\w]+)['"]/);
+    if (importMatch) return importMatch[1];
+
+    const tagMatch = s.match(/<\/?[\w]+-([\w-]+)>?/);
+    if (tagMatch) return kebabToCamel(tagMatch[1]);
+
+    s = s.replace(/^['"]|['"]$/g, '').trim();
+    if (s.includes('/')) s = s.split('/').pop();
+    if (/-/.test(s)) s = kebabToCamel(s);
+
+    // A real component name is a single identifier — if the selection was a
+    // whole line/statement, take the longest identifier-like token in it
+    // rather than failing outright.
+    if (!/^[\w]+$/.test(s)) {
+        const tokens = s.match(/[A-Za-z_][\w]*/g) || [];
+        if (!tokens.length) return null;
+        s = tokens.reduce((a, b) => (b.length > a.length ? b : a));
+    }
+    return s || null;
+}
+
 function activate(context) {
     const fileIndexHolder = { current: null };
     const provider = new TraceParentsProvider(fileIndexHolder);
@@ -98,6 +134,27 @@ function activate(context) {
             }
             const base = path.basename(target.fsPath).replace(/\.(js|html)$/i, '');
             await traceFrom(base, target.fsPath);
+        })
+    );
+
+    // "Highlight a class/component name, right-click, trace THAT name" — not
+    // the file it happens to be written in. Handles the common shapes a
+    // selection might take: a bare name, a quoted import path ('c/Name'), or
+    // a copied <c-name> / <ns-name> template tag.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('apexflowTraceParents.traceSelection', async () => {
+            const editor = vscode.window.activeTextEditor;
+            const raw = editor ? editor.document.getText(editor.selection).trim() : '';
+            if (!raw) {
+                vscode.window.showWarningMessage('ApexFlow: highlight a component name first, then right-click.');
+                return;
+            }
+            const name = normalizeSelectedComponentName(raw);
+            if (!name) {
+                vscode.window.showWarningMessage(`ApexFlow: couldn't find a component name in "${raw}".`);
+                return;
+            }
+            await traceFrom(name, editor.document.uri.fsPath);
         })
     );
 
