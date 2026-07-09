@@ -1,0 +1,2488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Salesforce Apex Debug Log Parser — Salesforce Apex Debug Log Parser, Analyzer &amp; Tracer</title>
+  <meta name="description" content="Free online Salesforce Apex debug log parser, analyzer and stack tracer. A debug log tool that traces the Apex call stack as a collapsible call tree, with SOQL and DML breakdown, exceptions, method timings, multi-log tabs, search and highlighting. Paste or drop a raw log — private, runs entirely in your browser.">
+  <link rel="canonical" href="https://apexdebug.trendx.uk/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Salesforce Apex Debug Log Parser">
+  <meta property="og:title" content="Salesforce Apex Debug Log Parser — Salesforce Apex Debug Log Parser, Analyzer &amp; Tracer">
+  <meta property="og:description" content="Paste or drop a Salesforce Apex debug log and explore its call tree, SOQL queries, DML and exceptions instantly — free and fully in-browser.">
+  <meta property="og:url" content="https://apexdebug.trendx.uk/">
+  <meta property="og:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://apexdebug.trendx.uk/sample-sf-debug-viewer.jpg">
+  <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Salesforce Apex Debug Log Parser","url":"https://apexdebug.trendx.uk/","applicationCategory":"DeveloperApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"featureList":["Collapsible Apex call tree","SOQL and DML breakdown","Exception highlighting","Method timings and performance view","Multi-log tabs","Full-text search and custom highlighting"],"keywords":"salesforce apex debug log analyzer, apex debug log analyzer, apex debug log inspector, apex debug log parser, apex debug log viewer, salesforce debug log tool, apex debug log tracer, apex debug log stack tracer, apex debug tools, apex log parser online, salesforce log analyzer, soql dml profiler, apex call tree viewer, debug log reader, salesforce log viewer, apex log viewer online, apex exception viewer, apex stack trace viewer, read apex debug log, apex performance analysis, soql dml count, salesforce developer log tool, apex log timing analysis","description":"Online Apex debug log analyzer for Salesforce with collapsible call tree, SOQL and DML breakdown, exception highlighting and multi-log search. Runs entirely in the browser; logs never leave your machine."}
+  </script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iIzBkMTExNyIvPjx0ZXh0IHg9IjE2IiB5PSIyMiIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiMzODhiZmQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlNGPC90ZXh0Pjwvc3ZnPg=="/>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    #root { height: 100vh; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <!-- The marketing intro banner (links to the browser tools) from
+       public/sf-debug-viewer.html is removed in the VS Code extension —
+       inside an editor tab it's just lost vertical space. -->
+  <div id="root"></div>
+  <script>
+// ── VS CODE HOST BRIDGE ───────────────────────────────────────────────────────
+// This file is the same sf-debug-viewer.html from the browser tool, run inside
+// a VS Code webview instead of a browser tab. Almost none of it needed to
+// change: log parsing, the call tree, tabs, search, and highlighting have no
+// file-system dependency at all. Only the narrow slice that talked to the
+// browser's File System Access API (picking/walking a source folder for the
+// "View Source" snippet popups) is replaced here — with calls proxied to the
+// extension host, which reads the real filesystem directly via Node's fs.
+// The host additionally pushes log files in ({type:'openLog'}) so "right-click
+// a .log file → Open in Apex Debug Log Parser" can land straight in a tab.
+const vscodeApi = acquireVsCodeApi();
+let __vfsReqSeq = 0;
+const __vfsPending = new Map();
+
+function vfsRequest(type, payload) {
+  return new Promise((resolve, reject) => {
+    const reqId = ++__vfsReqSeq;
+    __vfsPending.set(reqId, { resolve, reject });
+    vscodeApi.postMessage(Object.assign({ type, reqId }, payload));
+  });
+}
+
+// Fired once per webview load, right after the extension host confirms which
+// workspace folder is open: auto-index its Apex classes/triggers so snippet
+// popups work immediately, replacing the browser tool's manual
+// showDirectoryPicker() flow (the "📂 Source" button still lets you point at
+// a different folder — it just opens VS Code's native picker now).
+async function onHostInit(msg) {
+  if (!msg.path || !window.__applyHostSourceScan) return;
+  try {
+    const res = await vfsRequest('scanSource', { path: msg.path });
+    if (res && res.files && res.files.length) window.__applyHostSourceScan(res);
+  } catch (e) {
+    console.warn('[ApexDebug bridge] workspace source scan failed', e);
+  }
+}
+
+window.addEventListener('message', (event) => {
+  const msg = event.data;
+  if (!msg) return;
+  if (msg.type === 'init') { onHostInit(msg); return; }
+  if (msg.type === 'openLog') {
+    // Pushed by the host for "Open in Apex Debug Log Parser" on a .log file.
+    if (window.__analyzer) window.__analyzer.openLog(msg.name, msg.text);
+    return;
+  }
+  if (msg.reqId && __vfsPending.has(msg.reqId)) {
+    const { resolve, reject } = __vfsPending.get(msg.reqId);
+    __vfsPending.delete(msg.reqId);
+    if (msg.error) reject(new Error(msg.error));
+    else resolve(msg.result);
+  }
+});
+
+// Dragging a file from VS Code's real Explorer (or an editor tab) sets
+// text/uri-list — a newline-separated list of file:// URIs — rather than
+// e.dataTransfer.files, which is only populated when dragging an actual OS
+// file in from outside VS Code entirely. The drop handler below calls this
+// first so both kinds of drag open the log.
+function __openDroppedUriList(uriList) {
+  const paths = String(uriList || '').split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l && !l.startsWith('#') && l.startsWith('file://'))
+    .map(l => {
+      let p = decodeURIComponent(l.replace(/^file:\/\//, ''));
+      if (/^\/[A-Za-z]:\//.test(p)) p = p.slice(1); // windows /C:/… → C:/…
+      return p;
+    });
+  if (!paths.length) return false;
+  paths.forEach(p => {
+    vfsRequest('readFile', { path: p })
+      .then(text => { if (window.__analyzer) window.__analyzer.openLog(p.split(/[\\/]/).pop(), text); })
+      .catch(err => console.error('[ApexDebug bridge] failed to read dropped file', p, err));
+  });
+  return true;
+}
+
+// ─── CSS ──────────────────────────────────────────────────────────────────────
+const CSS = `
+.sda{--bg:#0d1117;--b2:#161b22;--b3:#21262d;--bd:#30363d;--tx:#c9d1d9;--dm:#8b949e;--vd:#484f58;--ac:#388bfd;--log-w:50%;display:flex;flex-direction:column;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--tx)}
+.sda *,.sda *::before,.sda *::after{box-sizing:border-box;margin:0;padding:0}
+.sda button{cursor:pointer;font-size:12px;font-family:inherit}
+.sda input{font-family:inherit}
+.hdr{background:var(--b2);border-bottom:1px solid var(--bd);padding:6px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.hdr-title{font-size:14px;font-weight:600;color:#e6edf3;white-space:nowrap;margin-right:4px}
+.g-search{flex:1;min-width:160px;max-width:280px;padding:4px 9px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--tx);font-size:12px;outline:none}
+.g-search:focus{border-color:var(--ac)}
+.hl-slots{display:flex;gap:4px;align-items:center}
+.hl-slot{display:flex;align-items:center;gap:2px;background:var(--b3);border:1px solid var(--bd);border-radius:5px;padding:2px 5px}
+.hl-dot{width:11px;height:11px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;padding:0}
+.hl-input{width:90px;background:transparent;border:none;color:var(--tx);font-size:11px;outline:none}
+.hl-clr{background:none;border:none;color:var(--vd);font-size:11px;line-height:1;padding:0 1px}
+.hl-clr:hover{color:var(--tx)}
+.hl-nav{display:none;background:none;border:none;color:var(--vd);font-size:9px;line-height:1;padding:0 1px;cursor:pointer}
+.hl-nav:hover{color:var(--tx)}
+.hl-slot.active-slot .hl-nav{display:inline}
+.hl-count{display:none;font-size:10px;color:var(--vd);min-width:18px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
+.hl-slot.active-slot .hl-count{display:inline}
+.btn{padding:4px 10px;border-radius:5px;border:1px solid var(--bd);background:transparent;color:var(--dm);transition:all .15s}
+.btn:hover{background:var(--b3);color:var(--tx)}
+.btn-sm{padding:2px 7px;font-size:11px}
+.tab-bar{background:var(--b2);border-bottom:1px solid var(--bd);display:flex;align-items:center;flex-shrink:0;overflow-x:auto;overflow-y:hidden}
+.tab-bar::-webkit-scrollbar{height:3px}
+.tab-bar::-webkit-scrollbar-thumb{background:var(--bd)}
+.tab{display:flex;align-items:center;gap:5px;padding:5px 12px;border-right:1px solid var(--bd);border-bottom:2px solid transparent;white-space:nowrap;color:var(--dm);cursor:pointer;font-size:12px;transition:all .15s;user-select:none}
+.tab:hover{color:var(--tx);background:var(--b3)}
+.tab.active{color:var(--tx);border-bottom-color:var(--ac)}
+.tab-x{background:none;border:none;color:var(--vd);font-size:11px;padding:0 2px;line-height:1}
+.tab-x:hover{color:#f85149}
+.tab-add{padding:5px 10px;border:none;background:transparent;color:var(--vd);font-size:16px;line-height:1}
+.tab-add:hover{color:var(--tx)}
+.split-wrap{flex:1;display:flex;flex-direction:row;overflow:hidden}
+.log-pane{width:var(--log-w);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;min-width:180px}
+.vdivider{width:6px;background:var(--b3);border-left:1px solid var(--bd);border-right:1px solid var(--bd);cursor:col-resize;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.vdivider::after{content:'';height:32px;width:2px;background:var(--bd);border-radius:1px}
+.tree-pane{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:180px}
+.split-wrap.tree-hidden .tree-pane,.split-wrap.tree-hidden .vdivider{display:none}
+.split-wrap.tree-hidden .log-pane{width:100%!important}
+.tree-pane-hdr{padding:4px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:11px}
+.tree-pane-hdr-title{font-weight:600;color:var(--tx);font-size:12px}
+.log-input-wrap{flex:1;display:flex;flex-direction:column;padding:10px;gap:8px;overflow:auto}
+.log-textarea{flex:1;min-height:80px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--dm);font-family:'SF Mono','Fira Code',monospace;font-size:11px;padding:8px;resize:none;outline:none}
+.log-textarea:focus{border-color:var(--ac);color:var(--tx)}
+.btn-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.btn-primary{background:#238636;border-color:#2ea043;color:#fff}
+.btn-primary:hover{background:#2ea043}
+.log-rendered{flex:1;overflow:auto;font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5;position:relative;outline:none}
+.log-rendered:focus{box-shadow:inset 0 0 0 1px var(--ac)}
+.log-toolbar{padding:4px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:6px;align-items:center;flex-shrink:0}
+.ll{display:flex;align-items:center;gap:6px;padding:0 8px;border-left:2px solid transparent;cursor:pointer;height:18px;overflow:hidden;white-space:nowrap;box-sizing:border-box}
+.log-rendered.wrap-on .ll{height:auto;min-height:18px;overflow:visible;white-space:normal;align-items:flex-start;padding-top:1px;padding-bottom:1px}
+.log-rendered.wrap-on .ll-rest{white-space:pre-wrap;word-break:break-word}
+.ll:hover{background:rgba(255,255,255,.03)}
+.ll.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
+.ll-num{color:var(--vd);min-width:36px;text-align:right;flex-shrink:0;font-size:10px;user-select:none}
+.ll-ind{flex-shrink:0;color:#2d333b;font-family:'SF Mono','Fira Code',monospace;letter-spacing:-.1px;user-select:none}
+.ll-fold-tog{color:var(--vd);flex-shrink:0;cursor:pointer;min-width:11px;font-size:9px;text-align:center;padding:0 2px;user-select:none}
+.ll-src-btn{margin-left:auto;flex-shrink:0;font-size:10px;color:var(--vd);cursor:pointer;padding:0 4px;opacity:0;transition:opacity .1s;user-select:none}
+.ll:hover .ll-src-btn{opacity:1}
+.ll-src-btn:hover{color:var(--ac)}
+.ll-fold-tog:hover{color:var(--tx)}
+.ll-ts{color:var(--vd);flex-shrink:0}
+.ll-ev{flex-shrink:0;font-weight:600}
+.ll-rest{color:var(--dm);word-break:break-all}
+.ev-METHOD_ENTRY .ll-ev,.ev-METHOD_EXIT .ll-ev{color:#79c0ff}
+.ev-CONSTRUCTOR_ENTRY .ll-ev,.ev-CONSTRUCTOR_EXIT .ll-ev{color:#56d364}
+.ev-CODE_UNIT_STARTED .ll-ev,.ev-CODE_UNIT_FINISHED .ll-ev{color:#c792ea}
+.ev-SOQL_EXECUTE_BEGIN .ll-ev,.ev-SOQL_EXECUTE_END .ll-ev{color:#39d353}
+.ev-DML_BEGIN .ll-ev,.ev-DML_END .ll-ev{color:#e3b341}
+.ev-USER_DEBUG .ll-ev{color:#8b949e}
+.ev-EXCEPTION_THROWN .ll-ev,.ev-FATAL_ERROR .ll-ev{color:#f85149}
+.ev-CALLOUT_REQUEST .ll-ev,.ev-CALLOUT_RESPONSE .ll-ev{color:#d2a8ff}
+.ev-SYSTEM_METHOD_ENTRY .ll-ev,.ev-SYSTEM_METHOD_EXIT .ll-ev{color:#484f58}
+.ev-EXECUTION_STARTED .ll-ev,.ev-EXECUTION_FINISHED .ll-ev{color:#f0c040}
+.tree-controls{padding:5px 10px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:5px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.chip{padding:2px 9px;border-radius:10px;border:1px solid var(--bd);background:transparent;color:var(--dm);font-size:11px;transition:all .12s}
+.chip:hover{border-color:var(--dm);color:var(--tx)}
+.chip.on{background:#1f3f6e22;border-color:var(--ac);color:#58a6ff}
+.toggle-btn{padding:2px 7px;border:1px solid var(--bd);border-radius:4px;background:transparent;color:var(--vd);font-size:10px;transition:all .12s}
+.toggle-btn:hover{color:var(--tx);border-color:var(--dm)}
+.toggle-btn.on{border-color:#388bfd88;color:#58a6ff;background:#1f3f6e22}
+.ns-wrap{position:relative}
+.ns-popup{position:absolute;top:100%;left:0;z-index:100;background:var(--b2);border:1px solid var(--bd);border-radius:6px;padding:6px;min-width:150px;max-height:180px;overflow-y:auto;display:none;box-shadow:0 4px 12px #0006}
+.ns-popup.open{display:block}
+.ns-item{display:flex;align-items:center;gap:5px;padding:2px 4px;font-size:11px;color:var(--dm);cursor:pointer;border-radius:3px}
+.ns-item:hover{background:var(--b3);color:var(--tx)}
+.tree-content{flex:1;overflow:auto;padding:8px 12px}
+.nsrc-btn{font-size:10px;color:var(--vd);cursor:pointer;padding:0 3px;margin-left:2px;opacity:0;transition:opacity .1s;flex-shrink:0;user-select:none}
+.nrow:hover .nsrc-btn{opacity:1}
+.nsrc-btn:hover{color:var(--ac)}
+.tree-node{margin:1px 0}
+.nrow{display:flex;align-items:baseline;gap:4px;padding:2px 5px;border-radius:4px;cursor:pointer;border-left:2px solid transparent;transition:background .1s}
+.nrow:hover{background:rgba(255,255,255,.04)}
+.nrow.active{background:rgba(56,139,253,.12);border-left-color:var(--ac)}
+.ntog{font-size:8px;color:var(--vd);min-width:11px;text-align:center;flex-shrink:0;margin-top:1px;transition:transform .1s}
+.ntog.open{color:var(--dm)}
+.nic{font-size:11px;min-width:14px;text-align:center;flex-shrink:0}
+.nbadge{font-size:9px;font-weight:600;padding:0 4px;border-radius:3px;flex-shrink:0;text-transform:uppercase;letter-spacing:.4px}
+.ncls{font-family:'SF Mono','Fira Code',monospace;font-size:11.5px;color:var(--vd)}
+.nmeth{font-family:'SF Mono','Fira Code',monospace;font-size:11.5px;font-weight:600}
+.nparams{font-family:'SF Mono','Fira Code',monospace;font-size:10.5px;color:var(--vd)}
+.nsig{font-family:'SF Mono','Fira Code',monospace;font-size:10.5px;color:var(--vd);max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nln{font-size:9px;color:var(--vd);font-family:monospace}
+.ndur{font-size:10px;color:var(--vd);margin-left:auto;padding-left:8px;white-space:nowrap;flex-shrink:0}
+.nchildren{margin-left:16px;border-left:1px solid #21262d;padding-left:5px}
+.ngap-inline{font-size:10px;color:#484f58;margin-left:6px;letter-spacing:.2px}
+.bg-method{background:#1f3f6e;color:#79c0ff}.bg-constructor{background:#1a3a22;color:#56d364}
+.bg-trigger{background:#3a2800;color:#ffab70}.bg-soql{background:#0e2d1e;color:#39d353}
+.bg-dml{background:#2c2300;color:#e3b341}.bg-debug{background:#1c1c1e;color:#8b949e}
+.bg-exc{background:#2d1117;color:#f85149}.bg-http{background:#200d3a;color:#d2a8ff}
+.bg-sys{background:#1a1a1e;color:#484f58}.bg-unit{background:#1e0a3c;color:#c792ea}
+.bg-flow{background:#1a0a2a;color:#c792ea}.bg-var{background:#0d1a2e;color:#58a6ff}
+.t-method .nmeth{color:#79c0ff}.t-constructor .nmeth{color:#56d364}
+.t-trigger .nmeth{color:#ffab70}.t-code_unit .nmeth{color:#c792ea}
+.t-soql .nmeth{color:#39d353}.t-dml .nmeth{color:#e3b341}
+.t-debug .nmeth{color:#8b949e}.t-exception .nmeth{color:#f85149}
+.t-callout .nmeth{color:#d2a8ff}.t-system_method .nmeth{color:#484f58}
+.t-execution .nmeth{color:#f0c040}.t-flow .nmeth{color:#c792ea}
+.t-varAssign .nmeth{color:#58a6ff}.t-varAssign .nsig{color:#388bfd}
+.stats-bar{background:var(--b2);border-top:1px solid var(--bd);padding:4px 12px;display:flex;gap:16px;font-size:11px;color:var(--vd);flex-shrink:0;flex-wrap:wrap}
+.stats-bar span{color:var(--dm);font-weight:600}
+.hist-panel{position:absolute;right:0;top:0;bottom:0;width:340px;background:var(--b2);border-left:1px solid var(--bd);z-index:200;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .2s}
+.hist-panel.open{transform:none}
+.hist-hdr{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.hist-list{flex:1;overflow-y:auto;padding:8px}
+.hist-item{background:var(--b3);border:1px solid var(--bd);border-radius:5px;padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:border-color .12s}
+.hist-item:hover{border-color:var(--ac)}
+.hist-item-name{font-size:12px;font-weight:600;color:var(--tx);margin-bottom:2px}
+.hist-item-meta{font-size:10px;color:var(--vd)}
+.hist-item-row{display:flex;justify-content:space-between;align-items:center}
+.hist-del{background:none;border:none;color:var(--vd);font-size:12px;padding:2px 5px;border-radius:3px}
+.hist-del:hover{color:#f85149;background:#2d1117}
+.hist-size-warn{color:#e3b341}
+.empty{text-align:center;padding:40px 20px;color:var(--vd)}
+.empty .ico{font-size:32px;margin-bottom:8px}
+.empty p{font-size:12px}
+.sda mark{border-radius:2px}
+.drop-overlay{position:absolute;inset:0;background:rgba(56,139,253,.15);border:3px dashed var(--ac);z-index:500;display:none;align-items:center;justify-content:center;font-size:18px;color:var(--ac)}
+.drop-overlay.show{display:flex}
+.gs-results{position:absolute;top:100%;left:0;right:0;background:var(--b2);border:1px solid var(--bd);border-radius:5px;max-height:220px;overflow-y:auto;z-index:300;box-shadow:0 4px 12px #0008}
+.gs-wrap{position:relative}
+.gs-row{padding:5px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--bd)}
+.gs-row:hover{background:var(--b3)}
+.gs-tab{color:var(--ac);margin-right:4px;font-weight:600}
+.gs-text{color:var(--dm)}
+.search-box{background:var(--bg);border:1px solid var(--bd);border-radius:4px;color:var(--tx);outline:none}
+.search-box:focus{border-color:var(--ac)}
+.hide-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.hide-input{padding:3px 7px;background:var(--bg);border:1px solid var(--bd);border-radius:4px;color:var(--tx);font-size:11px;width:120px;outline:none}
+.hide-input:focus{border-color:#f85149}
+.hide-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;background:#2d1117;border:1px solid #f8514966;border-radius:10px;font-size:10px;color:#f85149}
+.hide-tag button{background:none;border:none;color:#f85149;font-size:11px;padding:0 1px;cursor:pointer;line-height:1}
+.ll.ll-block{background:rgba(227,179,65,.08)}
+.ll.ll-block:not(.active){border-left-color:#e3b34188}
+.ll.active.ll-block{background:rgba(56,139,253,.15)}
+.log-ctx-menu{position:fixed;z-index:9999;background:#1c2128;border:1px solid #444c56;border-radius:7px;box-shadow:0 6px 24px #000c;min-width:300px;padding:4px 0;font-size:12px}
+.log-ctx-item{padding:7px 16px;color:#e6edf3;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
+.log-ctx-item:hover{background:#2d333b;color:#fff}
+.log-ctx-item.danger{color:#f47067}
+.log-ctx-item.danger:hover{background:#2d1117;color:#ff7b72}
+.log-ctx-sep{height:1px;background:#30363d;margin:3px 0}
+.log-ctx-label{padding:5px 16px 2px;font-size:10px;color:#768390;text-transform:uppercase;letter-spacing:.7px;user-select:none}
+.log-ctx-item.disabled{color:#586069;cursor:default;flex-direction:column;align-items:flex-start;gap:1px}
+.log-ctx-item.disabled:hover{background:none;color:#586069}
+.log-ctx-item .ctx-reason{font-size:10px;color:#586069}
+.log-ctx-info{padding:6px 14px 5px;background:#0d1117;border-bottom:1px solid #30363d;margin-bottom:2px}
+.log-ctx-info-name{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#79c0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px}
+.log-ctx-info-meta{font-size:10px;color:#768390;margin-top:2px}
+.log-tags-bar{padding:3px 8px;background:var(--b2);border-bottom:1px solid var(--bd);display:flex;gap:3px;align-items:center;flex-wrap:wrap;flex-shrink:0;max-height:52px;overflow-y:auto}
+.log-tag-chip{padding:1px 6px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--dm);font-size:10px;cursor:pointer;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace;transition:all .1s}
+.log-tag-chip:hover{border-color:var(--dm);color:var(--tx)}
+.log-tag-chip.tag-hidden{opacity:.35;text-decoration:line-through;color:var(--vd)}
+.filter-modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:8000;display:flex;align-items:center;justify-content:center}
+.filter-modal{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:640px;max-height:72vh;display:flex;flex-direction:column;box-shadow:0 16px 48px #000d}
+.filter-modal-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.filter-modal-title{font-weight:600;font-size:13px;flex:1}
+.filter-modal-search{background:var(--b3);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:3px 8px;font-size:12px;width:130px;outline:none}
+.filter-modal-search:focus{border-color:var(--ac)}
+.filter-modal-body{overflow-y:auto;padding:4px 2px;flex:1;display:grid;grid-template-columns:repeat(2,1fr);align-content:start}
+.filter-modal-item{display:flex;align-items:center;gap:8px;padding:4px 12px;border-radius:5px;cursor:pointer;user-select:none}
+.filter-modal-item:hover{background:var(--b3)}
+.filter-modal-item label{flex:1;font-family:'SF Mono','Fira Code',monospace;font-size:11px;cursor:pointer;color:var(--tx)}
+.filter-modal-item .fmi-cnt{font-size:10px;color:var(--vd)}
+.filter-modal-footer{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--bd);flex-shrink:0}
+.ns-log-popup{position:fixed;z-index:8000;background:var(--b2);border:1px solid var(--bd);border-radius:7px;box-shadow:0 8px 28px #000b;padding:4px 0;min-width:190px;max-height:300px;overflow-y:auto;display:none}
+.ns-log-popup.open{display:block}
+.ns-log-item{display:flex;align-items:center;gap:8px;padding:4px 12px;cursor:pointer;user-select:none}
+.ns-log-item:hover{background:var(--b3)}
+.ns-log-item label{font-family:monospace;font-size:11px;flex:1;cursor:pointer;color:var(--tx)}
+.parse-progress-bar{width:220px;height:4px;background:var(--b3);border-radius:2px;overflow:hidden}
+.parse-progress-fill{height:100%;background:var(--ac);border-radius:2px;transition:width .12s}
+.parse-progress-pct{font-size:10px;color:var(--vd)}
+.sda.hide-vars .t-varAssign{display:none}
+.snippet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.65);z-index:9000;display:flex;align-items:center;justify-content:center}
+.snippet-popup{background:#0d1117;border:1px solid #388bfd66;border-radius:10px;box-shadow:0 16px 56px #000e;width:min(1100px,92%);height:75vh;font-family:'SF Mono','Fira Code',monospace;font-size:11px;overflow:hidden;display:flex;flex-direction:column}
+.snippet-hdr{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#161b22;border-bottom:1px solid #30363d;font-size:12px;color:#8b949e;flex-shrink:0}
+.snippet-cls{color:#79c0ff;font-weight:600}
+.snippet-ln{color:#e3b341}
+.snippet-close{margin-left:auto;background:none;border:none;color:#8b949e;font-size:16px;cursor:pointer;padding:0 4px;line-height:1}
+.snippet-close:hover{color:#f85149}
+.snippet-body{overflow:auto;flex:1;padding:8px 0}
+.snippet-loading{padding:26px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#8b949e;font-size:11px}
+.snippet-spinner{width:16px;height:16px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:snippetSpin .8s linear infinite}
+@keyframes snippetSpin{to{transform:rotate(360deg)}}
+.snippet-error{padding:12px 16px;color:#f85149;font-size:11px}
+.sline{display:flex;align-items:baseline;padding:1px 0}
+.sline.sline-target{background:#388bfd1a;border-left:2px solid #388bfd}
+.sline-num{min-width:42px;text-align:right;padding-right:12px;color:#484f58;user-select:none;font-size:10px;flex-shrink:0}
+.sline-target .sline-num{color:#e3b341}
+.sline-code{white-space:pre;color:#c9d1d9}
+.sc-kw{color:#ff7b72}.sc-str{color:#a5d6ff}.sc-cmt{color:#8b949e;font-style:italic}
+.sc-ann{color:#ffa657}.sc-num{color:#79c0ff}.sc-cls{color:#56d364}.sc-punc{color:#c9d1d9}
+.help-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.72);z-index:9100;display:none;align-items:center;justify-content:center;padding:24px}
+.help-overlay.open{display:flex}
+.help-panel{background:var(--b2);border:1px solid var(--bd);border-radius:10px;width:100%;max-width:800px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px #000d}
+.help-ph{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--bd);flex-shrink:0;background:#0d1117;border-radius:10px 10px 0 0}
+.help-ph h3{font-size:13px;font-weight:600;color:#e6edf3}
+.help-pbody{flex:1;overflow-y:auto;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.help-s{background:var(--b3);border:1px solid var(--bd);border-radius:8px;padding:9px 11px}
+.help-s h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ac);margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
+.help-r{display:flex;gap:7px;padding:2px 0;font-size:11px;align-items:flex-start}
+.help-k{font-family:'SF Mono','Fira Code',monospace;font-size:10px;background:var(--b2);border:1px solid var(--bd);border-radius:4px;padding:1px 5px;white-space:nowrap;color:#58a6ff;flex-shrink:0;min-width:64px;text-align:center}
+.help-d{color:var(--dm);flex:1;line-height:1.45}
+.help-summary{grid-column:1 / -1;border-color:var(--ac)}
+.help-sum-desc{font-size:12px;color:var(--tx);line-height:1.5;margin:0 0 8px}
+.help-sum-flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--dm)}
+.help-sum-flow .help-step{background:var(--b2);border:1px solid var(--bd);border-radius:4px;padding:2px 7px;color:#58a6ff}
+`;
+
+// ─── STATIC HTML ──────────────────────────────────────────────────────────────
+const HTML = `
+<div class="drop-overlay" id="dropOverlay">Drop log file(s) to open</div>
+<div class="hdr">
+  <span class="hdr-title">Salesforce Apex Debug Log Parser</span>
+  <div class="gs-wrap" style="flex:1;min-width:140px;max-width:280px">
+    <input class="g-search" id="globalSearch" placeholder="Search all logs…" autocomplete="off">
+    <div class="gs-results" id="gsResults" style="display:none"></div>
+  </div>
+  <div class="hl-slots" id="hlSlots"></div>
+  <div style="width:1px;height:20px;background:var(--bd)"></div>
+  <div class="hide-row" id="hideRow">
+    <span style="font-size:10px;color:var(--vd);white-space:nowrap">Hide:</span>
+    <input class="hide-input" id="hideInput" placeholder="keyword…">
+    <button class="btn btn-sm" id="btn-addHide" title="Hide log lines containing this keyword">+</button>
+    <div id="hideTags" class="hide-row"></div>
+  </div>
+  <button class="btn btn-sm" id="btn-history" title="Recently opened logs">📚 History</button>
+  <button class="btn btn-sm" id="btn-copyLog" title="Copy entire raw log to clipboard">⎘ Copy Log</button>
+  <div style="width:1px;height:20px;background:var(--bd)"></div>
+  <button class="btn btn-sm" id="btn-openSrc" title="Open Salesforce source project folder">📂 Source</button>
+  <span id="srcFolderName" style="font-size:10px;color:var(--vd);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default"></span>
+  <input id="srcFolderFallback" type="file" webkitdirectory multiple style="display:none">
+  <a class="btn btn-sm" style="text-decoration:none" href="/guides" title="Salesforce debug log how-to guides">📖 Guides</a>
+  <a class="btn btn-sm" style="text-decoration:none" href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" title="Enjoying this tool? Buy me a coffee">☕</a>
+  <button class="btn btn-sm" id="btn-help" title="Features &amp; usage guide">? Help</button>
+</div>
+<div class="tab-bar" id="tabBar">
+  <button class="tab-add" id="btn-addTab" title="New tab">＋</button>
+</div>
+<div class="split-wrap tree-hidden" id="splitWrap">
+  <div class="log-pane" id="logPane"></div>
+  <div class="vdivider" id="vdivider" title="Drag to resize"></div>
+  <div class="tree-pane" id="treePane">
+    <div class="tree-pane-hdr" id="treePaneHdr" style="display:none">
+      <span class="tree-pane-hdr-title">Call Stack</span>
+      <button class="btn btn-sm" id="btn-hideTree" style="margin-left:auto" title="Hide call stack">Hide ✕</button>
+    </div>
+    <div class="tree-controls" id="treeControls" style="display:none">
+      <button class="chip on" data-f="all" title="Show all event types">All</button>
+      <button class="chip" data-f="method" title="Show only method entry/exit events">Methods</button>
+      <button class="chip" data-f="soql" title="Show only SOQL queries">SOQL</button>
+      <button class="chip" data-f="dml" title="Show only DML operations">DML</button>
+      <button class="chip" data-f="debug" title="Show only USER_DEBUG output">Debug</button>
+      <button class="chip" data-f="exception" title="Show only exceptions and fatal errors">Exceptions</button>
+      <div style="width:1px;height:16px;background:var(--bd)"></div>
+      <button class="toggle-btn on" id="togDebug" title="Show/hide USER_DEBUG">Dbg</button>
+      <button class="toggle-btn" id="togSys" title="Show/hide system methods">Sys</button>
+      <button class="toggle-btn on" id="togVarAssign" title="Show/hide variable assignments">Vars</button>
+      <button class="toggle-btn on" id="togTiming" title="Show/hide timing gaps">Timing</button>
+      <div class="ns-wrap">
+        <button class="toggle-btn" id="nsBtn" title="Filter the tree by namespace">NS ▾</button>
+        <div class="ns-popup" id="nsPopup"></div>
+      </div>
+      <div class="ns-wrap">
+        <button class="toggle-btn" id="logTagsBtn" title="Show the log's debug levels and categories">Log Tags ▾</button>
+        <div class="ns-popup" id="logTagsPopup" style="min-width:220px;max-height:260px"></div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:4px;align-items:center">
+        <input class="search-box" id="treeSearchBox" placeholder="Filter tree…" style="width:130px;padding:3px 8px;font-size:11px">
+        <button class="btn btn-sm" id="btn-expandAll" title="Expand every node in the call tree">Expand</button>
+        <button class="btn btn-sm" id="btn-collapseAll" title="Collapse every node in the call tree">Collapse</button>
+      </div>
+    </div>
+    <div class="tree-content" id="treeContent">
+      <div class="empty"><div class="ico">📋</div><p>Paste a Salesforce debug log and click Parse</p></div>
+    </div>
+  </div>
+</div>
+<div class="stats-bar" id="statsBar" style="display:none"></div>
+<div class="hist-panel" id="histPanel">
+  <div class="hist-hdr">
+    <span>Log History</span>
+    <div id="histSize" style="font-size:11px;color:var(--dm);font-weight:400;margin-left:4px"></div>
+    <button class="btn btn-sm" id="btn-closeHist" style="margin-left:auto" title="Close history">✕</button>
+  </div>
+  <div class="hist-list" id="histList"></div>
+</div>
+<div class="help-overlay" id="helpModal">
+  <div class="help-panel">
+    <div class="help-ph">
+      <h3>Salesforce Apex Debug Log Parser — Features &amp; Usage</h3>
+      <button class="btn btn-sm" id="btn-closeHelp" title="Close this help">✕ Close</button>
+    </div>
+    <div class="help-pbody">
+      <div class="help-s help-summary">
+        <h4>At a Glance</h4>
+        <p class="help-sum-desc">Turn a raw Salesforce debug log into an interactive call tree. The raw log and the tree stay in sync — click either side to jump to the other. Filter by event type, search across tabs, color-code lines, and (with a project folder open) jump straight to the Apex source.</p>
+        <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:.7">Tip: use the <strong>▶ Load sample</strong> button next to <strong>Parse Log</strong> to parse an example log instantly.</p>
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;opacity:.8">📷 Example screenshot — sample debug log parsed into a call tree</summary><img src="sample-sf-debug-viewer.jpg" alt="Salesforce Apex Debug Log Parser showing a parsed Salesforce Apex debug log with color-coded events and stats" loading="lazy" style="max-width:100%;border:1px solid #30363d;border-radius:6px;margin-top:8px"></details>
+        <p class="help-sum-desc" style="margin-top:10px;font-size:12px;opacity:0.65">👁 Visitors: <strong id="visit-count">…</strong> · <a href="https://buymeacoffee.com/xer900009" target="_blank" rel="noopener" style="color:inherit">☕ Buy me a coffee</a></p>
+        <div class="help-sum-flow">
+          <span class="help-step">1. Paste / drop a log → Parse</span> →
+          <span class="help-step">2. Explore the call tree</span> →
+          <span class="help-step">3. Filter &amp; search</span> →
+          <span class="help-step">4. Jump to source</span>
+        </div>
+      </div>
+      <div class="help-s">
+        <h4>Getting Started</h4>
+        <div class="help-r"><span class="help-k">Paste</span><span class="help-d">Paste a Salesforce debug log into the text area, then click Parse Log</span></div>
+        <div class="help-r"><span class="help-k">Drop file</span><span class="help-d">Drag a .log or .txt file onto the page to open it as a new tab automatically</span></div>
+        <div class="help-r"><span class="help-k">+ tab</span><span class="help-d">Click ＋ in the tab bar to open a blank tab for a new log</span></div>
+        <div class="help-r"><span class="help-k">Sample</span><span class="help-d">Click "Load Sample" to explore the UI with a built-in example log</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Navigating the Log</h4>
+        <div class="help-r"><span class="help-k">Click line</span><span class="help-d">Click any raw log line to highlight and jump to the matching call tree node</span></div>
+        <div class="help-r"><span class="help-k">Click node</span><span class="help-d">Click a tree node to scroll the raw log panel to that line</span></div>
+        <div class="help-r"><span class="help-k">↑ / ↓</span><span class="help-d">Arrow keys navigate lines when the log panel is focused; PageUp / PageDown jump by page</span></div>
+        <div class="help-r"><span class="help-k">Fold ▼▶</span><span class="help-d">Click the fold toggle on any log block to collapse or expand that call block</span></div>
+        <div class="help-r"><span class="help-k">Right-click</span><span class="help-d">Right-click a log line to jump to entry/exit, view source, or highlight a selection</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Call Tree Filtering</h4>
+        <div class="help-r"><span class="help-k">Type chips</span><span class="help-d">Click All / Methods / SOQL / DML / Debug / Exceptions to filter the tree by event category</span></div>
+        <div class="help-r"><span class="help-k">Dbg toggle</span><span class="help-d">Show or hide all USER_DEBUG entries</span></div>
+        <div class="help-r"><span class="help-k">Sys toggle</span><span class="help-d">Show or hide system method calls (SYSTEM_METHOD_ENTRY)</span></div>
+        <div class="help-r"><span class="help-k">Vars toggle</span><span class="help-d">Show or hide VARIABLE_ASSIGNMENT entries</span></div>
+        <div class="help-r"><span class="help-k">Timing</span><span class="help-d">Show timing gap labels between adjacent nodes</span></div>
+        <div class="help-r"><span class="help-k">NS ▾</span><span class="help-d">Filter the tree by Apex namespace prefix (e.g. hide managed package noise)</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Log Line Controls</h4>
+        <div class="help-r"><span class="help-k">Log Tags ▾</span><span class="help-d">Show or hide specific event types (e.g. HEAP_ALLOCATE, STATEMENT_EXECUTE) from the raw log</span></div>
+        <div class="help-r"><span class="help-k">Hide: kw</span><span class="help-d">Type a keyword and press + to suppress all log lines containing that text</span></div>
+        <div class="help-r"><span class="help-k">Wrap</span><span class="help-d">Toggle line wrapping in the raw log panel</span></div>
+        <div class="help-r"><span class="help-k">Block</span><span class="help-d">Right-click → "Show current block" to highlight all lines belonging to the enclosing call block</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Search &amp; Highlights</h4>
+        <div class="help-r"><span class="help-k">Global</span><span class="help-d">The header search box searches across all open log tabs; results drop down with tab context</span></div>
+        <div class="help-r"><span class="help-k">Tree filter</span><span class="help-d">The "Filter tree…" box narrows call tree nodes by method name, class, or signature</span></div>
+        <div class="help-r"><span class="help-k">H1–H4</span><span class="help-d">Four color-coded highlight slots: type a keyword into any slot to mark matching lines across both panels</span></div>
+        <div class="help-r"><span class="help-k">Right-click</span><span class="help-d">Select text in the log, right-click → "Highlight …" to assign it to the next free slot</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Source View</h4>
+        <div class="help-r"><span class="help-k">📂 Source</span><span class="help-d">Open a Salesforce project folder to enable source navigation</span></div>
+        <div class="help-r"><span class="help-k">⌗ icon</span><span class="help-d">Hover a log line or tree node and click ⌗ to open the Apex source file at the relevant line</span></div>
+        <div class="help-r"><span class="help-k">Right-click</span><span class="help-d">Right-click a log line → "View source: ClassName" for the same action</span></div>
+      </div>
+      <div class="help-s">
+        <h4>History &amp; Layout</h4>
+        <div class="help-r"><span class="help-k">📚 History</span><span class="help-d">Previously parsed logs are auto-saved to localStorage; click History to reload any past session</span></div>
+        <div class="help-r"><span class="help-k">⎘ Copy Log</span><span class="help-d">Copy the active tab's entire raw log to the clipboard</span></div>
+        <div class="help-r"><span class="help-k">Expand/Collapse</span><span class="help-d">Expand All / Collapse All flatten or fully expand the call tree at once</span></div>
+        <div class="help-r"><span class="help-k">⋮ divider</span><span class="help-d">Drag the vertical divider between the raw log and tree panels to resize them</span></div>
+        <div class="help-r"><span class="help-k">Stats bar</span><span class="help-d">Footer shows totals: methods, SOQL, DML, callouts, exceptions, and execution duration</span></div>
+      </div>
+      <div class="help-s">
+        <h4>Tree Node Types</h4>
+        <div class="help-r"><span class="help-k">▸ method</span><span class="help-d">Blue — Apex method or constructor call</span></div>
+        <div class="help-r"><span class="help-k">⬡ soql</span><span class="help-d">Green — SOQL query with row count on completion</span></div>
+        <div class="help-r"><span class="help-k">💾 dml</span><span class="help-d">Amber — DML operation (insert, update, delete, etc.)</span></div>
+        <div class="help-r"><span class="help-k">↗ http</span><span class="help-d">Purple — HTTP callout with response status</span></div>
+        <div class="help-r"><span class="help-k">✖ exc</span><span class="help-d">Red — exception or fatal error</span></div>
+        <div class="help-r"><span class="help-k">· debug</span><span class="help-d">Grey — USER_DEBUG statement</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+// ─── PARSER ───────────────────────────────────────────────────────────────────
+const PUSH_EVS = new Set(['CODE_UNIT_STARTED','METHOD_ENTRY','CONSTRUCTOR_ENTRY',
+  'SYSTEM_METHOD_ENTRY','VF_APEX_CALL_START','SOQL_EXECUTE_BEGIN','DML_BEGIN',
+  'CALLOUT_REQUEST','FLOW_START_INTERVIEWS_BEGIN','FLOW_START_INTERVIEW_BEGIN','FLOW_ELEMENT_BEGIN']);
+const EXIT_MAP = {
+  CODE_UNIT_FINISHED:'CODE_UNIT_STARTED',METHOD_EXIT:'METHOD_ENTRY',
+  CONSTRUCTOR_EXIT:'CONSTRUCTOR_ENTRY',SYSTEM_METHOD_EXIT:'SYSTEM_METHOD_ENTRY',
+  VF_APEX_CALL_END:'VF_APEX_CALL_START',SOQL_EXECUTE_END:'SOQL_EXECUTE_BEGIN',
+  DML_END:'DML_BEGIN',CALLOUT_RESPONSE:'CALLOUT_REQUEST',
+  FLOW_START_INTERVIEWS_END:'FLOW_START_INTERVIEWS_BEGIN',
+  FLOW_START_INTERVIEW_END:'FLOW_START_INTERVIEW_BEGIN',
+  FLOW_ELEMENT_END:'FLOW_ELEMENT_BEGIN',EXECUTION_FINISHED:'EXECUTION_STARTED',
+};
+const SID_RE = /^01[a-zA-Z0-9]{13,16}$/;
+
+function parseLine(raw) {
+  // Fast indexOf-based parser, ~3x faster than regex for large logs
+  if (raw.length < 20 || raw[2] !== ':' || raw[5] !== ':') return null;
+  const sp = raw.indexOf(' ');
+  if (sp < 0 || raw[sp+1] !== '(') return null;
+  const cp = raw.indexOf(')', sp+2);
+  if (cp < 0 || raw[cp+1] !== '|') return null;
+  const p1 = cp+2;
+  const p2 = raw.indexOf('|', p1);
+  const ts = raw.slice(0, sp);
+  const nsRaw = raw.slice(sp+2, cp);
+  const ns = nsRaw.length ? parseInt(nsRaw) : 0;
+  const ev = p2 < 0 ? raw.slice(p1) : raw.slice(p1, p2);
+  const rest = p2 < 0 ? '' : raw.slice(p2+1);
+  if (!ev || !/^[A-Z_0-9]+$/.test(ev)) return null;
+  return {ts, ns, ev, rest};
+}
+
+function evType(ev) {
+  return {METHOD_ENTRY:'method',CONSTRUCTOR_ENTRY:'constructor',CODE_UNIT_STARTED:'code_unit',
+    SYSTEM_METHOD_ENTRY:'system_method',VF_APEX_CALL_START:'callout',SOQL_EXECUTE_BEGIN:'soql',
+    DML_BEGIN:'dml',CALLOUT_REQUEST:'callout',FLOW_START_INTERVIEWS_BEGIN:'flow',
+    FLOW_START_INTERVIEW_BEGIN:'flow',FLOW_ELEMENT_BEGIN:'flow'}[ev]||'other';
+}
+
+function evMeta(ev, rest) {
+  const p = rest.split('|');
+  if (ev==='METHOD_ENTRY'||ev==='CONSTRUCTOR_ENTRY'||ev==='SYSTEM_METHOD_ENTRY'||
+      ev==='METHOD_EXIT' ||ev==='CONSTRUCTOR_EXIT' ||ev==='SYSTEM_METHOD_EXIT' ||
+      ev==='VF_APEX_CALL_START'||ev==='VF_APEX_CALL_END') {
+    const lr=p[0]||'';
+    const hasCid=p.length>=3&&(SID_RE.test(p[1])||p[1]==='');
+    const sig=hasCid?p.slice(2).join('|'):p.slice(1).join('|');
+    const pL=sig.indexOf('('),pR=sig.lastIndexOf(')');
+    const namePart=pL>=0?sig.slice(0,pL):sig;
+    const params=pL>=0&&pR>pL?sig.slice(pL+1,pR):'';
+    const dot=namePart.lastIndexOf('.');
+    const cls=dot>=0?namePart.slice(0,dot):'';
+    const meth=dot>=0?namePart.slice(dot+1):namePart;
+    return {cls,meth,params,sig,lr};
+  }
+  if (ev==='CODE_UNIT_STARTED') {
+    const hasCid=p.length>=3&&SID_RE.test(p[1]);
+    const name=(hasCid?p.slice(2):p.slice(1)).join('|')||p[0];
+    return {cls:'',meth:name,params:'',sig:'',lr:p[0],subtype:/trigger/i.test(name)?'trigger':null};
+  }
+  if (ev==='SOQL_EXECUTE_BEGIN') {
+    const q=p.slice(2).join('|');
+    return {cls:'',meth:'SOQL',params:'',sig:q||p[1]||'',lr:p[0]};
+  }
+  if (ev==='DML_BEGIN') {
+    return {cls:'',meth:`DML ${p[1]||''}`,params:'',sig:`${p[2]||''} ${p[3]?p[3]+' rows':''}`.trim(),lr:p[0]};
+  }
+  if (ev==='CALLOUT_REQUEST') {
+    const ep=p.find(x=>x.startsWith('Endpoint='))||p[0]||'';
+    const mt=p.find(x=>x.startsWith('Method='))||'';
+    return {cls:'',meth:'HTTP Callout',params:'',sig:`${mt} ${ep}`.trim(),lr:''};
+  }
+  if (ev==='USER_DEBUG') {
+    const msg=p.slice(2).join('|');
+    return {cls:'',meth:msg||'(empty)',params:'',sig:'',lr:p[0],level:p[1]||'DEBUG'};
+  }
+  if (ev==='VARIABLE_ASSIGNMENT') {
+    const parts=p.slice(2);
+    if (parts.length>0&&/^0x[0-9a-f]+$/i.test(parts[parts.length-1])) parts.pop();
+    return {cls:'',meth:p[1]||'',params:'',sig:parts.join('|'),lr:p[0]||''};
+  }
+  if (ev==='EXCEPTION_THROWN'||ev==='FATAL_ERROR') {
+    return {cls:'',meth:p.slice(1).join('|')||rest||'Exception',params:'',sig:'',lr:p[0]||''};
+  }
+  // default: extract lr from p[0] if it looks like [N]
+  const lr=/^\[\d+\]$/.test(p[0])?p[0]:'';
+  return {cls:'',meth:rest||ev,params:'',sig:'',lr};
+}
+
+const PARSE_CHUNK = 8000; // lines per async tick
+const RAW_INLINE_LIMIT = 1024 * 1024; // 1 MB — above this, show a size hint in the input tab
+
+async function parseLogAsync(text, onProgress) {
+  const rawLines=text.split('\n');
+  const stats={methods:0,soql:0,dml:0,exc:0,lines:rawLines.length};
+  const namespaces=new Set();
+  const eventTypeCounts=new Map();
+  const logLines=[];
+  let seq=0;
+  const root={id:'root',type:'execution',cls:'',meth:'Execution',params:'',sig:'',lr:'',
+    ts:'',ns:0,endNs:0,dur:0,children:[],expanded:true,rowCount:null,calloutResp:null};
+  const stack=[root];
+  const cur=()=>stack[stack.length-1];
+  for (let i=0;i<rawLines.length;i++) {
+    // yield to browser every PARSE_CHUNK lines so UI stays responsive
+    if (i>0&&i%PARSE_CHUNK===0){
+      onProgress&&onProgress(i/rawLines.length);
+      await new Promise(r=>setTimeout(r,0));
+    }
+    const raw=rawLines[i].trim();
+    if (!raw) continue;
+    const pl=parseLine(raw);
+    if (!pl){logLines.push({idx:i,ns:0,ts:'',ev:'',rest:raw,raw,depth:Math.max(0,stack.length-1)});continue}
+    const {ts,ns,ev,rest}=pl;
+    // depth: exit lines match their entry level; push lines are at current depth before push
+    const depth=EXIT_MAP[ev]&&ev!=='EXECUTION_FINISHED'
+      ? Math.max(0,stack.length-2)
+      : Math.max(0,stack.length-1);
+    logLines.push({idx:i,ns,ts,ev,rest,raw,depth});
+    if (ev) eventTypeCounts.set(ev,(eventTypeCounts.get(ev)||0)+1);
+    if (ev==='EXECUTION_STARTED'){root.ts=ts;root.ns=ns;continue}
+    if (ev==='EXECUTION_FINISHED'){root.endNs=ns;root.dur=ns-root.ns;continue}
+    if (EXIT_MAP[ev]) {
+      if (stack.length>1) {
+        const n=stack.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=logLines.length-1;
+        if (ev==='SOQL_EXECUTE_END'){const m=rest.match(/Rows:(\d+)/i);if(m)n.rowCount=m[1]}
+        if (ev==='CALLOUT_RESPONSE'){const sc=rest.match(/StatusCode=(\d+)/);if(sc)n.calloutResp=`HTTP ${sc[1]}`}
+      }
+      continue;
+    }
+    if (ev==='USER_DEBUG') {
+      const m=evMeta(ev,rest);
+      cur().children.push({id:`n${++seq}`,type:'debug',cls:'',meth:m.meth,params:'',sig:'',lr:m.lr,
+        ts,ns,endNs:ns,dur:0,children:[],expanded:false,level:m.level});
+      continue;
+    }
+    if (ev==='VARIABLE_ASSIGNMENT') {
+      const m=evMeta(ev,rest);
+      cur().children.push({id:`n${++seq}`,type:'varAssign',cls:'',meth:m.meth,params:'',sig:m.sig,lr:m.lr,
+        ts,ns,endNs:ns,dur:0,children:[],expanded:false});
+      continue;
+    }
+    if (ev==='EXCEPTION_THROWN'||ev==='FATAL_ERROR') {
+      const m=evMeta(ev,rest);
+      cur().children.push({id:`n${++seq}`,type:'exception',cls:'',meth:m.meth,params:'',sig:'',lr:m.lr,
+        ts,ns,endNs:ns,dur:0,children:[],expanded:false});
+      stats.exc++;continue;
+    }
+    if (PUSH_EVS.has(ev)) {
+      const m=evMeta(ev,rest);
+      const nt=m.subtype||evType(ev);
+      const node={id:`n${++seq}`,type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,
+        ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=='system_method',rowCount:null,calloutResp:null,logIdx:logLines.length-1};
+      if (nt==='method'||nt==='constructor') stats.methods++;
+      if (nt==='soql') stats.soql++;
+      if (nt==='dml') stats.dml++;
+      if (m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes('.')?m.cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\./):null);if(nsm)namespaces.add(nsm[1])}
+      cur().children.push(node);
+      stack.push(node);
+    }
+  }
+  return {tree:root,stats,logLines,namespaces,eventTypes:eventTypeCounts};
+}
+
+const BLOCK_TYPES=new Set(['execution','code_unit','trigger','method','constructor','soql','dml','callout','flow']);
+function findBlockAtNs(root,ns){
+  let best=null;
+  function walk(node){
+    if (!BLOCK_TYPES.has(node.type)) {node.children.forEach(walk);return}
+    if (node.ns>ns||(node.endNs>0&&node.endNs<ns)) return;
+    best=node;
+    node.children.forEach(walk);
+  }
+  walk(root);
+  return best;
+}
+
+// Returns chain from outermost to innermost block containing ns
+function findBlockChainAtNs(root,ns){
+  const chain=[];
+  function walk(node){
+    if (!BLOCK_TYPES.has(node.type)){node.children.forEach(walk);return}
+    if (node.ns>ns||(node.endNs>0&&node.endNs<ns)) return;
+    chain.push(node);
+    node.children.forEach(walk);
+  }
+  walk(root);
+  return chain;
+}
+
+function buildWorkerSrc(){
+  return (
+    '"use strict";\n'+
+    'const PUSH_EVS=new Set('+JSON.stringify([...PUSH_EVS])+');\n'+
+    'const EXIT_MAP='+JSON.stringify(EXIT_MAP)+';\n'+
+    'const SID_RE=/^01[a-zA-Z0-9]{13,16}$/;\n'+
+    parseLine.toString()+';\n'+
+    evType.toString()+';\n'+
+    evMeta.toString()+';\n'+
+    'self.onmessage=function(e){\n'+
+    '  const text=e.data,lines=text.split("\\n"),N=lines.length;\n'+
+    '  const stats={methods:0,soql:0,dml:0,exc:0,lines:N};\n'+
+    '  const nsArr=[],evCts=new Map(),lls=[];let seq=0;\n'+
+    '  const root={id:"root",type:"execution",cls:"",meth:"Execution",params:"",sig:"",lr:"",ts:"",ns:0,endNs:0,dur:0,children:[],expanded:true,rowCount:null,calloutResp:null};\n'+
+    '  const stk=[root];const cur=()=>stk[stk.length-1];\n'+
+    '  for(let i=0;i<N;i++){\n'+
+    '    if(i>0&&i%25000===0)self.postMessage({t:"p",p:i/N});\n'+
+    '    const r=lines[i].trim();if(!r)continue;\n'+
+    '    const pl=parseLine(r);\n'+
+    '    if(!pl){lls.push({idx:i,ns:0,ts:"",ev:"",rest:r,raw:r,depth:Math.max(0,stk.length-1)});continue}\n'+
+    '    const {ts,ns,ev,rest}=pl;\n'+
+    '    const depth=EXIT_MAP[ev]&&ev!=="EXECUTION_FINISHED"?Math.max(0,stk.length-2):Math.max(0,stk.length-1);\n'+
+    '    lls.push({idx:i,ns,ts,ev,rest,raw:r,depth});\n'+
+    '    if(ev)evCts.set(ev,(evCts.get(ev)||0)+1);\n'+
+    '    if(ev==="EXECUTION_STARTED"){root.ts=ts;root.ns=ns;continue}\n'+
+    '    if(ev==="EXECUTION_FINISHED"){root.endNs=ns;root.dur=ns-root.ns;continue}\n'+
+    '    if(EXIT_MAP[ev]){\n'+
+    '      if(stk.length>1){const n=stk.pop();n.endNs=ns;n.dur=ns-n.ns;n.logEndIdx=lls.length-1;\n'+
+    '        if(ev==="SOQL_EXECUTE_END"){const m=rest.match(/Rows:(\\d+)/i);if(m)n.rowCount=m[1]}\n'+
+    '        if(ev==="CALLOUT_RESPONSE"){const sc=rest.match(/StatusCode=(\\d+)/);if(sc)n.calloutResp="HTTP "+sc[1]}\n'+
+    '      }continue;}\n'+
+    '    if(ev==="USER_DEBUG"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"debug",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false,level:m.level});continue}\n'+
+    '    if(ev==="VARIABLE_ASSIGNMENT"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"varAssign",cls:"",meth:m.meth,params:"",sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});continue}\n'+
+    '    if(ev==="EXCEPTION_THROWN"||ev==="FATAL_ERROR"){const m=evMeta(ev,rest);cur().children.push({id:"n"+(++seq),type:"exception",cls:"",meth:m.meth,params:"",sig:"",lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:false});stats.exc++;continue}\n'+
+    '    if(PUSH_EVS.has(ev)){\n'+
+    '      const m=evMeta(ev,rest);const nt=m.subtype||evType(ev);\n'+
+    '      const nd={id:"n"+(++seq),type:nt,eventType:ev,cls:m.cls,meth:m.meth,params:m.params,sig:m.sig,lr:m.lr,ts,ns,endNs:ns,dur:0,children:[],expanded:nt!=="system_method",rowCount:null,calloutResp:null,logIdx:lls.length-1};\n'+
+    '      if(nt==="method"||nt==="constructor")stats.methods++;\n'+
+    '      if(nt==="soql")stats.soql++;\n'+
+    '      if(nt==="dml")stats.dml++;\n'+
+    '      if(m.cls){const nsm=m.cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(m.cls.includes(".")?m.cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\\./) :null);if(nsm)nsArr.push(nsm[1])}\n'+
+    '      cur().children.push(nd);stk.push(nd);\n'+
+    '    }\n'+
+    '  }\n'+
+    '  self.postMessage({t:"done",lls,tree:root,stats,ns:[...new Set(nsArr)],evts:[...evCts]});\n'+
+    '};\n'
+  );
+}
+
+function fmtDur(ns) {
+  if (!ns||ns<=0) return '';
+  const ms=ns/1e6;
+  if (ms<0.01) return `${(ns/1000).toFixed(0)}μs`;
+  if (ms<1000) return `${ms.toFixed(ms<10?2:1)}ms`;
+  return `${(ms/1000).toFixed(3)}s`;
+}
+
+// ─── ENGINE ───────────────────────────────────────────────────────────────────
+function initAnalyzer(rootEl, fetchSource) {
+  // Inject styles
+  const styleEl = document.createElement('style');
+  styleEl.textContent = CSS;
+  rootEl.appendChild(styleEl);
+
+  // Build the analyzer container
+  const C = document.createElement('div');
+  C.className = 'sda';
+  C.style.position = 'relative';
+  C.innerHTML = HTML;
+  rootEl.appendChild(C);
+
+  // DOM helpers — scoped to the analyzer container
+  const $ = id => C.querySelector('#' + id);
+  const $$ = sel => Array.from(C.querySelectorAll(sel));
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const HL_COLORS = [
+    {bg:'#e8c000',fg:'#000',border:'#cca800'},
+    {bg:'#00aaaa',fg:'#000',border:'#008b8b'},
+    {bg:'#d63384',fg:'#fff',border:'#c71585'},
+    {bg:'#2d9e50',fg:'#fff',border:'#228b22'},
+  ];
+  const S = {
+    tabs:[],activeId:null,
+    highlights:HL_COLORS.map((c,i)=>({id:i+1,query:'',bg:c.bg,fg:c.fg,border:c.border})),
+    typeFilter:new Set(),showDebug:true,showSystem:false,showVarAssign:true,showTiming:true,showLogIndent:false,wrapLogLines:false,
+    nsFilter:null,hiddenNsLines:new Set(),hideKeywords:[],hiddenEventTypes:new Set(['HEAP_ALLOCATE','STATEMENT_EXECUTE']),treeSearch:'',
+  };
+  let tabSeq = 0;
+
+  // ── Highlight helpers ──────────────────────────────────────────────────────
+  function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function getActiveHls(){return S.highlights.filter(h=>h.query.trim())}
+
+  function applyHl(text,hls){
+    if (!hls.length) return escHtml(text);
+    const ranges=[];
+    for (const h of hls){
+      const q=h.query.toLowerCase(),t=text.toLowerCase();
+      let i=0;
+      while (i<t.length){const p=t.indexOf(q,i);if(p<0)break;ranges.push({s:p,e:p+h.query.length,bg:h.bg,fg:h.fg});i=p+1}
+    }
+    if (!ranges.length) return escHtml(text);
+    ranges.sort((a,b)=>a.s-b.s);
+    let html='',cur=0;
+    for (const r of ranges){
+      if (r.s<cur) continue;
+      html+=escHtml(text.slice(cur,r.s));
+      html+=`<mark style="background:${r.bg};color:${r.fg}">${escHtml(text.slice(r.s,r.e))}</mark>`;
+      cur=r.e;
+    }
+    return html+escHtml(text.slice(cur));
+  }
+
+  function hlMatchesBg(text,hls){
+    for (const h of hls){if(h.query&&text.toLowerCase().includes(h.query.toLowerCase()))return{bg:h.bg,fg:h.fg}}
+    return null;
+  }
+
+  // ── Log renderer (virtual scroll) ─────────────────────────────────────────
+  const LOG_ROW_H = 18; // must match .ll height in CSS
+  const LOG_OVERSCAN = 50;
+
+  function stripSids(s){return s.replace(/\|01[a-zA-Z0-9]{13,16}(?=\|)/g,'')}
+
+  function buildFoldableMap(tree,logLines){
+    const map=new Map();
+    function walk(node){
+      if (node.logIdx!==undefined&&node.logEndIdx!==undefined&&logLines[node.logIdx]&&logLines[node.logEndIdx])
+        map.set(logLines[node.logIdx].idx,{endRawIdx:logLines[node.logEndIdx].idx,folded:false});
+      node.children.forEach(walk);
+    }
+    walk(tree);
+    return map;
+  }
+
+  function computeVisibleLines(tab){
+    const kws=S.hideKeywords,hEvs=S.hiddenEventTypes,hNs=S.hiddenNsLines;
+    if (!kws.length&&!hEvs.size&&!hNs.size&&!tab._hasFolds) return tab.logLines;
+    return tab.logLines.filter(ll=>{
+      if (ll._folded) return false;
+      if (ll.ev&&hEvs.has(ll.ev)) return false;
+      if (hNs.size&&ll.nsTag&&hNs.has(ll.nsTag)) return false;
+      if (kws.length&&kws.some(k=>ll.raw.toLowerCase().includes(k))) return false;
+      return true;
+    });
+  }
+
+  // Tag each log line with its namespace using a call-stack approach so that
+  // Tag each log line with its namespace using a call-stack approach so that
+  // VARIABLE_ASSIGNMENT / USER_DEBUG / etc. inside a namespace method also get
+  // tagged, not just the METHOD_ENTRY line itself.
+  function tagLineNamespaces(logLines){
+    if(!logLines.length||logLines[0].nsTag!==undefined) return;
+    const NS_RE=/\|([a-zA-Z][a-zA-Z0-9]*)(?:\.|__)/;
+    function restNs(rest){if(!rest)return'';const m=rest.match(NS_RE);return m?m[1]:'';}
+    const nsStack=[''];
+    for(let i=0;i<logLines.length;i++){
+      const ll=logLines[i];
+      const curNs=nsStack[nsStack.length-1];
+      if(PUSH_EVS.has(ll.ev)){
+        // SYSTEM_METHOD_ENTRY always runs on behalf of the caller — don't extract
+        // its own "System" namespace, just inherit the enclosing namespace so that
+        // hiding e.g. fferpcore also hides System.debug calls made inside it.
+        const myNs=ll.ev==='SYSTEM_METHOD_ENTRY'?'':restNs(ll.rest);
+        ll.nsTag=myNs||curNs;
+        nsStack.push(ll.nsTag);
+      } else if(EXIT_MAP[ll.ev]&&ll.ev!=='EXECUTION_FINISHED'){
+        ll.nsTag=curNs;
+        if(nsStack.length>1) nsStack.pop();
+      } else {
+        ll.nsTag=curNs;
+      }
+    }
+  }
+
+  function buildLogRow(ll,tab,hls,visIdx){
+    const isActive=tab._cursorVisIdx===visIdx;
+    const inBlock=!!(tab._blockRange&&ll.ns>0&&ll.ns>=tab._blockRange.startNs&&ll.ns<=tab._blockRange.endNs);
+    const div=document.createElement('div');
+    div.className=`ll ev-${ll.ev}${isActive?' active':''}${inBlock?' ll-block':''}`;
+    div.dataset.ns=ll.ns;div.dataset.idx=ll.idx;div.dataset.ev=ll.ev;div.dataset.visidx=visIdx;
+    const num=document.createElement('span');num.className='ll-num';num.textContent=ll.idx+1;
+    div.appendChild(num);
+    if (tab._foldableMap?.has(ll.idx)){
+      const fi=tab._foldableMap.get(ll.idx);
+      const tog=document.createElement('span');tog.className='ll-fold-tog';
+      tog.textContent=fi.folded?'▶':'▼';tog.title=fi.folded?'Expand block':'Collapse block';
+      tog.addEventListener('click',e=>{
+        e.stopPropagation();
+        fi.folded=!fi.folded;
+        tab._hasFolds=[...tab._foldableMap.values()].some(f=>f.folded);
+        for (const lll of tab.logLines){
+          if (lll.idx>ll.idx&&lll.idx<=fi.endRawIdx) lll._folded=fi.folded;
+        }
+        tab._logScroller?.refresh();
+      });
+      div.appendChild(tog);
+    }
+    if (S.showLogIndent&&ll.depth>0){
+      const ind=document.createElement('span');ind.className='ll-ind';
+      // two non-breaking spaces per depth level, with subtle pipe guides
+      ind.textContent=('\xa0\xa0│').repeat(ll.depth-1)+'\xa0\xa0┤';
+      div.appendChild(ind);
+    }
+    if (ll.ev){
+      const ts=document.createElement('span');ts.className='ll-ts';ts.textContent=ll.ts;
+      const ev=document.createElement('span');ev.className='ll-ev';ev.innerHTML=applyHl(ll.ev,hls);
+      const rest=document.createElement('span');rest.className='ll-rest';rest.innerHTML=applyHl(stripSids(ll.rest),hls);
+      div.appendChild(ts);div.appendChild(ev);div.appendChild(rest);
+      // hover source button
+      const m=evMeta(ll.ev,ll.rest);
+      const srcCls=m.cls||(m.lr&&tab.tree?([...findBlockChainAtNs(tab.tree,ll.ns)].reverse().find(n=>n.cls)?.cls||''):'');
+      if (srcCls){
+        const sb=document.createElement('span');sb.className='ll-src-btn';sb.textContent='⌗';sb.title='View source: '+srcCls;
+        sb.addEventListener('click',e=>{e.stopPropagation();showSnippet(srcCls,m.lr||'');});
+        div.appendChild(sb);
+      }
+    } else {
+      const raw=document.createElement('span');raw.className='ll-rest';raw.innerHTML=applyHl(ll.raw,hls);
+      div.appendChild(raw);
+    }
+    div.addEventListener('click',()=>{
+      tab._cursorVisIdx=visIdx;
+      syncLogToTree(tab,ll.ns,div);
+    });
+    return div;
+  }
+
+  function makeLogScroller(container,tab){
+    let visLines=computeVisibleLines(tab);
+    tab._visLines=visLines;
+    let rendered={start:-1,end:-1};
+    const spacer=document.createElement('div');spacer.style.cssText='position:relative;';
+    const rowsEl=document.createElement('div');rowsEl.style.cssText='position:absolute;top:0;left:0;right:0;will-change:transform;';
+    spacer.appendChild(rowsEl);
+    container.appendChild(spacer);
+
+    function render(){
+      // Wrap mode: bypass virtualization so variable row heights render correctly.
+      if (S.wrapLogLines){
+        spacer.style.height='auto';
+        rowsEl.style.transform='none';
+        if (rendered.start===0&&rendered.end===visLines.length) return;
+        rendered={start:0,end:visLines.length};
+        const hls=getActiveHls();
+        const frag=document.createDocumentFragment();
+        for (let i=0;i<visLines.length;i++) frag.appendChild(buildLogRow(visLines[i],tab,hls,i));
+        rowsEl.innerHTML='';rowsEl.appendChild(frag);
+        return;
+      }
+      const scrollTop=container.scrollTop;
+      const viewH=container.clientHeight||600;
+      spacer.style.height=(visLines.length*LOG_ROW_H)+'px';
+      const start=Math.max(0,Math.floor(scrollTop/LOG_ROW_H)-LOG_OVERSCAN);
+      const end=Math.min(visLines.length,Math.ceil((scrollTop+viewH)/LOG_ROW_H)+LOG_OVERSCAN);
+      if (start===rendered.start&&end===rendered.end) return;
+      rendered={start,end};
+      rowsEl.style.transform=`translateY(${start*LOG_ROW_H}px)`;
+      const hls=getActiveHls();
+      const frag=document.createDocumentFragment();
+      for (let i=start;i<end;i++) frag.appendChild(buildLogRow(visLines[i],tab,hls,i));
+      rowsEl.innerHTML='';rowsEl.appendChild(frag);
+    }
+
+    function scrollToVisIdx(idx,center){
+      if (S.wrapLogLines){
+        const row=rowsEl.children[idx];
+        if (row) row.scrollIntoView({block:center?'center':'nearest'});
+        return;
+      }
+      const rowTop=idx*LOG_ROW_H;
+      const rowBot=rowTop+LOG_ROW_H;
+      const viewTop=container.scrollTop;
+      const viewBot=viewTop+container.clientHeight;
+      if (center||rowTop<viewTop) container.scrollTop=Math.max(0,rowTop-(container.clientHeight/2));
+      else if (rowBot>viewBot) container.scrollTop=rowBot-container.clientHeight;
+      rendered={start:-1,end:-1};render();
+    }
+
+    container.addEventListener('scroll',()=>render(),{passive:true});
+
+    return {
+      refresh(newVis){visLines=newVis??computeVisibleLines(tab);tab._visLines=visLines;rendered={start:-1,end:-1};render()},
+      scrollToNs(ns){
+        const idx=visLines.findIndex(ll=>ll.ns===ns);
+        if (idx<0) return null;
+        scrollToVisIdx(idx,true);
+        return rowsEl.querySelector(`.ll[data-ns="${ns}"]`);
+      },
+      scrollToVisIdx,
+      scrollToFirst(pred){
+        const idx=visLines.findIndex(pred);
+        if (idx>=0) scrollToVisIdx(idx,true);
+      },
+      forceRender:render,
+      pageSize(){return Math.max(1,Math.floor(container.clientHeight/LOG_ROW_H)-1)},
+    };
+  }
+
+  // ── Block highlight ────────────────────────────────────────────────────────
+  function highlightBlock(tab,ns){
+    if (!tab.tree) return;
+    const node=findBlockAtNs(tab.tree,ns);
+    if (!node||node.endNs<=0) return;
+    tab._blockRange={startNs:node.ns,endNs:node.endNs,label:`${node.cls?node.cls+'.':''}${node.meth}`};
+    tab._logScroller?.refresh();
+  }
+
+  function clearBlock(tab){
+    tab._blockRange=null;
+    tab._logScroller?.refresh();
+  }
+
+  let _ctxMenu=null;
+  function closeLogContextMenu(){if(_ctxMenu){_ctxMenu.remove();_ctxMenu=null}}
+
+  function applyHighlight(query){
+    const slot=S.highlights.find(h=>!h.query.trim());
+    if (!slot) return false;
+    slot.query=query;
+    renderHlSlots();
+    rerenderHighlights();
+    return true;
+  }
+
+  function jumpToNs(tab,targetNs){
+    const vis=tab._visLines||[];
+    const idx=vis.findIndex(ll=>ll.ns===targetNs);
+    if (idx>=0){moveLogCursor(tab,idx);return true}
+    return false;
+  }
+
+  function sep(menu){const d=document.createElement('div');d.className='log-ctx-sep';menu.appendChild(d)}
+
+  function rowFromNode(node){
+    let n=node;
+    while(n&&n!==document.body){
+      if(n.classList&&n.classList.contains('ll')) return n;
+      n=n.parentNode;
+    }
+    return null;
+  }
+
+  function getRowRawText(tab,rowEl){
+    if(!rowEl) return '';
+    const vis=tab._visLines||[];
+    const vi=parseInt(rowEl.dataset.visidx||'-1',10);
+    if(Number.isFinite(vi)&&vi>=0&&vis[vi]) return vis[vi].raw||'';
+    const ns=parseInt(rowEl.dataset.ns||'0',10);
+    const ll=vis.find(l=>l.ns===ns)||(tab.logLines||[]).find(l=>l.ns===ns);
+    return ll?.raw||rowEl.textContent||'';
+  }
+
+  function getSelectedRowsText(tab,rowEl){
+    const sel=window.getSelection?.();
+    if(!sel||sel.rangeCount===0) return '';
+    const a=rowFromNode(sel.anchorNode),b=rowFromNode(sel.focusNode);
+    if(!a||!b||a===b) return '';
+    const ai=parseInt(a.dataset.visidx||'-1',10),bi=parseInt(b.dataset.visidx||'-1',10);
+    if(!Number.isFinite(ai)||!Number.isFinite(bi)||ai<0||bi<0) return '';
+    const vis=tab._visLines||[];
+    const s=Math.min(ai,bi),e=Math.max(ai,bi);
+    if(!vis.length||s>=vis.length) return '';
+    const out=[];
+    for(let i=s;i<=e&&i<vis.length;i++) out.push(vis[i].raw||'');
+    return out.join('\n');
+  }
+
+  async function copyTextToClipboard(text){
+    const val=String(text||'');
+    if(!val) return false;
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(val);
+        return true;
+      }
+    }catch(_){/* fallback below */}
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=val;ta.style.position='fixed';ta.style.opacity='0';
+      document.body.appendChild(ta);ta.focus();ta.select();
+      const ok=document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    }catch(_){return false;}
+  }
+
+  function showLogContextMenu(e,tab,ns,sel='',rowEl=null){
+    closeLogContextMenu();
+    const menu=document.createElement('div');menu.className='log-ctx-menu';_ctxMenu=menu;
+    const vis=tab._visLines||[];
+    const ll=vis.find(l=>l.ns===ns)||(tab.logLines||[]).find(l=>l.ns===ns);
+
+    function item(text,cls,fn){
+      const d=document.createElement('div');d.className='log-ctx-item'+(cls?' '+cls:'');d.textContent=text;
+      d.addEventListener('click',()=>{closeLogContextMenu();fn()});
+      menu.appendChild(d);
+    }
+    function lbl(text){
+      const d=document.createElement('div');d.className='log-ctx-label';d.textContent=text;menu.appendChild(d);
+    }
+    function disabledItem(text,reason){
+      const d=document.createElement('div');d.className='log-ctx-item disabled';
+      const t=document.createElement('span');t.textContent=text;d.appendChild(t);
+      if (reason){const r=document.createElement('span');r.className='ctx-reason';r.textContent=reason;d.appendChild(r)}
+      menu.appendChild(d);
+    }
+
+    // ── block info + jump ──────────────────────────────────────────────────
+    const chain=tab.tree&&ns>0?findBlockChainAtNs(tab.tree,ns):[];
+    const block=chain.length?chain[chain.length-1]:null;
+    if (block&&block.type!=='execution'){
+      const info=document.createElement('div');info.className='log-ctx-info';
+      // build breadcrumb: show up to last 2 meaningful frames
+      const frames=chain.filter(n=>n.type!=='execution');
+      const label=frames.length>=2
+        ? ((frames[frames.length-2].cls?frames[frames.length-2].cls+'.':'')+frames[frames.length-2].meth+
+           ' → '+(block.cls?block.cls+'.':'')+block.meth)
+        : ((block.cls?block.cls+'.':'')+block.meth);
+      const lineCount=(tab.logLines||[]).filter(ll=>ll.ns>=block.ns&&ll.ns<=block.endNs).length;
+      const dur=block.dur>0?fmtDur(block.dur):'—';
+      const name=document.createElement('div');name.className='log-ctx-info-name';
+      name.title=label;name.textContent=label;
+      const meta=document.createElement('div');meta.className='log-ctx-info-meta';
+      meta.textContent=`${lineCount} lines · ${dur}`;
+      info.appendChild(name);info.appendChild(meta);menu.appendChild(info);
+      item('↑ Jump to entry','',()=>jumpToNs(tab,block.ns));
+      if (block.endNs>0) item('↓ Jump to exit','',()=>jumpToNs(tab,block.endNs));
+      sep(menu);
+    } else if (ll?.ev){
+      lbl(ll.ev);
+    }
+
+    // ── view source ──────────────────────────────────────────────────────
+    if (ll?.ev){
+      const m=evMeta(ll.ev,ll.rest);
+      const lrTxt=m.lr?':'+m.lr.replace(/[\[\]]/g,''):'';
+      const hasSourceLoaded=_srcFileMap.size>0;
+      if (m.cls){
+        if (hasSourceLoaded){
+          item(`⌗ View source: ${m.cls}${lrTxt}`, '', ()=>{
+            closeLogContextMenu();
+            showSnippet(m.cls, m.lr||'', rowEl);
+          });
+        } else {
+          disabledItem(`⌗ View source: ${m.cls}${lrTxt}`, 'load source folder first');
+        }
+        sep(menu);
+      } else if (m.lr) {
+        // event has a line ref but no class of its own — infer the enclosing class
+        const chainCls=chain.length?[...chain].reverse().find(n=>n.cls)?.cls:'';
+        if (chainCls){
+          if (hasSourceLoaded){
+            item(`⌗ View source: ${chainCls}${lrTxt}`, '', ()=>{
+              closeLogContextMenu();
+              showSnippet(chainCls, m.lr||'', rowEl);
+            });
+          } else {
+            disabledItem(`⌗ View source: ${chainCls}${lrTxt}`, 'load source folder first');
+          }
+        } else {
+          disabledItem('⌗ View source', 'no Apex class for this line (anonymous/system code)');
+        }
+        sep(menu);
+      }
+    }
+
+    // ── copy line / multiline ────────────────────────────────────────────
+    const lineText=getRowRawText(tab,rowEl);
+    const selectedRowsText=getSelectedRowsText(tab,rowEl);
+    const hasSelText=!!sel;
+    item('Copy this line','',async()=>{
+      const text=selectedRowsText||lineText;
+      await copyTextToClipboard(text);
+    });
+    if (selectedRowsText){
+      item('Copy selected lines','',async()=>{await copyTextToClipboard(selectedRowsText)});
+    } else if (hasSelText) {
+      item('Copy selected text','',async()=>{await copyTextToClipboard(sel)});
+    }
+    sep(menu);
+
+    // ── highlight selection ───────────────────────────────────────────────
+    if (sel){
+      const freeSlot=S.highlights.find(h=>!h.query.trim());
+      const label=sel.length>32?sel.slice(0,32)+'…':sel;
+      if (freeSlot){
+        item(`Highlight "${label}" → H${freeSlot.id}`,'',()=>applyHighlight(sel));
+      } else {
+        const d=document.createElement('div');d.className='log-ctx-item';
+        d.style.cssText='opacity:.45;cursor:default';
+        d.textContent='No free highlight slot (H1–H4 all used)';
+        menu.appendChild(d);
+      }
+      sep(menu);
+    }
+
+    // ── block highlight ───────────────────────────────────────────────────
+    item('Show current block','',()=>highlightBlock(tab,ns));
+    if (tab._blockRange){
+      sep(menu);
+      lbl('Block: '+tab._blockRange.label.slice(0,28));
+      item('Clear block highlight','danger',()=>clearBlock(tab));
+    }
+
+    document.body.appendChild(menu);
+    const mw=300;
+    menu.style.minWidth=mw+'px';
+    menu.style.left=Math.min(e.clientX,window.innerWidth-mw-4)+'px';
+    menu.style.top=Math.min(e.clientY,window.innerHeight-menu.offsetHeight-4)+'px';
+  }
+
+  document.addEventListener('click',e=>{if(_ctxMenu&&!_ctxMenu.contains(e.target))closeLogContextMenu()},true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLogContextMenu();closeLogTagsModal();closeSnippet();$('helpModal')?.classList.remove('open');}});
+
+  function moveLogCursor(tab,newIdx){
+    const vis=tab._visLines||[];
+    if (!vis.length) return;
+    newIdx=Math.max(0,Math.min(vis.length-1,newIdx));
+    tab._cursorVisIdx=newIdx;
+    const ll=vis[newIdx];
+    tab._activeLogNs=ll.ns;
+    tab._logScroller?.scrollToVisIdx(newIdx,false);
+    // update tree selection
+    $$('.nrow.active').forEach(e=>e.classList.remove('active'));
+    const nodeEl=C.querySelector(`.nrow[data-ns="${ll.ns}"]`);
+    if (nodeEl){
+      nodeEl.classList.add('active');
+      let p=nodeEl.parentElement;
+      while (p&&!p.classList.contains('tree-content')){
+        if (p.classList.contains('nchildren')) p.style.display='block';
+        p=p.parentElement;
+      }
+      nodeEl.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  }
+
+  function renderLogView(tab){
+    tab._cursorVisIdx=-1;
+    const wrap=document.createElement('div');
+    wrap.className='log-rendered'+(S.wrapLogLines?' wrap-on':'');
+    wrap.id='logRendered_'+tab.id;
+    wrap.tabIndex=0;
+    wrap.setAttribute('aria-label','Log lines — use arrow keys to navigate');
+
+    wrap.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      const rowEl=e.target.closest('.ll');
+      if (!rowEl) return;
+      const ns=parseInt(rowEl.dataset.ns);
+      // capture selection before the menu causes it to collapse
+      const sel=window.getSelection()?.toString().trim()||'';
+      showLogContextMenu(e,tab,ns,sel,rowEl);
+    });
+
+    wrap.addEventListener('keydown',e=>{
+      const vis=tab._visLines||[];
+      if (!vis.length) return;
+      const cur=tab._cursorVisIdx<0?0:tab._cursorVisIdx;
+      const ps=tab._logScroller?.pageSize()??20;
+      let next=-1;
+      if (e.key==='ArrowDown')  {next=cur+1;e.preventDefault()}
+      else if (e.key==='ArrowUp')    {next=cur-1;e.preventDefault()}
+      else if (e.key==='PageDown')   {next=cur+ps;e.preventDefault()}
+      else if (e.key==='PageUp')     {next=cur-ps;e.preventDefault()}
+      else if (e.key==='Home')       {next=0;e.preventDefault()}
+      else if (e.key==='End')        {next=vis.length-1;e.preventDefault()}
+      if (next>=0) moveLogCursor(tab,next);
+    });
+
+    // Scroller needs actual layout — init after element is in DOM
+    setTimeout(()=>{
+      tab._logScroller=makeLogScroller(wrap,tab);
+      tab._logScroller.forceRender();
+      const hls=getActiveHls();
+      if (hls.length){
+        tab._logScroller.scrollToFirst(ll=>hls.some(h=>h.query&&ll.raw.toLowerCase().includes(h.query.toLowerCase())));
+      }
+    },0);
+    return {el:wrap};
+  }
+
+  function syncLogToTree(tab,ns,lineEl){
+    $$('.ll.active').forEach(e=>e.classList.remove('active'));
+    $$('.nrow.active').forEach(e=>e.classList.remove('active'));
+    tab._activeLogNs=ns;
+    if (lineEl){
+      lineEl.classList.add('active');
+      // keep _cursorVisIdx in sync when row is clicked directly
+      const vi=lineEl.dataset.visidx;
+      if (vi!=null) tab._cursorVisIdx=parseInt(vi);
+    }
+    const nodeEl=C.querySelector(`.nrow[data-ns="${ns}"]`);
+    if (nodeEl){
+      nodeEl.classList.add('active');
+      let p=nodeEl.parentElement;
+      while (p&&!p.classList.contains('tree-content')){
+        if (p.classList.contains('nchildren')) p.style.display='block';
+        p=p.parentElement;
+      }
+      nodeEl.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  }
+
+  function syncTreeToLog(tab,ns){
+    tab._activeLogNs=ns;
+    $$('.ll.active').forEach(e=>e.classList.remove('active'));
+    if (!tab._logScroller) return;
+    const rowEl=tab._logScroller.scrollToNs(ns);
+    if (rowEl){
+      rowEl.classList.add('active');
+      const vi=rowEl.dataset.visidx;
+      if (vi!=null) tab._cursorVisIdx=parseInt(vi);
+    }
+  }
+
+  // ── Tree renderer ──────────────────────────────────────────────────────────
+  const TCFG = {
+    execution:{ic:'⚡',badge:null,bc:''},code_unit:{ic:'◈',badge:'unit',bc:'bg-unit'},
+    trigger:{ic:'⚡',badge:'trigger',bc:'bg-trigger'},method:{ic:'▸',badge:'method',bc:'bg-method'},
+    constructor:{ic:'⊕',badge:'new',bc:'bg-constructor'},system_method:{ic:'⚙',badge:'sys',bc:'bg-sys'},
+    soql:{ic:'⬡',badge:'soql',bc:'bg-soql'},dml:{ic:'💾',badge:'dml',bc:'bg-dml'},
+    debug:{ic:'·',badge:'dbg',bc:'bg-debug'},exception:{ic:'✖',badge:'exc',bc:'bg-exc'},
+    callout:{ic:'↗',badge:'http',bc:'bg-http'},flow:{ic:'⟳',badge:'flow',bc:'bg-flow'},
+    varAssign:{ic:'≔',badge:'var',bc:'bg-var'},
+    other:{ic:'·',badge:null,bc:''},
+  };
+
+  function nsMatchesFilter(cls){
+    if (!S.nsFilter||!S.nsFilter.size) return true;
+    const m=cls.match(/^([a-zA-Z][a-zA-Z0-9]+)__/)||(cls.includes('.')?cls.match(/^([a-zA-Z][a-zA-Z0-9]*)\./):null);
+    return S.nsFilter.has(m?m[1]:'(none)');
+  }
+  function nodeText(node){return`${node.cls} ${node.meth} ${node.params} ${node.sig}`.toLowerCase()}
+  function subtreeHasSearchMatch(node){
+    if (!S.treeSearch) return true;
+    const q=S.treeSearch.toLowerCase();
+    if (nodeText(node).includes(q)) return true;
+    return node.children.some(c=>subtreeHasSearchMatch(c));
+  }
+  function subtreeHasMatch(node){
+    if (!nodeVisible(node)) return false;
+    if (!S.typeFilter.size) return true;
+    const direct=S.typeFilter.has(node.type)||(S.typeFilter.has('method')&&node.type==='constructor');
+    return direct||node.children.some(c=>subtreeHasMatch(c));
+  }
+  function nodeVisible(node){
+    if (node.type==='debug'&&!S.showDebug) return false;
+    if (node.type==='system_method'&&!S.showSystem) return false;
+    if (node.type==='varAssign'&&!S.showVarAssign) return false;
+    if (S.typeFilter.size){
+      const direct=S.typeFilter.has(node.type)||(S.typeFilter.has('method')&&node.type==='constructor');
+      if (!direct&&!node.children.some(c=>subtreeHasMatch(c))) return false;
+    }
+    if ((node.type==='method'||node.type==='constructor')&&node.cls&&!nsMatchesFilter(node.cls)) return false;
+    if (S.hideKeywords.length){const t=nodeText(node);if(S.hideKeywords.some(k=>t.includes(k)))return false}
+    if (S.treeSearch){const t=nodeText(node);if(!t.includes(S.treeSearch.toLowerCase())&&!node.children.some(c=>subtreeHasSearchMatch(c)))return false}
+    return true;
+  }
+
+  function groupVarKids(els){
+    const out=[];let i=0;
+    while(i<els.length){
+      if(!els[i].classList.contains('t-varAssign')){out.push(els[i++]);continue}
+      const run=[];
+      while(i<els.length&&els[i].classList.contains('t-varAssign'))run.push(els[i++]);
+      if(run.length===1){out.push(run[0]);continue}
+      const wrap=document.createElement('div');wrap.className='tree-node t-varAssign';
+      const hdr=document.createElement('div');hdr.className='nrow';
+      const tog=document.createElement('span');tog.className='ntog';tog.textContent='▶';
+      const ic=document.createElement('span');ic.className='nic';ic.textContent='≔';
+      const bd=document.createElement('span');bd.className='nbadge bg-var';bd.textContent='vars';
+      const sg=document.createElement('span');sg.className='nsig';sg.textContent=` ${run.length} assignments`;
+      hdr.appendChild(tog);hdr.appendChild(ic);hdr.appendChild(bd);hdr.appendChild(sg);
+      const body=document.createElement('div');body.className='nchildren';body.style.display='none';
+      run.forEach(r=>body.appendChild(r));
+      hdr.addEventListener('click',e=>{
+        e.stopPropagation();
+        const open=body.style.display!=='none';
+        body.style.display=open?'none':'block';
+        tog.textContent=open?'▶':'▼';
+      });
+      wrap.appendChild(hdr);wrap.appendChild(body);
+      out.push(wrap);
+    }
+    return out;
+  }
+
+  function buildNode(node,tab,hls,gapAfter=''){
+    if (!nodeVisible(node)) return null;
+    const cfg=TCFG[node.type]||TCFG.other;
+    const childMeta=node.children.map((c,i)=>{
+      const next=node.children[i+1];
+      const gap=(S.showTiming&&next&&c.endNs>0&&next.ns>c.endNs)?fmtDur(next.ns-c.endNs):'';
+      return{c,gap};
+    });
+    const visibleKids=[];
+    for (const {c,gap} of childMeta){const el=buildNode(c,tab,hls,gap);if(el)visibleKids.push(el)}
+    const wrap=document.createElement('div');wrap.className=`tree-node t-${node.type}`;
+    const row=document.createElement('div');row.className='nrow';row.dataset.ns=node.ns;row.dataset.id=node.id;
+    const tog=document.createElement('span');
+    tog.className=`ntog ${visibleKids.length?(node.expanded?'open':''):''}`;
+    tog.textContent=visibleKids.length?(node.expanded?'▼':'▶'):'·';
+    row.appendChild(tog);
+    const ic=document.createElement('span');ic.className='nic';ic.textContent=cfg.ic;row.appendChild(ic);
+    if (cfg.badge){const bd=document.createElement('span');bd.className=`nbadge ${cfg.bc}`;bd.textContent=cfg.badge;row.appendChild(bd)}
+    if (node.cls){const cn=document.createElement('span');cn.className='ncls';cn.dataset.raw=node.cls+'.';cn.innerHTML=applyHl(node.cls+'.',hls);row.appendChild(cn)}
+    const mn=document.createElement('span');mn.className='nmeth';mn.dataset.raw=node.meth;mn.innerHTML=applyHl(node.meth,hls);row.appendChild(mn);
+    if (node.params!==undefined&&node.params!==null&&node.params!==''){
+      const ps=document.createElement('span');ps.className='nparams';ps.dataset.raw=node.params;
+      ps.innerHTML='('+applyHl(node.params,hls)+')';row.appendChild(ps);
+    } else if (node.sig){
+      const rawSig=node.sig.length>90?node.sig.slice(0,90)+'…':node.sig;
+      const sg=document.createElement('span');sg.className='nsig';sg.title=node.sig;sg.dataset.raw=rawSig;
+      sg.innerHTML=applyHl(rawSig,hls);row.appendChild(sg);
+    }
+    if (node.rowCount){const rc=document.createElement('span');rc.className='nsig';rc.style.color='#39d353';rc.textContent=` → ${node.rowCount} rows`;row.appendChild(rc)}
+    if (node.calloutResp){const cr=document.createElement('span');cr.className='nsig';cr.textContent=` ← ${node.calloutResp}`;row.appendChild(cr)}
+    if (node.lr&&node.lr!=='[EXTERNAL]'){const ln=document.createElement('span');ln.className='nln';ln.textContent=node.lr;row.appendChild(ln)}
+    const dur=fmtDur(node.dur);
+    if (dur){const dd=document.createElement('span');dd.className='ndur';dd.textContent=dur;row.appendChild(dd)}
+    if (gapAfter&&S.showTiming){const g=document.createElement('span');g.className='ngap-inline';g.textContent=`+${gapAfter}`;row.appendChild(g)}
+    if (node.cls){
+      row.dataset.snippetCls=node.cls;
+      if (node.lr&&node.lr!=='[EXTERNAL]') row.dataset.snippetLr=node.lr;
+      const srcBtn=document.createElement('span');
+      srcBtn.className='nsrc-btn';srcBtn.textContent='⌗';srcBtn.title='View source';
+      srcBtn.addEventListener('click',e=>{e.stopPropagation();showSnippet(node.cls,node.lr&&node.lr!=='[EXTERNAL]'?node.lr:'',row)});
+      row.appendChild(srcBtn);
+    }
+    wrap.appendChild(row);
+    if (visibleKids.length){
+      const kids=document.createElement('div');kids.className='nchildren';
+      kids.style.display=node.expanded?'block':'none';
+      groupVarKids(visibleKids).forEach(k=>kids.appendChild(k));
+      wrap.appendChild(kids);
+      row.addEventListener('click',e=>{
+        e.stopPropagation();
+        const open=kids.style.display!=='none';
+        kids.style.display=open?'none':'block';
+        tog.textContent=open?'▶':'▼';
+        node.expanded=!open;
+        syncTreeToLog(tab,node.ns);
+        $$('.nrow.active').forEach(el=>el.classList.remove('active'));
+        row.classList.add('active');
+      });
+    } else {
+      row.addEventListener('click',e=>{
+        e.stopPropagation();
+        syncTreeToLog(tab,node.ns);
+        $$('.nrow.active').forEach(el=>el.classList.remove('active'));
+        row.classList.add('active');
+      });
+    }
+    return wrap;
+  }
+
+  // ── Tab manager ────────────────────────────────────────────────────────────
+  function addTab(id,name,raw){
+    const tab={id:id||`t${++tabSeq}`,name:name||'Log '+tabSeq,raw,parsed:false,
+      logLines:[],tree:null,stats:{},namespaces:new Set()};
+    S.tabs.push(tab);
+    renderTabBar();
+    switchTab(tab.id);
+    if (raw) parseTab(tab);
+  }
+
+  function closeTab(id,e){
+    e&&e.stopPropagation();
+    const i=S.tabs.findIndex(t=>t.id===id);
+    if (i<0) return;
+    S.tabs.splice(i,1);
+    if (S.activeId===id) S.activeId=S.tabs.length?S.tabs[Math.max(0,i-1)].id:null;
+    renderTabBar();
+    if (S.activeId) switchTab(S.activeId); else renderEmpty();
+  }
+
+  function switchTab(id){
+    S.activeId=id;
+    renderTabBar();
+    const tab=S.tabs.find(t=>t.id===id);
+    if (!tab) return;
+    if (tab.parsed) renderParsedTab(tab); else renderInputTab(tab);
+  }
+
+  function renderTabBar(){
+    const bar=$('tabBar');
+    bar.innerHTML='';
+    S.tabs.forEach(tab=>{
+      const btn=document.createElement('div');
+      btn.className='tab'+(tab.id===S.activeId?' active':'');
+      btn.textContent=tab.name;
+      btn.addEventListener('click',()=>switchTab(tab.id));
+      const x=document.createElement('button');x.className='tab-x';x.textContent='×';
+      x.addEventListener('click',e=>closeTab(tab.id,e));
+      btn.appendChild(x);bar.appendChild(btn);
+    });
+    const add=document.createElement('button');
+    add.className='tab-add';add.textContent='＋';add.title='New tab';
+    add.addEventListener('click',()=>addTab(null,'Untitled',''));
+    bar.appendChild(add);
+  }
+
+  function renderInputTab(tab){
+    const logPane=$('logPane');
+    logPane.innerHTML='';
+    const wrap=document.createElement('div');wrap.className='log-input-wrap';
+    const ta=document.createElement('textarea');ta.className='log-textarea';
+    ta.id='logTA_'+tab.id;ta.placeholder='Paste Salesforce debug log here…';
+    ta.value=tab.raw||'';
+    wrap.appendChild(ta);
+    const btnRow=document.createElement('div');btnRow.className='btn-row';
+    const parseBtn=document.createElement('button');parseBtn.className='btn btn-primary';
+    parseBtn.textContent='Parse Log';parseBtn.title='Parse the pasted log into a call tree';parseBtn.addEventListener('click',parseActiveTab);
+    const sampleBtn=document.createElement('button');sampleBtn.className='btn';
+    sampleBtn.textContent='▶ Load sample';sampleBtn.title='Load an example Apex debug log and parse it instantly';sampleBtn.addEventListener('click',()=>{loadSample();parseActiveTab();});
+    const status=document.createElement('span');status.id='parseStatus';
+    status.style.cssText='font-size:11px;color:var(--dm)';
+    if (tab.raw&&tab.raw.length>RAW_INLINE_LIMIT) status.textContent=`${(tab.raw.length/1024/1024).toFixed(1)} MB ready — click Parse Log`;
+    btnRow.appendChild(parseBtn);btnRow.appendChild(sampleBtn);btnRow.appendChild(status);
+    wrap.appendChild(btnRow);logPane.appendChild(wrap);
+    $('treePaneHdr').style.display='none';
+    $('treeControls').style.display='none';
+    $('treeContent').innerHTML='<div class="empty"><div class="ico">📋</div><p>Click Parse Log to visualize the call stack</p></div>';
+    $('statsBar').style.display='none';
+  }
+
+  async function parseActiveTab(){
+    const tab=S.tabs.find(t=>t.id===S.activeId);
+    if (!tab) return;
+    const ta=$('logTA_'+tab.id);
+    if (ta) tab.raw=ta.value;
+    if (!tab.raw.trim()){const ps=$('parseStatus');if(ps)ps.textContent='Paste a log first.';return}
+    await parseTab(tab);
+    saveToHistory(tab);
+  }
+
+  function showParseProgress(tab,pct){
+    const logPane=$('logPane');
+    let wrap=logPane.querySelector('.parse-progress-wrap');
+    if (!wrap){
+      logPane.innerHTML='';
+      wrap=document.createElement('div');wrap.className='parse-progress-wrap';
+      const label=document.createElement('div');label.className='parse-progress-label';
+      label.textContent='Parsing log…';
+      const bar=document.createElement('div');bar.className='parse-progress-bar';
+      const fill=document.createElement('div');fill.className='parse-progress-fill';fill.style.width='0%';
+      bar.appendChild(fill);
+      const pctEl=document.createElement('div');pctEl.className='parse-progress-pct';pctEl.textContent='0%';
+      wrap.appendChild(label);wrap.appendChild(bar);wrap.appendChild(pctEl);
+      logPane.appendChild(wrap);
+    }
+    const fill=wrap.querySelector('.parse-progress-fill');
+    const pctEl=wrap.querySelector('.parse-progress-pct');
+    const p=Math.round(pct*100);
+    if(fill)fill.style.width=p+'%';
+    if(pctEl)pctEl.textContent=p+'%';
+  }
+
+  function parseWithWorker(text, onProgress){
+    return new Promise((resolve,reject)=>{
+      let src;
+      try { src=buildWorkerSrc(); } catch(e){ return reject(e); }
+      const blob=new Blob([src],{type:'application/javascript'});
+      const url=URL.createObjectURL(blob);
+      const w=new Worker(url);
+      w.onmessage=function(e){
+        const d=e.data;
+        if(d.t==='p'){ onProgress&&onProgress(d.p); return; }
+        if(d.t==='done'){
+          URL.revokeObjectURL(url);
+          w.terminate();
+          resolve({
+            logLines:d.lls,
+            tree:d.tree,
+            stats:d.stats,
+            namespaces:new Set(d.ns),
+            eventTypes:new Map(d.evts)
+          });
+        }
+      };
+      w.onerror=function(e){
+        URL.revokeObjectURL(url);
+        w.terminate();
+        reject(e);
+      };
+      w.postMessage(text);
+    });
+  }
+
+  async function parseTab(tab){
+    showParseProgress(tab,0);
+    let result;
+    try {
+      result=await parseWithWorker(tab.raw,pct=>showParseProgress(tab,pct));
+    } catch(_){
+      result=await parseLogAsync(tab.raw,pct=>showParseProgress(tab,pct));
+    }
+    tab.logLines=result.logLines;tab.tree=result.tree;tab.stats=result.stats;
+    tab.namespaces=result.namespaces;tab.eventTypes=result.eventTypes;tab.parsed=true;
+    tagLineNamespaces(tab.logLines);
+    tab._foldableMap=buildFoldableMap(tab.tree,tab.logLines);
+    tab._hasFolds=false;
+    // collect any namespaces the parser missed (e.g. || empty-field format)
+    tab.logLines.forEach(ll=>{if(ll.nsTag)tab.namespaces.add(ll.nsTag);});
+    renderParsedTab(tab);
+  }
+
+  function renderParsedTab(tab){
+    renderLogPane(tab);
+    $('treePaneHdr').style.display='flex';
+    $('treeControls').style.display='flex';
+    $('statsBar').style.display='flex';
+    const wrap=$('splitWrap');
+    if (wrap.classList.contains('tree-hidden')){
+      tab._treeDirty=true;
+    } else {
+      renderTreePane(tab);
+    }
+    renderStats(tab);renderNsPopup(tab);renderLogTagsPopup(tab);
+    const tsb=$('treeSearchBox');if(tsb)tsb.value=S.treeSearch;
+  }
+
+  function renderLogTagsBar(tab){
+    if (!tab?.eventTypes?.size) return null;
+    const bar=document.createElement('div');bar.className='log-tags-bar';
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    sorted.forEach(([ev,count])=>{
+      const chip=document.createElement('button');
+      chip.className='log-tag-chip'+(S.hiddenEventTypes.has(ev)?' tag-hidden':'');
+      chip.textContent=ev;chip.title=`${ev} — ${count} occurrences. Click to hide/show`;
+      chip.addEventListener('click',()=>{
+        const nowHidden=!S.hiddenEventTypes.has(ev);
+        if (nowHidden) S.hiddenEventTypes.add(ev); else S.hiddenEventTypes.delete(ev);
+        chip.classList.toggle('tag-hidden',nowHidden);
+        applyHideToLog(tab);updateAllHlCounts();
+      });
+      bar.appendChild(chip);
+    });
+    return bar;
+  }
+
+  function renderLogPane(tab){
+    const logPane=$('logPane');
+    const toolbar=document.createElement('div');toolbar.className='log-toolbar';
+    const info=document.createElement('span');info.style.cssText='font-size:11px;color:var(--dm)';
+    info.textContent=`${tab.name} — ${tab.logLines.length} lines`;
+    const showTreeBtn=document.createElement('button');showTreeBtn.className='btn btn-sm';
+    showTreeBtn.id='btn-showTree';showTreeBtn.textContent='◀ Stack';
+    showTreeBtn.style.display=$('splitWrap').classList.contains('tree-hidden')?'':'none';
+    showTreeBtn.addEventListener('click',showTreePane);
+    const indentBtn=document.createElement('button');
+    indentBtn.className='btn btn-sm'+(S.showLogIndent?' toggle-btn on':'');
+    indentBtn.id='btn-logIndent';indentBtn.title='Toggle call-depth indentation';indentBtn.textContent='⇥ Indent';
+    indentBtn.addEventListener('click',()=>{
+      S.showLogIndent=!S.showLogIndent;
+      indentBtn.className='btn btn-sm'+(S.showLogIndent?' toggle-btn on':'');
+      tab._logScroller?.refresh();
+    });
+    const wrapBtn=document.createElement('button');
+    wrapBtn.className='btn btn-sm'+(S.wrapLogLines?' toggle-btn on':'');
+    wrapBtn.id='btn-logWrap';wrapBtn.title='Toggle line wrap';wrapBtn.textContent='↵ Wrap';
+    wrapBtn.addEventListener('click',()=>{
+      S.wrapLogLines=!S.wrapLogLines;
+      wrapBtn.className='btn btn-sm'+(S.wrapLogLines?' toggle-btn on':'');
+      const rendered=C.querySelector('#logRendered_'+tab.id);
+      if (rendered) rendered.classList.toggle('wrap-on',S.wrapLogLines);
+      tab._logScroller?.refresh();
+    });
+    const editBtn=document.createElement('button');editBtn.className='btn btn-sm';
+    editBtn.textContent='✎ Edit';editBtn.addEventListener('click',()=>editTab(tab.id));
+    const logTagsModalBtn=document.createElement('button');logTagsModalBtn.className='btn btn-sm';
+    logTagsModalBtn.textContent='Log Tags';
+    logTagsModalBtn.addEventListener('click',()=>openLogTagsModal(tab));
+    const nsLogWrap=document.createElement('div');nsLogWrap.style.cssText='position:relative;display:inline-block';
+    const nsLogBtn=document.createElement('button');nsLogBtn.className='btn btn-sm';
+    nsLogBtn.textContent='NS ▾';nsLogBtn.title='Hide namespaces from log';
+    const nsLogPop=document.createElement('div');nsLogPop.className='ns-log-popup';
+    nsLogWrap.appendChild(nsLogBtn);nsLogWrap.appendChild(nsLogPop);
+    nsLogBtn.addEventListener('click',e=>{e.stopPropagation();nsLogPop.classList.toggle('open');if(nsLogPop.classList.contains('open')){renderNsLogPopup(tab,nsLogPop,nsLogBtn)}});
+    toolbar.appendChild(info);toolbar.appendChild(showTreeBtn);toolbar.appendChild(indentBtn);toolbar.appendChild(wrapBtn);toolbar.appendChild(editBtn);
+    toolbar.appendChild(logTagsModalBtn);toolbar.appendChild(nsLogWrap);
+    const {el}=renderLogView(tab);
+    logPane.innerHTML='';
+    logPane.appendChild(toolbar);
+    logPane.appendChild(el);
+  }
+
+  function renderTreePane(tab){
+    const content=$('treeContent');
+    if (!content) return;
+    content.innerHTML='';
+    const hls=getActiveHls();
+    if (!tab.tree||!tab.tree.children.length){
+      content.innerHTML='<div class="empty"><div class="ico">🔍</div><p>No call stack found in log.</p></div>';
+      return;
+    }
+    const el=buildNode(tab.tree,tab,hls);
+    if (el) content.appendChild(el);
+  }
+
+  function editTab(id){
+    const tab=S.tabs.find(t=>t.id===id);
+    if (!tab) return;
+    tab.parsed=false;renderInputTab(tab);
+  }
+
+  function showTreePane(){
+    const wrap=$('splitWrap');
+    wrap.classList.remove('tree-hidden');
+    const showBtn=C.querySelector('#btn-showTree');
+    if (showBtn) showBtn.style.display='none';
+    const tab=getActiveTab();
+    if (tab?.parsed&&tab._treeDirty){tab._treeDirty=false;renderTreePane(tab)}
+  }
+  function hideTreePane(){
+    $('splitWrap').classList.add('tree-hidden');
+    const showBtn=C.querySelector('#btn-showTree');
+    if (showBtn) showBtn.style.display='';
+  }
+
+  function renderEmpty(){
+    $('logPane').innerHTML='<div class="empty" style="padding:40px"><div class="ico">📋</div><p>Open or drag a log file</p></div>';
+    $('treeContent').innerHTML='<div class="empty"><div class="ico">📋</div><p>Paste a Salesforce debug log and click Parse</p></div>';
+    $('treePaneHdr').style.display='none';
+    $('treeControls').style.display='none';
+    $('statsBar').style.display='none';
+  }
+
+  // ── Stats bar ──────────────────────────────────────────────────────────────
+  function renderStats(tab){
+    const s=tab.stats,bar=$('statsBar');
+    bar.innerHTML=`Methods:<span>${s.methods}</span> SOQL:<span>${s.soql}</span> DML:<span>${s.dml}</span> Exceptions:<span>${s.exc}</span> Lines:<span>${s.lines}</span> Duration:<span>${fmtDur(tab.tree.dur)||'—'}</span>`;
+  }
+
+  // ── Highlight system ───────────────────────────────────────────────────────
+  function navigateHighlight(h,dir){
+    const tab=S.tabs.find(t=>t.id===S.activeId);
+    if (!tab||!tab._logScroller||!h.query.trim()) return;
+    const vis=tab._visLines||[];
+    if (!vis.length) return;
+    const q=h.query.toLowerCase();
+    const cur=tab._cursorVisIdx??-1;
+    let idx=-1;
+    if (dir==='down'){
+      // search forward from cur+1, wrapping
+      for (let i=1;i<=vis.length;i++){
+        const c=(cur+i)%vis.length;
+        if (vis[c].raw.toLowerCase().includes(q)){idx=c;break}
+      }
+    } else {
+      // search backward from cur-1, wrapping
+      for (let i=1;i<=vis.length;i++){
+        const c=(cur-i+vis.length)%vis.length;
+        if (vis[c].raw.toLowerCase().includes(q)){idx=c;break}
+      }
+    }
+    if (idx>=0) moveLogCursor(tab,idx);
+  }
+
+  let _hlCountRefreshers=[];
+  function updateAllHlCounts(){_hlCountRefreshers.forEach(fn=>fn())}
+
+  function renderHlSlots(){
+    const wrap=$('hlSlots');wrap.innerHTML='';
+    _hlCountRefreshers=[];
+    S.highlights.forEach(h=>{
+      const slot=document.createElement('div');slot.className='hl-slot';
+      slot.style.borderColor=h.query?h.border:'var(--bd)';
+      if (h.query) slot.classList.add('active-slot');
+      const dot=document.createElement('div');dot.className='hl-dot';
+      dot.style.background=h.query?h.bg:'var(--b3)';
+      dot.style.border=`2px solid ${h.border}`;dot.title='Click to cycle color';
+      dot.addEventListener('click',()=>{});
+      const inp=document.createElement('input');inp.className='hl-input';
+      inp.value=h.query;inp.placeholder=`H${h.id}`;
+      const cnt=document.createElement('span');cnt.className='hl-count';
+      function refreshCount(){
+        if (!h.query.trim()){cnt.textContent='';return}
+        const tab=S.tabs.find(t=>t.id===S.activeId);
+        const vis=tab?._visLines||(tab?.logLines)||[];
+        const q=h.query.toLowerCase();
+        cnt.textContent=vis.filter(ll=>ll.raw.toLowerCase().includes(q)).length;
+      }
+      _hlCountRefreshers.push(refreshCount);
+      refreshCount();
+      const applyHlInput=()=>{
+        h.query=inp.value;
+        slot.style.borderColor=h.query?h.border:'var(--bd)';
+        dot.style.background=h.query?h.bg:'var(--b3)';
+        slot.classList.toggle('active-slot',!!h.query);
+        rerenderHighlights();
+      };
+      inp.addEventListener('blur',applyHlInput);
+      inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();applyHlInput()}});
+      const navUp=document.createElement('button');navUp.className='hl-nav';navUp.textContent='▲';
+      navUp.title=`Previous H${h.id} match`;
+      navUp.addEventListener('click',()=>navigateHighlight(h,'up'));
+      const navDn=document.createElement('button');navDn.className='hl-nav';navDn.textContent='▼';
+      navDn.title=`Next H${h.id} match`;
+      navDn.addEventListener('click',()=>navigateHighlight(h,'down'));
+      const clr=document.createElement('button');clr.className='hl-clr';clr.textContent='×';
+      clr.addEventListener('click',()=>{h.query='';inp.value='';slot.style.borderColor='var(--bd)';dot.style.background='var(--b3)';slot.classList.remove('active-slot');refreshCount();rerenderHighlights()});
+      slot.appendChild(dot);slot.appendChild(inp);slot.appendChild(cnt);slot.appendChild(navUp);slot.appendChild(navDn);slot.appendChild(clr);wrap.appendChild(slot);
+    });
+  }
+
+  function rerenderHighlights(){
+    const tab=S.tabs.find(t=>t.id===S.activeId);
+    if (!tab||!tab.parsed) return;
+    // Re-render visible log rows via virtual scroller
+    if (tab._logScroller) tab._logScroller.refresh();
+    // Update tree node highlights in-place (tree is fully in DOM)
+    const hls=getActiveHls();
+    $$('.nrow [data-raw]').forEach(span=>{
+      const raw=span.dataset.raw;
+      if (span.className==='nparams') span.innerHTML='('+applyHl(raw,hls)+')';
+      else span.innerHTML=applyHl(raw,hls);
+    });
+    updateAllHlCounts();
+  }
+
+  function applyHideToLog(tab){
+    const t=tab||getActiveTab();
+    if (!t?._logScroller) return;
+    t._logScroller.refresh(computeVisibleLines(t));
+  }
+
+  function getActiveTab(){return S.tabs.find(t=>t.id===S.activeId)}
+
+  function addHideKeyword(){
+    const inp=$('hideInput');const kw=inp.value.trim().toLowerCase();
+    if (!kw||S.hideKeywords.includes(kw)) return;
+    S.hideKeywords.push(kw);inp.value='';
+    renderHideTags();applyHideToLog();rerender();
+  }
+  function removeHideKeyword(kw){
+    S.hideKeywords=S.hideKeywords.filter(k=>k!==kw);
+    renderHideTags();applyHideToLog();rerender();
+  }
+  function renderHideTags(){
+    const wrap=$('hideTags');wrap.innerHTML='';
+    S.hideKeywords.forEach(kw=>{
+      const tag=document.createElement('span');tag.className='hide-tag';
+      tag.innerHTML=`${escHtml(kw)}`;
+      const btn=document.createElement('button');btn.textContent='×';btn.title='Remove';
+      btn.addEventListener('click',()=>removeHideKeyword(kw));
+      tag.appendChild(btn);wrap.appendChild(tag);
+    });
+  }
+
+  // ── Filter / toggle ────────────────────────────────────────────────────────
+  function setTypeFilter(btn){
+    const f=btn.dataset.f;
+    if (f==='all'){
+      S.typeFilter.clear();
+    } else {
+      if (S.typeFilter.has(f)) S.typeFilter.delete(f); else S.typeFilter.add(f);
+    }
+    $$('.chip').forEach(b=>{
+      const bf=b.dataset.f;
+      b.classList.toggle('on', bf==='all' ? !S.typeFilter.size : S.typeFilter.has(bf));
+    });
+    rerender();
+  }
+  function toggleOpt(key,btn){S[key]=!S[key];btn.classList.toggle('on',S[key]);rerender()}
+  function rerender(){
+    const tab=S.tabs.find(t=>t.id===S.activeId);
+    if (!tab||!tab.parsed) return;
+    if ($('splitWrap').classList.contains('tree-hidden')){tab._treeDirty=true;return}
+    renderTreePane(tab);
+  }
+
+  // ── Namespace filter ───────────────────────────────────────────────────────
+  function renderNsPopup(tab){
+    const pop=$('nsPopup');pop.innerHTML='';
+    const nsArr=['(none)',...Array.from(tab.namespaces).sort()];
+    if (nsArr.length<=1){$('nsBtn').style.display='none';return}
+    $('nsBtn').style.display='';
+    const allChk=document.createElement('div');allChk.className='ns-item';
+    const ac=document.createElement('input');ac.type='checkbox';ac.checked=!S.nsFilter;
+    ac.addEventListener('change',()=>{S.nsFilter=null;renderNsPopup(tab);rerender()});
+    allChk.appendChild(ac);allChk.appendChild(document.createTextNode('All namespaces'));
+    pop.appendChild(allChk);
+    nsArr.forEach(ns=>{
+      const item=document.createElement('div');item.className='ns-item';
+      const cb=document.createElement('input');cb.type='checkbox';
+      cb.checked=!S.nsFilter||S.nsFilter.has(ns);
+      cb.addEventListener('change',()=>{
+        if (!S.nsFilter) S.nsFilter=new Set(nsArr);
+        if (cb.checked) S.nsFilter.add(ns); else S.nsFilter.delete(ns);
+        if (S.nsFilter.size===nsArr.length) S.nsFilter=null;
+        rerender();
+      });
+      item.appendChild(cb);item.appendChild(document.createTextNode(ns));pop.appendChild(item);
+    });
+  }
+
+  function toggleNsPopup(){$('nsPopup').classList.toggle('open')}
+  function toggleLogTagsPopup(){$('logTagsPopup').classList.toggle('open')}
+
+  function renderLogTagsPopup(tab){
+    const pop=$('logTagsPopup');pop.innerHTML='';
+    if (!tab?.eventTypes?.size){$('logTagsBtn').style.display='none';return}
+    $('logTagsBtn').style.display='';
+    const ctrl=document.createElement('div');
+    ctrl.style.cssText='display:flex;gap:6px;padding:4px 4px 6px;border-bottom:1px solid var(--bd);margin-bottom:4px';
+    const showAll=document.createElement('button');showAll.className='btn btn-sm';showAll.textContent='Show all';
+    showAll.addEventListener('click',()=>{S.hiddenEventTypes.clear();renderLogTagsPopup(tab);applyHideToLog(tab)});
+    const hideAll=document.createElement('button');hideAll.className='btn btn-sm';hideAll.textContent='Hide all';
+    hideAll.addEventListener('click',()=>{tab.eventTypes.forEach((_,ev)=>S.hiddenEventTypes.add(ev));renderLogTagsPopup(tab);applyHideToLog(tab)});
+    ctrl.appendChild(showAll);ctrl.appendChild(hideAll);pop.appendChild(ctrl);
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    sorted.forEach(([ev,count])=>{
+      const item=document.createElement('div');item.className='ns-item';
+      const cb=document.createElement('input');cb.type='checkbox';cb.checked=!S.hiddenEventTypes.has(ev);
+      cb.addEventListener('change',()=>{
+        if (cb.checked) S.hiddenEventTypes.delete(ev); else S.hiddenEventTypes.add(ev);
+        applyHideToLog(tab);
+      });
+      const label=document.createElement('span');label.style.cssText='flex:1;font-family:monospace;font-size:10px';label.textContent=ev;
+      const cnt=document.createElement('span');cnt.style.cssText='color:var(--vd);font-size:10px;margin-left:auto';cnt.textContent=count;
+      item.appendChild(cb);item.appendChild(label);item.appendChild(cnt);pop.appendChild(item);
+    });
+  }
+
+  // ── Log Tags modal ─────────────────────────────────────────────────────────
+  let _logTagsModal=null;
+  function openLogTagsModal(tab){
+    if (_logTagsModal) { _logTagsModal.remove(); _logTagsModal=null; }
+    if (!tab?.eventTypes?.size) return;
+    const overlay=document.createElement('div');overlay.className='filter-modal-overlay';
+    _logTagsModal=overlay;
+    const modal=document.createElement('div');modal.className='filter-modal';
+
+    // header
+    const hdr=document.createElement('div');hdr.className='filter-modal-hdr';
+    const title=document.createElement('span');title.className='filter-modal-title';title.textContent='Log Tags';
+    const search=document.createElement('input');search.className='filter-modal-search';search.placeholder='Filter…';search.type='search';
+    const closeBtn=document.createElement('button');closeBtn.className='btn btn-sm';closeBtn.textContent='✕';
+    closeBtn.addEventListener('click',closeLogTagsModal);
+    hdr.appendChild(title);hdr.appendChild(search);hdr.appendChild(closeBtn);
+
+    // body
+    const body=document.createElement('div');body.className='filter-modal-body';
+    const sorted=[...tab.eventTypes.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    function renderItems(filter){
+      body.innerHTML='';
+      sorted.forEach(([ev,count])=>{
+        if (filter&&!ev.toLowerCase().includes(filter)) return;
+        const row=document.createElement('div');row.className='filter-modal-item';
+        const cb=document.createElement('input');cb.type='checkbox';cb.id='fmi_'+ev;
+        cb.checked=!S.hiddenEventTypes.has(ev);
+        cb.addEventListener('change',()=>{
+          if(cb.checked) S.hiddenEventTypes.delete(ev); else S.hiddenEventTypes.add(ev);
+          applyHideToLog(tab);updateAllHlCounts();
+        });
+        const lbl=document.createElement('label');lbl.htmlFor='fmi_'+ev;lbl.textContent=ev;
+        const cnt=document.createElement('span');cnt.className='fmi-cnt';cnt.textContent=count;
+        row.appendChild(cb);row.appendChild(lbl);row.appendChild(cnt);body.appendChild(row);
+      });
+    }
+    renderItems('');
+    search.addEventListener('input',()=>renderItems(search.value.trim().toLowerCase()));
+
+    // footer
+    const footer=document.createElement('div');footer.className='filter-modal-footer';
+    const showAll=document.createElement('button');showAll.className='btn btn-sm';showAll.textContent='Show all';
+    showAll.addEventListener('click',()=>{S.hiddenEventTypes.clear();renderItems(search.value.trim().toLowerCase());applyHideToLog(tab);updateAllHlCounts()});
+    const hideAll=document.createElement('button');hideAll.className='btn btn-sm';hideAll.textContent='Hide all';
+    hideAll.addEventListener('click',()=>{tab.eventTypes.forEach((_,ev)=>S.hiddenEventTypes.add(ev));renderItems(search.value.trim().toLowerCase());applyHideToLog(tab);updateAllHlCounts()});
+    const count=document.createElement('span');count.style.cssText='font-size:11px;color:var(--dm);margin-left:auto';
+    count.textContent=`${tab.eventTypes.size} types`;
+    footer.appendChild(showAll);footer.appendChild(hideAll);footer.appendChild(count);
+
+    modal.appendChild(hdr);modal.appendChild(body);modal.appendChild(footer);
+    overlay.appendChild(modal);
+    C.appendChild(overlay);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)closeLogTagsModal()});
+    overlay.addEventListener('keydown',e=>{if(e.key==='Escape')closeLogTagsModal()});
+    search.focus();
+  }
+  function closeLogTagsModal(){if(_logTagsModal){_logTagsModal.remove();_logTagsModal=null}}
+
+  // ── NS log filter (hide namespace from log lines) ──────────────────────────
+  function renderNsLogPopup(tab,pop,anchorBtn){
+    pop.innerHTML='';
+    const nsArr=[...tab.namespaces].sort();
+    if (!nsArr.length){pop.classList.remove('open');return}
+    // position below button
+    const rect=anchorBtn.getBoundingClientRect();
+    pop.style.top=(rect.bottom+4)+'px';
+    pop.style.left=rect.left+'px';
+    // "all" toggle
+    const allRow=document.createElement('div');allRow.className='ns-log-item';
+    const allCb=document.createElement('input');allCb.type='checkbox';
+    allCb.checked=S.hiddenNsLines.size===0;
+    allCb.addEventListener('change',()=>{
+      if(allCb.checked){ S.hiddenNsLines.clear(); }
+      else { nsArr.forEach(ns=>S.hiddenNsLines.add(ns)); }
+      renderNsLogPopup(tab,pop,anchorBtn);
+      applyHideToLog(tab);updateAllHlCounts();
+    });
+    const allLbl=document.createElement('label');allLbl.textContent='Show all namespaces';
+    allRow.appendChild(allCb);allRow.appendChild(allLbl);pop.appendChild(allRow);
+    const sep=document.createElement('div');sep.style.cssText='height:1px;background:var(--bd);margin:3px 0';pop.appendChild(sep);
+    nsArr.forEach(ns=>{
+      const row=document.createElement('div');row.className='ns-log-item';
+      const cb=document.createElement('input');cb.type='checkbox';
+      cb.checked=!S.hiddenNsLines.has(ns);
+      cb.addEventListener('change',()=>{
+        if(cb.checked) S.hiddenNsLines.delete(ns); else S.hiddenNsLines.add(ns);
+        allCb.checked=S.hiddenNsLines.size===0;
+        applyHideToLog(tab);updateAllHlCounts();
+      });
+      const lbl=document.createElement('label');lbl.textContent=ns;
+      row.appendChild(cb);row.appendChild(lbl);pop.appendChild(row);
+    });
+  }
+
+  // ── Expand / collapse ──────────────────────────────────────────────────────
+  function setExpanded(node,v){node.expanded=v;node.children.forEach(c=>setExpanded(c,v))}
+  function expandAll(){const tab=S.tabs.find(t=>t.id===S.activeId);if(tab?.tree){setExpanded(tab.tree,true);renderTreePane(tab)}}
+  function collapseAll(){const tab=S.tabs.find(t=>t.id===S.activeId);if(tab?.tree){setExpanded(tab.tree,false);tab.tree.expanded=true;renderTreePane(tab)}}
+
+  // ── Global search ──────────────────────────────────────────────────────────
+  function onGlobalSearch(){
+    const q=$('globalSearch').value.trim().toLowerCase();
+    const res=$('gsResults');
+    if (!q||q.length<2){res.style.display='none';return}
+    const matches=[];
+    S.tabs.forEach(tab=>{
+      if (!tab.parsed) return;
+      tab.logLines.forEach(ll=>{
+        if (matches.length>=30) return;
+        if (ll.raw.toLowerCase().includes(q)) matches.push({tab,ll});
+      });
+    });
+    if (!matches.length){res.style.display='none';return}
+    res.style.display='block';res.innerHTML='';
+    matches.forEach(({tab,ll})=>{
+      const row=document.createElement('div');row.className='gs-row';
+      const gs=document.createElement('span');gs.className='gs-tab';gs.textContent=`[${tab.name}]`;
+      const gt=document.createElement('span');gt.className='gs-text';gt.textContent=ll.raw.slice(0,100);
+      row.appendChild(gs);row.appendChild(gt);
+      row.addEventListener('click',()=>{
+        res.style.display='none';switchTab(tab.id);
+        setTimeout(()=>{
+          const logEl=C.querySelector('#logRendered_'+tab.id);
+          const lineEl=logEl?.querySelector(`.ll[data-ns="${ll.ns}"]`);
+          if (lineEl){lineEl.classList.add('active');lineEl.scrollIntoView({block:'center'})}
+        },50);
+      });
+      res.appendChild(row);
+    });
+  }
+
+  // ── History ────────────────────────────────────────────────────────────────
+  const LS_KEY='sf-log-hist';const MAX_LS=4*1024*1024;
+  function getHistory(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]')}catch{return[]}}
+  function saveToHistory(tab){
+    if (!tab.raw) return;
+    const hist=getHistory();
+    const existing=hist.findIndex(h=>h.raw===tab.raw);
+    if (existing>=0) hist.splice(existing,1);
+    hist.unshift({id:Date.now(),name:tab.name,date:new Date().toISOString(),size:tab.raw.length,raw:tab.raw});
+    let total=hist.reduce((s,h)=>s+h.size,0);
+    while (total>MAX_LS&&hist.length>1){total-=hist.pop().size}
+    try{localStorage.setItem(LS_KEY,JSON.stringify(hist))}catch(e){console.warn('Storage full',e)}
+  }
+  function deleteHistory(id){
+    const hist=getHistory().filter(h=>h.id!==id);
+    localStorage.setItem(LS_KEY,JSON.stringify(hist));
+    renderHistoryPanel();
+  }
+  function loadFromHistory(h){addTab(null,h.name,h.raw);toggleHistory()}
+  function renderHistoryPanel(){
+    const hist=getHistory(),list=$('histList');
+    const total=hist.reduce((s,h)=>s+h.size,0);
+    const kb=(total/1024).toFixed(1),pct=Math.round(total/MAX_LS*100),warn=total>MAX_LS*0.75;
+    $('histSize').innerHTML=`<span class="${warn?'hist-size-warn':''}">${kb}KB / ${(MAX_LS/1024).toFixed(0)}KB (${pct}%)</span>`;
+    if (!hist.length){list.innerHTML='<div style="padding:12px;font-size:12px;color:var(--vd)">No saved logs</div>';return}
+    list.innerHTML='';
+    hist.forEach(h=>{
+      const item=document.createElement('div');item.className='hist-item';
+      const row=document.createElement('div');row.className='hist-item-row';
+      const name=document.createElement('div');name.className='hist-item-name';name.textContent=h.name;
+      const del=document.createElement('button');del.className='hist-del';del.textContent='🗑';
+      del.addEventListener('click',e=>{deleteHistory(h.id);e.stopPropagation()});
+      const meta=document.createElement('div');meta.className='hist-item-meta';
+      meta.textContent=`${new Date(h.date).toLocaleString()} · ${(h.size/1024).toFixed(1)}KB`;
+      row.appendChild(name);row.appendChild(del);
+      item.appendChild(row);item.appendChild(meta);
+      item.addEventListener('click',()=>loadFromHistory(h));
+      list.appendChild(item);
+    });
+  }
+  function toggleHistory(){
+    const panel=$('histPanel');panel.classList.toggle('open');
+    if (panel.classList.contains('open')) renderHistoryPanel();
+  }
+
+  // ── Source folder ──────────────────────────────────────────────────────────
+  let _srcFileMap = new Map(); // simpleCls.toLowerCase() -> FileSystemFileHandle | {_rawFile}
+  let _srcFolderName = '';
+  let _srcScanScope = 'force-app';
+
+  async function walkDirForSrc(dh, underForceApp=false) {
+    try {
+      for await (const [name, h] of dh.entries()) {
+        try {
+          if (h.kind==='directory')
+            await walkDirForSrc(h, underForceApp || name.toLowerCase()==='force-app');
+          else if (h.kind==='file' && underForceApp && /\.(cls|trigger)$/i.test(name))
+            _srcFileMap.set(name.replace(/\.(cls|trigger)$/i,'').toLowerCase(), h);
+        } catch(_){}
+      }
+    } catch(_){}
+  }
+
+  async function walkDirForAllApex(dh) {
+    try {
+      for await (const [name, h] of dh.entries()) {
+        try {
+          if (h.kind==='directory') {
+            await walkDirForAllApex(h);
+          } else if (h.kind==='file' && /\.(cls|trigger)$/i.test(name)) {
+            _srcFileMap.set(name.replace(/\.(cls|trigger)$/i,'').toLowerCase(), h);
+          }
+        } catch(_){ }
+      }
+    } catch(_){ }
+  }
+
+  // VS Code webview: folder picking and Apex-file scanning happen in the
+  // extension host (native fs — see src/apexScan.js), replacing the browser's
+  // showDirectoryPicker/walkDirForSrc flow above (left in place, now unused).
+  // The open workspace folder is auto-scanned on load (see onHostInit), so
+  // the "📂 Source" button is only needed to point snippets at a different
+  // project. Each entry's ._rawFile.text() lazily reads the real file through
+  // the host — the exact slice of the File interface readSrcFile() calls.
+  function applyHostSourceScan(res) {
+    _srcFileMap.clear();_bodyCache.clear();
+    _srcScanScope=res.scope;
+    for (const f of res.files) {
+      _srcFileMap.set(f.key, {_rawFile:{ text: () => vfsRequest('readFile', { path: f.path }) }});
+    }
+    _srcFolderName=res.name;
+    updateSrcFolderUI();
+  }
+  window.__applyHostSourceScan = applyHostSourceScan;
+
+  async function openSourceFolder() {
+    try {
+      const res = await vfsRequest('pickSourceFolder', {});
+      if (res) applyHostSourceScan(res);
+    } catch(e){console.error(e);}
+  }
+
+  function updateSrcFolderUI() {
+    const el=$('srcFolderName');if(!el)return;
+    if (_srcFolderName){
+      el.textContent=_srcFolderName;
+      const scopeLabel=_srcScanScope==='force-app'?'under force-app':'in selected folder scope';
+      el.title=`${_srcFileMap.size} Apex files found ${scopeLabel} in "${_srcFolderName}"`;
+    } else {el.textContent='';el.title='';}
+  }
+
+  async function readSrcFile(cls) {
+    const parts = cls.split('.').filter(Boolean);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const h = _srcFileMap.get(parts[i].toLowerCase());
+      if (h) { const f=h._rawFile||await h.getFile(); return f.text(); }
+    }
+    // Return debug info so the user can see what was tried vs what's in the map
+    const tried = parts.map(p=>p+'.cls').join(', ');
+    const sample = [..._srcFileMap.keys()].slice(0,8).map(k=>k+'.cls').join(', ');
+    return {_notFound:true, tried, sample, total:_srcFileMap.size};
+  }
+
+  $('btn-openSrc').addEventListener('click', openSourceFolder);
+  const _srcFallback=$('srcFolderFallback');
+  if (_srcFallback) {
+    _srcFallback.addEventListener('change',()=>{
+      _srcFileMap.clear();_bodyCache.clear();
+      const allApex=[];
+      const forceAppApex=[];
+      for (const f of _srcFallback.files){
+        const path=(f.webkitRelativePath||f.name).replace(/\\/g,'/');
+        if (/\.(cls|trigger)$/i.test(f.name)) {
+          allApex.push(f);
+          if (/(?:^|\/)force-app\//i.test(path)||/^force-app\//i.test(path)) forceAppApex.push(f);
+        }
+      }
+      const srcList=forceAppApex.length?forceAppApex:allApex;
+      _srcScanScope=forceAppApex.length?'force-app':'selected-folder';
+      for (const f of srcList){
+        _srcFileMap.set(f.name.replace(/\.(cls|trigger)$/i,'').toLowerCase(),{_rawFile:f});
+      }
+      if (_srcFallback.files.length){_srcFolderName='Loaded files';updateSrcFolderUI();}
+      _srcFallback.value='';
+    });
+  }
+
+  // ── Code snippet popup ─────────────────────────────────────────────────────
+  const _bodyCache = new Map();
+  let _snippetEl = null;
+
+  function apexHL(code) {
+    const kw = /\b(public|private|protected|global|static|final|abstract|virtual|override|with sharing|without sharing|inherited sharing|class|interface|enum|extends|implements|return|void|null|true|false|new|this|super|if|else|for|while|do|try|catch|finally|throw|break|continue|instanceof|trigger|on|before|after|insert|update|delete|undelete|merge|and|or|not|in|like|from|where|order by|group by|having|limit|offset|select)\b/g;
+    const tokens = [];
+    let i = 0;
+    const src = code;
+    while (i < src.length) {
+      if (src[i]==='/'&&src[i+1]==='/') {
+        const end=src.indexOf('\n',i);const e=end<0?src.length:end;
+        tokens.push(`<span class="sc-cmt">${esc(src.slice(i,e))}</span>`);i=e;continue;
+      }
+      if (src[i]==='/'&&src[i+1]==='*') {
+        const end=src.indexOf('*/',i+2);const e=end<0?src.length:end+2;
+        tokens.push(`<span class="sc-cmt">${esc(src.slice(i,e))}</span>`);i=e;continue;
+      }
+      if (src[i]==="'") {
+        let j=i+1;while(j<src.length&&(src[j]!=="'"||src[j-1]==='\\'))j++;j++;
+        tokens.push(`<span class="sc-str">${esc(src.slice(i,j))}</span>`);i=j;continue;
+      }
+      if (src[i]==='@') {
+        let j=i+1;while(j<src.length&&/\w/.test(src[j]))j++;
+        tokens.push(`<span class="sc-ann">${esc(src.slice(i,j))}</span>`);i=j;continue;
+      }
+      if (/\d/.test(src[i])) {
+        let j=i;while(j<src.length&&/[\d.]/.test(src[j]))j++;
+        tokens.push(`<span class="sc-num">${esc(src.slice(i,j))}</span>`);i=j;continue;
+      }
+      if (/[a-zA-Z_]/.test(src[i])) {
+        let j=i;while(j<src.length&&/\w/.test(src[j]))j++;
+        const word=src.slice(i,j);
+        const isKw=kw.test(word);kw.lastIndex=0;
+        if (isKw) tokens.push(`<span class="sc-kw">${esc(word)}</span>`);
+        else tokens.push(esc(word));
+        i=j;continue;
+      }
+      tokens.push(esc(src[i]));i++;
+    }
+    return tokens.join('');
+  }
+
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+  function parseLineNum(lr) {
+    if (!lr) return null;
+    const m = lr.match(/\[(\d+)\]/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  function closeSnippet() {
+    if (_snippetEl) { _snippetEl.remove(); _snippetEl = null; }
+  }
+
+  function showSnippet(cls, lr, anchorEl) {
+    if (!cls) return;
+    const lineNum = parseLineNum(lr);
+    closeSnippet();
+
+    const pop = document.createElement('div');
+    pop.className = 'snippet-popup';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'snippet-hdr';
+    hdr.innerHTML = `<span class="snippet-cls">${esc(cls)}</span>`
+      + (lineNum ? `<span style="color:var(--vd)">:</span><span class="snippet-ln">${lineNum}</span>` : '')
+      + `<button class="snippet-close" title="Close">✕</button>`;
+    hdr.querySelector('.snippet-close').addEventListener('click', closeSnippet);
+
+    const body = document.createElement('div');
+    body.className = 'snippet-body';
+    pop.appendChild(hdr); pop.appendChild(body);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'snippet-overlay';
+    overlay.appendChild(pop);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeSnippet(); });
+    C.appendChild(overlay);
+    _snippetEl = overlay;
+
+    if (!_srcFileMap.size) {
+      body.innerHTML = '<div class="snippet-error" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No project folder open.<button class="btn btn-sm" id="snippetOpenFolderBtn" style="margin-top:2px" title="Open your source project folder so code snippets can be shown">📂 Open Source Folder</button></div>';
+      body.querySelector('#snippetOpenFolderBtn').addEventListener('click',()=>{closeSnippet();openSourceFolder();});
+      return;
+    }
+
+    body.innerHTML = '<div class="snippet-loading"><div class="snippet-spinner" aria-hidden="true"></div><div>Loading source file…</div></div>';
+    const renderHtml = (html) => {
+      body.innerHTML = html;
+      const target = body.querySelector('.sline-target');
+      if (target) target.scrollIntoView({ block: 'center' });
+    };
+    const buildHtml = (src) => {
+      if (!src || src?._notFound) {
+        const info = src?._notFound ? `<div style="margin-top:6px;color:#768390;font-size:10px">Tried: ${esc(src.tried)}<br>Folder has ${src.total} files, e.g.: ${esc(src.sample)}</div>` : '';
+        return `<div class="snippet-error"><b>${esc(cls)}</b> not found in project folder${info}</div>`;
+      }
+      const lines = src.split('\n');
+      let html = '';
+      for (let i = 0; i < lines.length; i++)
+        html += `<div class="sline${i+1===lineNum?' sline-target':''}"><span class="sline-num">${i+1}</span><span class="sline-code">${apexHL(lines[i])}</span></div>`;
+      return html;
+    };
+    if (_bodyCache.has(cls)) {
+      renderHtml(_bodyCache.get(cls));
+    } else {
+      readSrcFile(cls).then(src => {
+        const html = buildHtml(src);
+        if (!src?._notFound) _bodyCache.set(cls, html);
+        renderHtml(html);
+      }).catch(() => {
+        body.innerHTML = '<div class="snippet-error">Failed to read source file</div>';
+      });
+    }
+  }
+
+  document.addEventListener('click', e => {
+    // snippet closes via its own overlay click handler
+  }, true);
+
+  // ── Sample log ─────────────────────────────────────────────────────────────
+  function loadSample(){
+    const ta=$('logTA_'+S.activeId);
+    if (ta) ta.value=`09:00:00.1 (100000)|EXECUTION_STARTED
+09:00:00.2 (200000)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex
+09:00:00.3 (300000)|METHOD_ENTRY|[1]|01pAB00000001AAA|pse__AccountService.processAccounts(List<Id>)
+09:00:00.4 (400000)|USER_DEBUG|[3]|DEBUG|Processing batch: 5 accounts
+09:00:00.5 (500000)|METHOD_ENTRY|[10]|01pAB00000001AAA|pse__AccountSelector.selectByIds(Set<Id>)
+09:00:00.6 (600000)|SOQL_EXECUTE_BEGIN|[12]|Aggregations:0
+09:00:00.7 (1100000)|SOQL_EXECUTE_END|[12]|Rows:5
+09:00:00.8 (1200000)|METHOD_EXIT|[10]|01pAB00000001AAA|pse__AccountSelector.selectByIds(Set<Id>)
+09:00:00.9 (1300000)|DML_BEGIN|[30]|Update|Account|5
+09:00:01.4 (2700000)|DML_END|[30]
+09:00:01.5 (2800000)|EXCEPTION_THROWN|[35]|System.NullPointerException: Attempt to de-reference a null object
+09:00:01.6 (2900000)|METHOD_EXIT|[1]|01pAB00000001AAA|pse__AccountService.processAccounts(List<Id>)
+09:00:01.7 (3000000)|CODE_UNIT_FINISHED|execute_anonymous_apex
+09:00:01.8 (3100000)|EXECUTION_FINISHED`;
+  }
+
+  // ── Event wiring ───────────────────────────────────────────────────────────
+  $('globalSearch').addEventListener('input', onGlobalSearch);
+  $('hideInput').addEventListener('keydown', e=>{if(e.key==='Enter')addHideKeyword()});
+  $('btn-addHide').addEventListener('click', addHideKeyword);
+  $('btn-history').addEventListener('click', toggleHistory);
+  $('btn-copyLog').addEventListener('click', async () => {
+    const tab=getActiveTab();
+    const text=tab?.raw||'';
+    const btn=$('btn-copyLog');
+    if(!text.trim()){btn.textContent='Nothing to copy';setTimeout(()=>{btn.textContent='⎘ Copy Log';},1200);return;}
+    const ok=await copyTextToClipboard(text);
+    btn.textContent=ok?'✓ Copied':'Copy failed';
+    setTimeout(()=>{btn.textContent='⎘ Copy Log';},1200);
+  });
+  $('btn-addTab').addEventListener('click', ()=>addTab(null,'Untitled',''));
+  $('btn-closeHist').addEventListener('click', toggleHistory);
+  $('btn-hideTree').addEventListener('click', hideTreePane);
+  $('togDebug').addEventListener('click', ()=>toggleOpt('showDebug',$('togDebug')));
+  $('togSys').addEventListener('click', ()=>toggleOpt('showSystem',$('togSys')));
+  $('togVarAssign').addEventListener('click', ()=>{
+    S.showVarAssign=!S.showVarAssign;
+    $('togVarAssign').classList.toggle('on',S.showVarAssign);
+    C.classList.toggle('hide-vars',!S.showVarAssign);
+  });
+  $('togTiming').addEventListener('click', ()=>toggleOpt('showTiming',$('togTiming')));
+  $('nsBtn').addEventListener('click', toggleNsPopup);
+  $('logTagsBtn').addEventListener('click', toggleLogTagsPopup);
+  $('treeSearchBox').addEventListener('keydown', e=>{
+    if (e.key==='Enter'||e.key==='Escape'){
+      S.treeSearch=e.key==='Escape'?'':e.target.value;
+      e.target.value=S.treeSearch;rerender();
+    }
+  });
+  $('treeSearchBox').addEventListener('blur', e=>{S.treeSearch=e.target.value;rerender()});
+  $('btn-expandAll').addEventListener('click', expandAll);
+  $('btn-collapseAll').addEventListener('click', collapseAll);
+  $('treeControls').addEventListener('click', e=>{
+    const chip=e.target.closest('[data-f]');if(chip)setTypeFilter(chip);
+  });
+  C.addEventListener('click', e=>{
+    if (!e.target.closest('.ns-wrap')){
+      $('nsPopup').classList.remove('open');
+      $('logTagsPopup').classList.remove('open');
+    }
+    if (!e.target.closest('.ns-log-popup')&&!e.target.closest('[title="Hide namespaces from log"]')){
+      document.querySelectorAll('.ns-log-popup.open').forEach(p=>p.classList.remove('open'));
+    }
+    if (!e.target.closest('.gs-wrap')) $('gsResults').style.display='none';
+  });
+
+  // ── Split pane (vertical drag) ─────────────────────────────────────────────
+  (()=>{
+    let dragging=false,startX=0,startW=0;
+    const div=$('vdivider');
+    div.addEventListener('mousedown',e=>{
+      dragging=true;startX=e.clientX;
+      startW=$('logPane').getBoundingClientRect().width;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove',e=>{
+      if (!dragging) return;
+      const delta=e.clientX-startX;
+      const total=$('splitWrap').getBoundingClientRect().width;
+      const newW=Math.max(180,Math.min(total-180,startW+delta));
+      C.style.setProperty('--log-w',newW+'px');
+    });
+    document.addEventListener('mouseup',()=>{dragging=false});
+  })();
+
+  // ── Drag & drop ────────────────────────────────────────────────────────────
+  const dropOverlay=$('dropOverlay');
+  document.addEventListener('dragover',e=>{
+    e.preventDefault();
+    const hasText=e.dataTransfer.types&&(e.dataTransfer.types.includes('text/plain')||e.dataTransfer.types.includes('Text'));
+    dropOverlay.textContent=hasText?'Drop to open as log':'Drop log file(s) to open';
+    dropOverlay.classList.add('show');
+  });
+  document.addEventListener('dragleave',e=>{if(!e.relatedTarget)dropOverlay.classList.remove('show')});
+  document.addEventListener('drop',e=>{
+    e.preventDefault();dropOverlay.classList.remove('show');
+    const files=[...e.dataTransfer.files];
+    if (!files.length){
+      // A drag from VS Code's own Explorer/editor tabs carries file:// URIs,
+      // not File objects — route those through the host bridge.
+      const uriList=e.dataTransfer.getData('text/uri-list');
+      if (uriList && __openDroppedUriList(uriList)) return;
+    }
+    if (files.length){
+      files.forEach(f=>{
+        const reader=new FileReader();
+        reader.onload=ev=>addTab(null,f.name,ev.target.result);
+        reader.readAsText(f);
+      });
+      return;
+    }
+    // plain-text drag from other apps (selected text, terminal output, etc.)
+    const text=e.dataTransfer.getData('text/plain')||e.dataTransfer.getData('Text');
+    if (text&&text.trim()) addTab(null,'Dropped log',text.trim());
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  // Delegated right-click handler for tree snippet — catches clicks on any
+  // child span (class name, method name, etc.) not just the row itself.
+  $('treeContent').addEventListener('contextmenu', e => {
+    const row = e.target.closest('[data-snippet-cls]');
+    if (!row) return;
+    e.preventDefault();
+    showSnippet(row.dataset.snippetCls, row.dataset.snippetLr||'', row);
+  });
+
+  $('btn-help').addEventListener('click',()=>$('helpModal').classList.add('open'));
+  $('btn-closeHelp').addEventListener('click',()=>$('helpModal').classList.remove('open'));
+  $('helpModal').addEventListener('click',e=>{if(e.target===$('helpModal'))$('helpModal').classList.remove('open');});
+
+  renderHlSlots();
+  addTab(null,'Log 1','');
+
+  return {
+    openLog(name, raw) {
+      // If the only tab is the untouched initial "Log 1" input tab, load into
+      // it instead of leaving an empty tab sitting next to the opened log.
+      const first = S.tabs.length===1 ? S.tabs[0] : null;
+      const firstTa = first ? $('logTA_'+first.id) : null;
+      if (first && !first.parsed && !(first.raw||'').trim() && !(firstTa && firstTa.value.trim())) {
+        first.name = name || first.name;
+        first.raw = raw;
+        renderTabBar();
+        switchTab(first.id);
+        if (raw) parseTab(first);
+        return;
+      }
+      addTab(null, name, raw);
+    }
+  };
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+window.__analyzer = initAnalyzer(document.getElementById('root'), null);
+
+// Tell the extension host we're ready: it replies with 'init' (workspace root
+// for the Apex source auto-scan) and flushes any 'openLog' pushes queued while
+// the webview was still loading — it can't safely postMessage back before our
+// message listener is attached. (The browser build's /api/visits counter fetch
+// is dropped: there's no server behind a webview.)
+vscodeApi.postMessage({ type: 'ready' });
+  </script>
+</body>
+</html>

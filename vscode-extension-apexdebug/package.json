@@ -1,0 +1,55 @@
+{
+  "name": "apexdebug-log-parser",
+  "displayName": "Apex Debug Log Parser",
+  "description": "Salesforce Apex debug log parser, analyzer and stack tracer inside VS Code — collapsible call tree, SOQL & DML breakdown, exceptions, method timings, multi-log tabs, search and highlighting. Right-click any .log file to open it in the viewer.",
+  "version": "0.1.0",
+  "publisher": "xer100001",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rexcclui/XTools.git",
+    "directory": "vscode-extension-apexdebug"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "apexDebug.open",
+        "title": "Apex Debug Log Parser: Open Viewer"
+      },
+      {
+        "command": "apexDebug.openLogFile",
+        "title": "Open in Apex Debug Log Parser"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "apexDebug.openLogFile",
+          "when": "resourceExtname == .log",
+          "group": "apexdebug@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "apexDebug.openLogFile",
+          "when": "resourceExtname == .log",
+          "group": "apexdebug@1"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "apexDebug.openLogFile",
+          "when": "resourceExtname == .log",
+          "group": "apexdebug@1"
+        }
+      ]
+    }
+  }
+}
