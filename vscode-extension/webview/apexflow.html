@@ -1673,7 +1673,7 @@ export default class OrderDashboard extends LightningElement {
         if (!node) return;
         if (node.kind === 'file') {
             if (ancestorIgnored) return;
-            const m = node.name.match(/^(.+)\.(cls|java)$/i);
+            const m = node.name.match(/^(.+)\.(cls|trigger|java)$/i);
             if (!m) return;
             if (/Test\.cls$/i.test(node.name)) return;
             feState.apexIndex.set(m[1], { name: node.name, handle: node.handle });
@@ -2480,7 +2480,12 @@ export default class OrderDashboard extends LightningElement {
     }
 
     function parseApex(content, folderPath) {
-        const classNameMatch = content.match(/(?:class|interface|enum|record)\s+(\w+)/i);
+        // Triggers have no class declaration — fall back to `trigger Foo on
+        // Account` (only when nothing class-like matched, so ordinary classes
+        // whose comments mention "trigger" are unaffected). This lets traced
+        // trigger ancestors load as real Apex nodes instead of staying ghosts.
+        const classNameMatch = content.match(/(?:class|interface|enum|record)\s+(\w+)/i)
+            || content.match(/(?:^|\n)\s*trigger\s+(\w+)\s+on\s+\w+/i);
         if (!classNameMatch) return;
         const className = classNameMatch[1];
         const varMap = {}; 
@@ -2553,7 +2558,16 @@ export default class OrderDashboard extends LightningElement {
                 return { target, kind: 'rel' };
             }
             if (source.startsWith('@salesforce/apex/')) {
-                return { target: source.replace(/^@salesforce\/apex\//, '').split('.')[0], kind: 'apex' };
+                // Path shapes: Class.method, ns.Class.method, or bare Class —
+                // the class is the second-to-last segment and the real Apex
+                // method the last. The local import alias can be anything
+                // (import apexFetch from '@salesforce/apex/Ctrl.fetch'), so
+                // the method linking this LWC to the Apex class must come
+                // from the path, not from the binding name.
+                const parts = source.replace(/^@salesforce\/apex\//, '').split('.');
+                const target = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+                const apexMethod = parts.length >= 2 ? parts[parts.length - 1] : null;
+                return { target, kind: 'apex', apexMethod };
             }
             if (source.startsWith('lightning/')) return { target: source, kind: 'lightning' };
             if (source.startsWith('@salesforce/')) return { target: source, kind: 'salesforce' };
@@ -2571,7 +2585,7 @@ export default class OrderDashboard extends LightningElement {
             const ns = m[2];
             const def = m[3];
             const source = m[5];
-            const { target, kind: importKind } = classifySource(source);
+            const { target, kind: importKind, apexMethod } = classifySource(source);
 
             const members = [];
             if (named) {
@@ -2582,7 +2596,10 @@ export default class OrderDashboard extends LightningElement {
             if (def) members.push(def);
             if (ns) members.push(`* as ${ns}`);
 
-            entry.imports.push({ target, members, kind: importKind, source });
+            // For Apex imports, the dependency edge / flow call must carry the
+            // real Apex method name from the import path — the Apex class has
+            // no method named after the local alias.
+            entry.imports.push({ target, members: importKind === 'apex' && apexMethod ? [apexMethod] : members, kind: importKind, source });
         }
 
         // Re-exports also pull dependencies into this module:
@@ -2595,7 +2612,7 @@ export default class OrderDashboard extends LightningElement {
             const named = re[1];
             const ns = re[2];
             const source = re[3];
-            const { target, kind: importKind } = classifySource(source);
+            const { target, kind: importKind, apexMethod } = classifySource(source);
 
             const members = [];
             if (named) {
@@ -2607,7 +2624,10 @@ export default class OrderDashboard extends LightningElement {
             if (ns) members.push(`* as ${ns}`);
             if (!named && !ns) members.push('*');
 
-            entry.imports.push({ target, members, kind: importKind, source });
+            // For Apex imports, the dependency edge / flow call must carry the
+            // real Apex method name from the import path — the Apex class has
+            // no method named after the local alias.
+            entry.imports.push({ target, members: importKind === 'apex' && apexMethod ? [apexMethod] : members, kind: importKind, source });
         }
 
         // HTML <c-foo-bar> references
@@ -2679,14 +2699,19 @@ export default class OrderDashboard extends LightningElement {
         if (importMatch) {
             const source = importMatch[4];
             let target = null;
+            let apexMethod = null;
             if (source.startsWith('c/')) target = source.slice(2);
             else if (source.startsWith('./') || source.startsWith('../')) {
                 target = source.replace(/^(\.\.?\/)+/, '').split('/').pop().replace(/\.(js|mjs|ts)$/i, '');
             } else if (source.startsWith('@salesforce/apex/')) {
-                target = source.replace(/^@salesforce\/apex\//, '').split('.')[0];
+                const parts = source.replace(/^@salesforce\/apex\//, '').split('.');
+                target = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+                apexMethod = parts.length >= 2 ? parts[parts.length - 1] : null;
             }
             const namedFirst = importMatch[1] ? importMatch[1].split(',')[0].trim().split(/\s+as\s+/)[0] : null;
-            const member = namedFirst || importMatch[3] || (importMatch[2] ? `* as ${importMatch[2]}` : null);
+            // Apex: the path's method name links to the loaded Apex class —
+            // the local alias (namedFirst/default) doesn't exist over there.
+            const member = apexMethod || namedFirst || importMatch[3] || (importMatch[2] ? `* as ${importMatch[2]}` : null);
             if (target && member) {
                 const key = `${target}.${member}`;
                 if (!seen.has(key)) {
@@ -2972,6 +2997,12 @@ export default class OrderDashboard extends LightningElement {
         //   3. who actually references the name (apexCalledOnly vs lwcCalledOnly)
         //   4. fall back to whichever index has it; final tie → lwc
         function inferKind(name) {
+            // A Trace Parents chain knows exactly how each node was found (an
+            // Apex code reference vs a JS import / HTML tag) — trust that over
+            // the heuristics below, which mislabel Apex ancestors that aren't
+            // in the Apex index (triggers, *Test.cls) as 'js'.
+            const chainKind = traceChainMode?.kindByNode?.get(bareComponentName(name));
+            if (chainKind === 'apex') return 'apex';
             const entry = registry[name];
             if (entry?.kind === 'apex') return 'apex';
             if (entry?.kind === 'lwcChild') return 'lwcChild';
@@ -3152,8 +3183,9 @@ export default class OrderDashboard extends LightningElement {
 
                     if (!depthNodeMap[placeDepth][node.id]) {
                         const isCollapsed = collapsedNodes.has(node.id);
-                        const subCalls = registry[targetClass]?.methods?.[call.method]
-                            ? collectOrderedCalls(registry[targetClass].methods[call.method], registry[targetClass].varMap, targetClass)
+                        const methodBody = findRegistryMethodBody(targetClass, call.method);
+                        const subCalls = methodBody
+                            ? collectOrderedCalls(methodBody, registry[targetClass].varMap, targetClass)
                             : [];
                         const hasChildren = subCalls.length > 0;
                         const nodeColor = getBlockColor(`depth${placeDepth}:${targetClass}:${call.method}`);
@@ -4415,6 +4447,7 @@ export default class OrderDashboard extends LightningElement {
         const edges = []; // { parent, child, kind, snippet }
         const orderedParents = []; // unique ancestor names, in discovery order
         const depthByNode = new Map([[rootBare, 0]]); // bare name -> generations from root (0 = root itself)
+        const kindByNode = new Map([[rootBare, rootKind]]); // bare name -> 'apex' | 'lwc', as discovered by the BFS
         let generation = 0;
 
         while (frontier.length && generation < maxGenerations && visited.size < maxNodes) {
@@ -4437,6 +4470,7 @@ export default class OrderDashboard extends LightningElement {
                         // parents are LWC and climb with the LWC rules.
                         nextFrontier.push({ name: p.componentName, kind: p.kind === 'apex-ref' ? 'apex' : 'lwc' });
                         depthByNode.set(pBare, generation);
+                        kindByNode.set(pBare, p.kind === 'apex-ref' ? 'apex' : 'lwc');
                         if (visited.size >= maxNodes) break outer;
                     }
                 }
@@ -4457,6 +4491,7 @@ export default class OrderDashboard extends LightningElement {
             fromCache: !!fileIndex.fromCache,
             scanTiming: fileIndex.timing || null,
             depthByNode,
+            kindByNode,
         };
     }
 
@@ -4512,6 +4547,7 @@ export default class OrderDashboard extends LightningElement {
             nodes: new Set([componentName, ...result.orderedParents]),
             edges: result.edges,
             depthByNode: result.depthByNode,
+            kindByNode: result.kindByNode,
             generations: result.generations,
         };
         focusedClass = null;
@@ -4776,6 +4812,18 @@ export default class OrderDashboard extends LightningElement {
         }
 
         return aggregated;
+    }
+
+    // Method-body lookup that tolerates case differences — Apex is
+    // case-insensitive, and a call site's casing (or an @salesforce/apex
+    // import path's) may not match the declaration exactly.
+    function findRegistryMethodBody(className, methodName) {
+        const methods = registry[className]?.methods;
+        if (!methods || !methodName) return null;
+        if (methods[methodName] !== undefined) return methods[methodName];
+        const lower = String(methodName).toLowerCase();
+        const key = Object.keys(methods).find(k => k.toLowerCase() === lower);
+        return key !== undefined ? methods[key] : null;
     }
 
     function collectOrderedCalls(rawContent, vMap, sourceName) {
