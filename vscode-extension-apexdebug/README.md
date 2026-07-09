@@ -27,8 +27,9 @@ Or run **Apex Debug Log Parser: Open Viewer** from the Command Palette and:
 - **Expand/collapse** tree nodes to walk the Apex call stack; method timings
   show where the time went.
 - **Right-click a tree row** to see the code behind it: with your Salesforce
-  project open as the workspace, the class source pops up at the right line
-  automatically. Use the **📂 Source** button to point at a different project.
+  project open as the workspace, the class opens in a real VS Code editor tab
+  beside the viewer, cursor on the log's line. Use the **📂 Source** button to
+  point at a different project.
 
 ## Search & highlighting
 

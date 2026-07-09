@@ -80,6 +80,22 @@ function activate(context) {
                     reply(await fsp.readFile(msg.path, 'utf8'));
                     break;
                 }
+                case 'openFile': {
+                    // "View source" from the log tree: open the real file in a
+                    // VS Code editor tab beside the viewer, at the log's line.
+                    const doc = await vscode.workspace.openTextDocument(msg.path);
+                    const editor = await vscode.window.showTextDocument(doc, {
+                        viewColumn: vscode.ViewColumn.Beside,
+                        preview: true,
+                    });
+                    if (typeof msg.line === 'number' && msg.line >= 0) {
+                        const pos = new vscode.Position(msg.line, 0);
+                        editor.selection = new vscode.Selection(pos, pos);
+                        editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+                    }
+                    reply(true);
+                    break;
+                }
                 default:
                     reply(null);
             }

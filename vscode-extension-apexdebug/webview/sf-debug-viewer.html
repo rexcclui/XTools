@@ -2139,7 +2139,7 @@ function initAnalyzer(rootEl, fetchSource) {
     _srcFileMap.clear();_bodyCache.clear();
     _srcScanScope=res.scope;
     for (const f of res.files) {
-      _srcFileMap.set(f.key, {_rawFile:{ text: () => vfsRequest('readFile', { path: f.path }) }});
+      _srcFileMap.set(f.key, {_rawFile:{ text: () => vfsRequest('readFile', { path: f.path }) }, _hostPath: f.path});
     }
     _srcFolderName=res.name;
     updateSrcFolderUI();
@@ -2253,7 +2253,39 @@ function initAnalyzer(rootEl, fetchSource) {
     if (_snippetEl) { _snippetEl.remove(); _snippetEl = null; }
   }
 
+  // Same resolution order as readSrcFile: try the last name segment first
+  // (inner-class refs like Outer.Inner live in Outer.cls, but the log often
+  // names the inner), then walk toward the outer name.
+  function findSrcPath(cls) {
+    const parts = String(cls || '').split('.').filter(Boolean);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const h = _srcFileMap.get(parts[i].toLowerCase());
+      if (h && h._hostPath) return h._hostPath;
+    }
+    return null;
+  }
+
+  // "View source" from anywhere (tree right-click, log-line source buttons):
+  // in VS Code the real editor is strictly better than the in-page popup, so
+  // open the file there — at the log's line when known — and only fall back
+  // to the popup when the class can't be resolved to a file on disk (which
+  // also covers the "no source folder scanned yet" prompt).
   function showSnippet(cls, lr, anchorEl) {
+    if (!cls) return;
+    const hostPath = findSrcPath(cls);
+    if (hostPath) {
+      const lineNum = parseLineNum(lr);
+      vfsRequest('openFile', { path: hostPath, line: lineNum ? lineNum - 1 : null })
+        .catch(err => {
+          console.warn('[ApexDebug] open in editor failed, falling back to popup', err);
+          showSnippetPopup(cls, lr, anchorEl);
+        });
+      return;
+    }
+    showSnippetPopup(cls, lr, anchorEl);
+  }
+
+  function showSnippetPopup(cls, lr, anchorEl) {
     if (!cls) return;
     const lineNum = parseLineNum(lr);
     closeSnippet();
@@ -2281,7 +2313,7 @@ function initAnalyzer(rootEl, fetchSource) {
 
     if (!_srcFileMap.size) {
       body.innerHTML = '<div class="snippet-error" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">No project folder open.<button class="btn btn-sm" id="snippetOpenFolderBtn" style="margin-top:2px" title="Open your source project folder so code snippets can be shown">📂 Open Source Folder</button></div>';
-      body.querySelector('#snippetOpenFolderBtn').addEventListener('click',()=>{closeSnippet();openSourceFolder();});
+      body.querySelector('#snippetOpenFolderBtn').addEventListener('click',async()=>{closeSnippet();await openSourceFolder();if(_srcFileMap.size)showSnippet(cls,lr,anchorEl);});
       return;
     }
 

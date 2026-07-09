@@ -2,7 +2,7 @@
   "name": "apexdebug-log-parser",
   "displayName": "Apex Debug Log Parser",
   "description": "Salesforce Apex debug log parser, analyzer and stack tracer inside VS Code — collapsible call tree, SOQL & DML breakdown, exceptions, method timings, multi-log tabs, search and highlighting. Right-click any .log file to open it in the viewer.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "xer100001",
   "repository": {
     "type": "git",

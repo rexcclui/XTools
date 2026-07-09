@@ -40,14 +40,18 @@ What actually changed, piece by piece:
   command's file straight into a tab (reusing the pristine initial tab so you
   don't get an empty "Log 1" sitting next to your log). Logs opened before
   the webview finishes loading are queued host-side and flushed on `ready`.
-- **`openSourceFolder()`** (powers the "View Source" code-snippet popups) —
-  instead of `window.showDirectoryPicker()` + a sandboxed directory walk, the
-  host scans for `.cls`/`.trigger` files with native `fs` (`src/apexScan.js`,
-  same force-app-first/fall-back-to-everything rules as the browser version)
-  and the webview reads file bodies on demand through the bridge. The open
-  workspace folder is **auto-scanned on load**, so snippets work immediately;
-  the "📂 Source" button now opens VS Code's native folder picker for
-  pointing at a different project.
+- **`openSourceFolder()` / "View source"** — instead of
+  `window.showDirectoryPicker()` + a sandboxed directory walk, the host scans
+  for `.cls`/`.trigger` files with native `fs` (`src/apexScan.js`, same
+  force-app-first/fall-back-to-everything rules as the browser version). The
+  open workspace folder is **auto-scanned on load**, and the "📂 Source"
+  button opens VS Code's native folder picker for pointing at a different
+  project. `showSnippet` is now a router: when the class resolves to a
+  scanned file path it opens in a real VS Code editor tab beside the viewer
+  (`openFile` message, cursor on the log's line); the browser tool's in-page
+  snippet popup survives only as the fallback for unresolvable classes and
+  the "no source folder yet" prompt (which retries into the editor after a
+  folder is picked).
 - **Drag & drop** — extended to handle `text/uri-list`, which is what a drag
   from VS Code's own Explorer or editor tabs carries (OS-file drags still go
   through the original `FileReader` path).
@@ -60,9 +64,9 @@ What actually changed, piece by piece:
 - **Removed** — the marketing intro banner and the `/api/visits` counter
   fetch (there's no server behind a webview).
 
-The host answers four message types: `ready` (handshake → replies with the
+The host answers five message types: `ready` (handshake → replies with the
 workspace root and flushes queued logs), `scanSource`, `pickSourceFolder`,
-and `readFile`.
+`readFile`, and `openFile` (open a source file in an editor tab at a line).
 
 ## Try it locally
 
