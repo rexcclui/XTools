@@ -2,7 +2,7 @@
   "name": "codegraph-apex-lwc",
   "displayName": "CodeGraph Apex/LWC Dependency",
   "description": "Visualize the dependencies between your components — an interactive map of which LWC components call which Apex classes and which classes depend on each other, plus per-class call-flow diagrams and parent tracing, right inside VS Code.",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publisher": "xer100001",
   "repository": {
     "type": "git",
@@ -21,27 +21,27 @@
     "commands": [
       {
         "command": "apexflowFull.open",
-        "title": "CodeGraph Apex/LWC Dependency: Open Diagram"
+        "title": "Apex/LWC Dependency: Open Diagram"
       },
       {
         "command": "apexflowFull.addFile",
-        "title": "CodeGraph Apex/LWC Dependency: Add to Diagram"
+        "title": "Apex/LWC Dependency: Add to Diagram"
       },
       {
         "command": "apexflowTraceParents.traceFromFile",
-        "title": "CodeGraph Apex/LWC Dependency: Trace Parents (this component)"
+        "title": "Apex/LWC Dependency: Trace Parents (this component)"
       },
       {
         "command": "apexflowTraceParents.traceSelection",
-        "title": "CodeGraph Apex/LWC Dependency: Trace Parents (selected name)"
+        "title": "Apex/LWC Dependency: Trace Parents (selected name)"
       },
       {
         "command": "apexflowTraceParents.traceByName",
-        "title": "CodeGraph Apex/LWC Dependency: Trace Parents…"
+        "title": "Apex/LWC Dependency: Trace Parents…"
       },
       {
         "command": "apexflowTraceParents.refresh",
-        "title": "CodeGraph Apex/LWC Dependency: Rescan Workspace Files",
+        "title": "Apex/LWC Dependency: Rescan Workspace Files",
         "icon": "$(refresh)"
       }
     ],

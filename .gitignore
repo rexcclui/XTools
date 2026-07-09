@@ -6,3 +6,4 @@ dist/
 .wrangler/
 vscode-extension/.sfdx/**
 vscode-extension/*.vsix
+vscode-extension-apexdebug/*.vsix
