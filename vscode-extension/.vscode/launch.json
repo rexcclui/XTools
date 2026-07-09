@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run CodeGraph Apex/LWC Extension",
+            "name": "Run CodeGraph Apex/LWC Dependency Extension",
             "type": "extensionHost",
             "request": "launch",
             "args": [

@@ -1,11 +1,11 @@
-# CodeGraph Apex/LWC — development notes
+# CodeGraph Apex/LWC Dependency — development notes
 
 How the extension is built and wired up, plus packaging/install instructions.
 For what it does and how to use it, see [README.md](./README.md) (that's what
 the VS Code extension page shows) — this file keeps the technical details that
 used to live there.
 
-The extension is the full [CodeGraph Apex/LWC](https://github.com/rexcclui/XTools/blob/main/public/apexflow.html)
+The extension is the full [CodeGraph Apex/LWC Dependency](https://github.com/rexcclui/XTools/blob/main/public/apexflow.html)
 browser-tool experience — architecture map, Analyze Flow call-graphs, Trace
 Parents, and every context-menu action — running inside VS Code instead of a
 browser tab, plus a lightweight Trace-Parents-only tree view for quick lookups
@@ -13,7 +13,7 @@ without opening the diagram.
 
 ## Why this exists
 
-The browser version of CodeGraph Apex/LWC is limited by the File System Access API's
+The browser version of CodeGraph Apex/LWC Dependency is limited by the File System Access API's
 sandboxing, which adds real per-file overhead a native process doesn't pay.
 Running inside VS Code means the file I/O happens in the extension host —
 plain Node.js, direct `fs` access — which is the whole reason a native script
@@ -21,7 +21,7 @@ comparison was so much faster than the browser tool for large projects.
 
 ## Two ways in
 
-### `CodeGraph Apex/LWC: Open Diagram` — the full experience
+### `CodeGraph Apex/LWC Dependency: Open Diagram` — the full experience
 
 Run this from the Command Palette. It opens a webview panel with the *exact*
 UI from `public/apexflow.html` — same Mermaid architecture map, Analyze Flow,
@@ -30,11 +30,11 @@ Code/Source, the works — automatically pointed at your current workspace
 folder (no folder picker needed unless you want to open a different one via
 the **Open Folder** button).
 
-### `CodeGraph Apex/LWC: Trace Parents…` / right-click → **Trace Parents (this component)**
+### `CodeGraph Apex/LWC Dependency: Trace Parents…` / right-click → **Trace Parents (this component)**
 
 A lighter-weight, VS Code-native alternative to the full diagram when you just
 want an ancestor chain: results show as a lazy-expanding tree in the Explorer
-sidebar (**CodeGraph Apex/LWC: Trace Parents (quick view)**), modeled on VS Code's
+sidebar (**CodeGraph Apex/LWC Dependency: Trace Parents (quick view)**), modeled on VS Code's
 built-in "Call Hierarchy: Show Incoming Calls" — expand a node to climb one
 generation further up. Click any node to open its source file.
 
@@ -92,7 +92,7 @@ No build step — plain CommonJS, zero dependencies.
 2. Press `F5` (or Run → Start Debugging) to launch an Extension Development
    Host window.
 3. In that new window, open your actual Salesforce project folder (or a
-  workspace) and run **CodeGraph Apex/LWC: Open Diagram**, or use the Trace Parents
+  workspace) and run **CodeGraph Apex/LWC Dependency: Open Diagram**, or use the Trace Parents
    commands directly.
 
 To install it permanently without publishing, package a VSIX and install it:
@@ -110,7 +110,7 @@ code --install-extension codegraph-apex-lwc-<version>.vsix --force
    This is the #1 cause of "I reinstalled but nothing changed."
 2. **Run "Developer: Reload Window"** after installing — the old code keeps
    running in the existing extension-host process until the window reloads.
-3. **Close and reopen any open CodeGraph Apex/LWC tab** — a webview panel runs the
+3. **Close and reopen any open CodeGraph Apex/LWC Dependency tab** — a webview panel runs the
    HTML/JS it was created with; a tab restored from before the update still
    runs the old code even after a reload.
 
@@ -130,6 +130,6 @@ VS Code UI wasn't available in the environment this was built in. What that
 rendering, context menus, modals, CDN script loading (Mermaid/Prism/Font
 Awesome/svg-pan-zoom load from `cdn.jsdelivr.net`/`cdnjs.cloudflare.com`, so
 this needs network access and no restrictive CSP — none is set, matching the
-browser version). Please open a real project with `CodeGraph Apex/LWC: Open Diagram`
+browser version). Please open a real project with `CodeGraph Apex/LWC Dependency: Open Diagram`
 and report back anything that doesn't render or misbehaves — that's the part
 most likely to need a follow-up fix.

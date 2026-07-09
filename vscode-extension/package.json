@@ -1,7 +1,7 @@
 {
   "name": "codegraph-apex-lwc",
-  "displayName": "CodeGraph Apex/LWC",
-  "description": "See how your Salesforce Apex, LWC, and Java code connects — interactive architecture map, per-class call-flow diagrams, and parent tracing, right inside VS Code.",
+  "displayName": "CodeGraph Apex/LWC Dependency",
+  "description": "Visualize the dependencies between your components — an interactive map of which LWC components call which Apex classes and which classes depend on each other, plus per-class call-flow diagrams and parent tracing, right inside VS Code.",
   "version": "0.2.4",
   "publisher": "xer100001",
   "repository": {
@@ -21,27 +21,27 @@
     "commands": [
       {
         "command": "apexflowFull.open",
-        "title": "CodeGraph Apex/LWC: Open Diagram"
+        "title": "CodeGraph Apex/LWC Dependency: Open Diagram"
       },
       {
         "command": "apexflowFull.addFile",
-        "title": "CodeGraph Apex/LWC: Add to Diagram"
+        "title": "CodeGraph Apex/LWC Dependency: Add to Diagram"
       },
       {
         "command": "apexflowTraceParents.traceFromFile",
-        "title": "CodeGraph Apex/LWC: Trace Parents (this component)"
+        "title": "CodeGraph Apex/LWC Dependency: Trace Parents (this component)"
       },
       {
         "command": "apexflowTraceParents.traceSelection",
-        "title": "CodeGraph Apex/LWC: Trace Parents (selected name)"
+        "title": "CodeGraph Apex/LWC Dependency: Trace Parents (selected name)"
       },
       {
         "command": "apexflowTraceParents.traceByName",
-        "title": "CodeGraph Apex/LWC: Trace Parents…"
+        "title": "CodeGraph Apex/LWC Dependency: Trace Parents…"
       },
       {
         "command": "apexflowTraceParents.refresh",
-        "title": "CodeGraph Apex/LWC: Rescan Workspace Files",
+        "title": "CodeGraph Apex/LWC Dependency: Rescan Workspace Files",
         "icon": "$(refresh)"
       }
     ],
@@ -92,7 +92,7 @@
       "explorer": [
         {
           "id": "apexflowTraceParentsView",
-          "name": "CodeGraph Apex/LWC: Trace Parents (quick view)",
+          "name": "CodeGraph Apex/LWC Dependency: Trace Parents (quick view)",
           "icon": "media/trace-parents-dark.svg"
         }
       ]
@@ -100,7 +100,7 @@
     "viewsWelcome": [
       {
         "view": "apexflowTraceParentsView",
-        "contents": "For the full architecture map, Analyze Flow, and every diagram feature, run **CodeGraph Apex/LWC: Open Diagram** from the Command Palette.\n[Open full diagram](command:apexflowFull.open)\n\nOr, for a quick lightweight lookup right here: right-click inside an open `.js`/`.html` file (with nothing selected) and choose **CodeGraph Apex/LWC: Trace Parents (this component)**.\n[Trace by name](command:apexflowTraceParents.traceByName)"
+        "contents": "For the full architecture map, Analyze Flow, and every diagram feature, run **CodeGraph Apex/LWC Dependency: Open Diagram** from the Command Palette.\n[Open full diagram](command:apexflowFull.open)\n\nOr, for a quick lightweight lookup right here: right-click inside an open `.js`/`.html` file (with nothing selected) and choose **CodeGraph Apex/LWC Dependency: Trace Parents (this component)**.\n[Trace by name](command:apexflowTraceParents.traceByName)"
       }
     ]
   }

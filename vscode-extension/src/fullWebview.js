@@ -64,7 +64,7 @@ function activateFullWebview(context, output) {
                 case 'walkTree': {
                     const start = Date.now();
                     const tree = await walkTree(msg.path, path.basename(msg.path));
-                    output.appendLine(`[CodeGraph Apex/LWC] Scanned "${msg.path}" in ${Date.now() - start}ms`);
+                    output.appendLine(`[CodeGraph Apex/LWC Dependency] Scanned "${msg.path}" in ${Date.now() - start}ms`);
                     reply(tree);
                     break;
                 }
@@ -81,7 +81,7 @@ function activateFullWebview(context, output) {
                         canSelectFolders: true,
                         canSelectFiles: false,
                         canSelectMany: false,
-                        openLabel: 'Open as CodeGraph Apex/LWC project',
+                        openLabel: 'Open as CodeGraph Apex/LWC Dependency project',
                     });
                     if (!picked || !picked.length) { reply(null); break; }
                     reply({ path: picked[0].fsPath, name: path.basename(picked[0].fsPath) });
@@ -134,7 +134,7 @@ function activateFullWebview(context, output) {
             pendingInvocation = invocation;
             panel = vscode.window.createWebviewPanel(
                 'apexflowFull',
-                'CodeGraph Apex/LWC',
+                'CodeGraph Apex/LWC Dependency',
                 vscode.ViewColumn.Active,
                 { enableScripts: true, retainContextWhenHidden: true }
             );
@@ -155,7 +155,7 @@ function activateFullWebview(context, output) {
         vscode.commands.registerCommand('apexflowFull.addFile', (uri) => {
             const targetUri = uri instanceof vscode.Uri ? uri : (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri);
             if (!targetUri) {
-                vscode.window.showWarningMessage('CodeGraph Apex/LWC: select or open a file first.');
+                vscode.window.showWarningMessage('CodeGraph Apex/LWC Dependency: select or open a file first.');
                 return;
             }
             if (panel) {

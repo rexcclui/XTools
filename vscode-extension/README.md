@@ -1,18 +1,20 @@
-# CodeGraph Apex/LWC
+# CodeGraph Apex/LWC Dependency
 
-See how your Salesforce Apex, LWC, and Java code connects — an interactive
-architecture map and call-flow diagrams, right inside VS Code.
+Visualize the dependencies between your components — an interactive map of
+how your Salesforce Apex classes, LWC components, and Java code depend on
+each other, right inside VS Code.
 
-Open your project, and the extension scans it and draws a dependency diagram:
+Open your project, and the extension scans it and draws the dependency map:
 which LWC components call which Apex classes, which classes call each other,
-and what each arrow actually carries (method calls, imports, `<c-…>` tags).
-From there you can drill into a single class's call flow, trace a component's
-ancestors, and read the underlying code without leaving the diagram.
+and what each dependency actually carries (method calls, imports, `<c-…>`
+tags). Every relationship is an arrow you can inspect. From there you can
+drill into a single class's call flow, follow a component's dependency chain
+up to its roots, and read the underlying code without leaving the diagram.
 
 ## Getting started
 
 1. Open your project folder (e.g. an SFDX project root) in VS Code.
-2. Run **CodeGraph Apex/LWC: Open Diagram** from the Command Palette
+2. Run **CodeGraph Apex/LWC Dependency: Open Diagram** from the Command Palette
    (`Ctrl/Cmd+Shift+P`) — or right-click a `.cls` / `.js` / `.html` / `.java`
    file and choose it from the menu to open the diagram with that file loaded.
 3. The workspace is scanned automatically and the architecture map renders.
@@ -63,7 +65,7 @@ Just want to know "who uses this component?" without opening the full diagram:
 
 - Right-click inside an open `.js`/`.html` file → **Trace Parents (this
   component)**, or highlight a component name → **Trace Parents (selected
-  name)**, or run **CodeGraph Apex/LWC: Trace Parents…** and type a name.
+  name)**, or run **CodeGraph Apex/LWC Dependency: Trace Parents…** and type a name.
 - Results appear as a tree in the Explorer sidebar — expand a node to climb
   one generation further up, click a node to open its source file.
 
