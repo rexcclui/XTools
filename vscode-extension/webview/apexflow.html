@@ -596,11 +596,19 @@ body.has-intro .btn-toggle{top:46px}
         startOnLoad: false, 
         theme: 'dark', 
         securityLevel: 'loose', 
+        // fontFamily must match the page font (body sets Inter): Mermaid
+        // measures html labels in a body-attached div (page font) but renders
+        // them inside the SVG (its own theme font) — when the two disagree,
+        // long names get a rect sized for the wrong font and the text clips.
+        themeVariables: { fontFamily: "'Inter', sans-serif" },
         flowchart: {
             useMaxWidth: false,
             defaultRenderer: 'elk',
             rankSpacing: 80,
             nodeSpacing: 25,
+            // node padding around the label (default 15) — a little extra so
+            // long Apex class names never sit flush against the node border
+            padding: 22,
             curve: 'basis'
         } 
     });
@@ -2411,7 +2419,7 @@ export default class OrderDashboard extends LightningElement {
         const text = (label?.textContent || '').trim();
         if (!text.startsWith('?')) return null;
         let name = text.replace(/^\?\s*/, '').trim();
-        name = name.replace(/^(js|html|apex):\s*/i, '');
+        name = name.replace(/^(js|html|apex|a):\s*/i, '');
         return name && !registry[name] && !innerClassNames.has(name) ? name : null;
     }
 
@@ -2426,7 +2434,7 @@ export default class OrderDashboard extends LightningElement {
         if (feState.apexIndex?.has(className)) {
             return feState.apexIndex.get(className);
         }
-        const targets = [`${className}.cls`, `${className}.java`].map(s => s.toLowerCase());
+        const targets = [`${className}.cls`, `${className}.trigger`, `${className}.java`].map(s => s.toLowerCase());
         return flatFiles(feState.tree).find(f => targets.includes(f.name.toLowerCase())) || null;
     }
 
@@ -2996,7 +3004,7 @@ export default class OrderDashboard extends LightningElement {
 
         function prefixForName(name) {
             const k = inferKind(name);
-            if (k === 'apex') return 'apex: ';
+            if (k === 'apex') return 'A: ';
             if (k === 'html') return 'html: ';
             return 'js: ';
         }
@@ -3367,10 +3375,12 @@ export default class OrderDashboard extends LightningElement {
         if (node) node.classList.add('node-focused');
     }
 
-    // Labels in the diagram are prefixed with `js: `, `html: ` or `apex: `.
-    // Strip the prefix when comparing label text to registry keys.
+    // Labels in the diagram are prefixed with `js: `, `html: ` or `A: `
+    // (Apex — shortened so long class names fit; older saved diagrams may
+    // still say `apex: `). Strip the prefix when comparing label text to
+    // registry keys.
     function stripNodeTypePrefix(s) {
-        return String(s || '').replace(/^(js|html|apex):\s*/i, '');
+        return String(s || '').replace(/^(js|html|apex|a):\s*/i, '');
     }
 
     // Global helper for qualified names like parent.Component -> Component.
@@ -3383,8 +3393,12 @@ export default class OrderDashboard extends LightningElement {
     function getNodeLabelInfo(node) {
         const labelEl = node?.querySelector('.nodeLabel') || node?.querySelector('text');
         const raw = (labelEl?.textContent || '').trim();
-        const m = raw.match(/^(js|html|apex):\s*(.+)$/i);
-        if (m) return { type: m[1].toLowerCase(), name: (m[2] || '').trim(), raw };
+        const m = raw.match(/^(js|html|apex|a):\s*(.+)$/i);
+        if (m) {
+            let type = m[1].toLowerCase();
+            if (type === 'a') type = 'apex';
+            return { type, name: (m[2] || '').trim(), raw };
+        }
         return { type: null, name: stripNodeTypePrefix(raw), raw };
     }
 
@@ -3440,8 +3454,31 @@ export default class OrderDashboard extends LightningElement {
     }
 
     function getApexFilePath(className) {
-        const rec = feState.apexIndex?.get(className);
-        return rec?.handle?.__vfsPath || null;
+        // Try the name as-is, then the outer segment (an inner-class reference
+        // `Outer.Inner` lives in Outer.cls), then the last segment (qualified
+        // lwcChild-style names). Each candidate is checked against the Apex
+        // index exactly, then case-insensitively (Apex is case-insensitive;
+        // the index is keyed by exact file name), then against a full tree
+        // scan (covers files the Apex index skips, e.g. *Test.cls, triggers)
+        // — so "Source" opens the real file in a VS Code editor instead of
+        // falling back to the in-page modal.
+        const name = String(className || '');
+        const candidates = [...new Set([name, name.split('.')[0], bareComponentName(name)])].filter(Boolean);
+        for (const cand of candidates) {
+            const rec = feState.apexIndex?.get(cand);
+            if (rec?.handle?.__vfsPath) return rec.handle.__vfsPath;
+        }
+        if (feState.apexIndex) {
+            const lowers = candidates.map(c => c.toLowerCase());
+            for (const [key, val] of feState.apexIndex) {
+                if (lowers.includes(key.toLowerCase()) && val?.handle?.__vfsPath) return val.handle.__vfsPath;
+            }
+        }
+        for (const cand of candidates) {
+            const node = findFileInTree(cand);
+            if (node?.handle?.__vfsPath) return node.handle.__vfsPath;
+        }
+        return null;
     }
 
     function getLwcFilePath(componentName, which) {
@@ -4984,7 +5021,10 @@ export default class OrderDashboard extends LightningElement {
             // Resolve class name: prefer label text match against registry / known unloaded names
             const labelEl = cluster.querySelector('.cluster-label text, .nodeLabel, foreignObject span, text');
             const rawLabel = (labelEl?.textContent || '').trim();
-            const labelName = rawLabel.startsWith('? ') ? rawLabel.slice(2).trim() : rawLabel;
+            // Strip both the ghost marker and the kind prefix ("? A: Foo" →
+            // "Foo") — Load Class needs the bare class name, and registry
+            // keys never carry the prefix.
+            const labelName = stripNodeTypePrefix(rawLabel.startsWith('? ') ? rawLabel.slice(2).trim() : rawLabel);
 
             // Match against registry or safeId reverse-lookup
             const known = Object.keys(registry).find(k => k === labelName || safeId(k) === safeId(labelName));
