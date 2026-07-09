@@ -1,8 +1,8 @@
 {
   "name": "codegraph-apex-lwc",
   "displayName": "CodeGraph Apex/LWC",
-  "description": "Full CodeGraph Apex/LWC experience inside VS Code — architecture map, Analyze Flow call graphs, and Trace Parents for Salesforce Apex/LWC/Java projects, backed by direct Node.js filesystem access instead of the browser's sandboxed File System Access API.",
-  "version": "0.2.3",
+  "description": "See how your Salesforce Apex, LWC, and Java code connects — interactive architecture map, per-class call-flow diagrams, and parent tracing, right inside VS Code.",
+  "version": "0.2.4",
   "publisher": "xer100001",
   "repository": {
     "type": "git",
