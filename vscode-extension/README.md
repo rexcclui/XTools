@@ -39,7 +39,7 @@ up to its roots, and read the underlying code without leaving the diagram.
 | **Analyze Flow** | Switch to a focused call-flow diagram for that class, tracing calls up to 6 levels deep |
 | **Load Class** | Load a ghost node's source into the diagram |
 | **Lookup Reference** | Find the HTML templates that embed this component via a `<c-…>` tag |
-| **Trace Parents** | Climb every import/reference up to the root, generation by generation, and optionally load the whole ancestor chain |
+| **Trace Parents** | Climb every reference up to the root, generation by generation, and load the whole ancestor chain. On an Apex node this finds which Apex classes and triggers call it (method calls, `new`, extends/implements, type usage) — and which LWC components reach it via `@salesforce/apex` imports, continuing the climb through those components' own parents |
 | **Hide Children / Hide JS/Apex/HTML** | Peel away this node's outgoing edges — all of them, or just one type |
 | **View Code / Source** | Open the method body or the full file in a real VS Code editor tab |
 

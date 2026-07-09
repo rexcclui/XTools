@@ -4048,6 +4048,18 @@ export default class OrderDashboard extends LightningElement {
         const viaIndex = await loadLwcComponentByName(componentName);
         if (viaIndex) return true;
 
+        // Apex ancestor from an Apex-direction trace: parse it straight from
+        // the text the trace scan already read (raw, comments included — the
+        // same input the normal Load Class path feeds parseApex).
+        const apexEntry = lastTraceFileIndex?.apexTextByName?.get(componentName);
+        if (apexEntry) {
+            parseApex(apexEntry.text, apexEntry.folderPath || null);
+            if (registry[componentName]) {
+                feState.loadedNames.add(apexEntry.fileName || `${componentName}.cls`);
+                return true;
+            }
+        }
+
         const jsEntry = lastTraceFileIndex?.jsTextByName.get(componentName);
         const htmlEntry = lastTraceFileIndex?.htmlTextByName.get(componentName);
         if (!jsEntry && !htmlEntry) return false;
@@ -4157,7 +4169,7 @@ export default class OrderDashboard extends LightningElement {
         const cacheKey = feState.dirHandle?.name || feState.tree?.name || null;
         if (traceFileIndexCache && cacheKey && traceFileIndexCacheKey === cacheKey) {
             console.info('[TraceParents] reusing cached file index for', cacheKey,
-                `(${traceFileIndexCache.jsTextByName.size + traceFileIndexCache.htmlTextByName.size} files, no re-scan)`);
+                `(${traceFileIndexCache.jsTextByName.size + traceFileIndexCache.htmlTextByName.size + (traceFileIndexCache.apexTextByName?.size || 0)} files, no re-scan)`);
             return { ...traceFileIndexCache, fromCache: true };
         }
 
@@ -4166,10 +4178,10 @@ export default class OrderDashboard extends LightningElement {
         // when the folder was opened, and cached in IndexedDB across sessions)
         // — reuse it instead of re-walking the live directory handle, which
         // just repeats that same work, slower, on every single trace.
-        let files = feState.tree ? flatFiles(feState.tree).filter(f => /\.(js|html)$/i.test(f.name || '')) : [];
+        let files = feState.tree ? flatFiles(feState.tree).filter(f => /\.(js|html|cls|trigger|java)$/i.test(f.name || '')) : [];
         if (!files.length && feState.dirHandle) {
             try {
-                files = await collectSourceFilesFromDirHandle(feState.dirHandle, ['.js', '.html']);
+                files = await collectSourceFilesFromDirHandle(feState.dirHandle, ['.js', '.html', '.cls', '.trigger', '.java']);
             } catch (e) {
                 console.warn('Trace Parents: live directory scan failed', e);
             }
@@ -4178,6 +4190,7 @@ export default class OrderDashboard extends LightningElement {
 
         const jsTextByName = new Map();   // bare component name -> { text, folderPath }
         const htmlTextByName = new Map();
+        const apexTextByName = new Map(); // Apex/Java class or trigger name -> { text, stripped, folderPath, fileName }
         const total = files.length;
         let cursor = 0;
         let completed = 0;
@@ -4198,17 +4211,27 @@ export default class OrderDashboard extends LightningElement {
                 const idx = cursor++;
                 if (idx >= total) return;
                 const f = files[idx];
+                const isApex = /\.(cls|trigger|java)$/i.test(f.name);
                 const isJs = /\.js$/i.test(f.name);
-                const base = f.name.replace(/\.(js|html)$/i, '');
+                const base = f.name.replace(/\.(js|html|cls|trigger|java)$/i, '');
                 const pathParts = (f.path || '').split('/').filter(Boolean);
                 const folderPath = pathParts.slice(0, -1).join('/') || null;
                 try {
                     const text = await readHandleTextFast(f.handle);
+                    if (isApex) {
+                        // `stripped` (comments + string literals blanked) is what the
+                        // Apex parent matcher searches, so a class name mentioned in
+                        // a comment or a debug string doesn't count as a reference.
+                        const existing = apexTextByName.get(base);
+                        const merged = existing ? `${existing.text}\n${text}` : text;
+                        apexTextByName.set(base, { text: merged, stripped: stripApexCodeForMatch(merged), folderPath: existing?.folderPath || folderPath, fileName: existing?.fileName || f.name });
+                    } else {
                     const map = isJs ? jsTextByName : htmlTextByName;
                     // Same base name can legitimately appear in more than one folder
                     // (rare, but concatenating is safer than overwriting a match).
                     const existing = map.get(base);
                     map.set(base, { text: existing ? `${existing.text}\n${text}` : text, folderPath: existing?.folderPath || folderPath });
+                    }
                 } catch (e) {
                     // unreadable file — skip, don't fail the whole scan
                 }
@@ -4233,7 +4256,7 @@ export default class OrderDashboard extends LightningElement {
             concurrency,
         });
 
-        const result = { jsTextByName, htmlTextByName, fromCache: false, timing: { totalFiles: total, listMs: Math.round(listMs), readMs: Math.round(readMs), msPerFile } };
+        const result = { jsTextByName, htmlTextByName, apexTextByName, fromCache: false, timing: { totalFiles: total, listMs: Math.round(listMs), readMs: Math.round(readMs), msPerFile } };
         traceFileIndexCache = result;
         traceFileIndexCacheKey = cacheKey;
         return result;
@@ -4280,18 +4303,78 @@ export default class OrderDashboard extends LightningElement {
         return parents;
     }
 
+    // Blank out block comments (newlines preserved so line structure survives),
+    // line comments, and string literals — the Apex parent matcher searches the
+    // result, so class names in comments/strings don't count as references.
+    function stripApexCodeForMatch(text) {
+        return String(text || '')
+            .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+            .replace(/\/\/[^\n]*/g, '')
+            .replace(/'(?:\\.|[^'\\\n])*'/g, "''");
+    }
+
+    // One hop, Apex direction: which Apex classes/triggers reference `className`
+    // in code — a call/static access (Foo.bar), instantiation (new Foo),
+    // extends/implements, a type usage (List<Foo>, (Foo) cast), or a variable/
+    // parameter declaration — and which LWC components import it via
+    // @salesforce/apex/Foo. Same pure in-memory shape as
+    // findDirectParentsFromIndex so the BFS can mix both directions freely.
+    // All patterns match case-insensitively because Apex itself is.
+    function findDirectApexParentsFromIndex(className, fileIndex) {
+        const bare = bareComponentName(className);
+        const bareLower = bare.toLowerCase();
+        const esc = escapeRegExpLiteral(bare);
+        const useRe = new RegExp(
+            `\\bnew\\s+${esc}\\s*\\(`
+            + `|\\b${esc}\\s*\\.\\s*\\w`
+            + `|\\bextends\\s+${esc}\\b`
+            + `|\\bimplements\\s+[\\w\\s.,]*\\b${esc}\\b`
+            + `|[<,(]\\s*${esc}\\s*[>,)]`
+            + `|\\b${esc}\\s+\\w+\\s*[;=,):]`,
+            'i');
+        const apexImportRe = new RegExp(`@salesforce/apex/${esc}(?:\\.\\w+)?['"]`, 'i');
+        const parents = [];
+        const matched = new Set();
+
+        (fileIndex.apexTextByName || new Map()).forEach((entry, candidateName) => {
+            const key = candidateName.toLowerCase();
+            if (key === bareLower || matched.has(key)) return;
+            const line = entry.stripped.split('\n').find(l => useRe.test(l));
+            if (line) {
+                matched.add(key);
+                parents.push({ componentName: candidateName, kind: 'apex-ref', snippet: line.trim() });
+            }
+        });
+
+        fileIndex.jsTextByName.forEach((entry, candidateName) => {
+            const key = bareComponentName(candidateName).toLowerCase();
+            if (key === bareLower || matched.has(key)) return;
+            const line = entry.text.split('\n').find(l => apexImportRe.test(l));
+            if (line) {
+                matched.add(key);
+                parents.push({ componentName: candidateName, kind: 'lwc-apex-import', snippet: line.trim() });
+            }
+        });
+
+        return parents;
+    }
+
     // Climbs the reference chain generation by generation from `rootComponentName`
     // up to every ancestor that has no further parent, guarding against cycles and
     // runaway scans on very large projects.
     async function traceParentsToRoot(rootComponentName, options = {}) {
-        const { maxNodes = 500, maxGenerations = 50 } = options;
+        const { maxNodes = 500, maxGenerations = 50, rootKind = 'lwc' } = options;
         await showLoadingStatus(`Tracing parents… scanning project files`);
         const fileIndex = await buildTraceParentsFileIndex();
         lastTraceFileIndex = fileIndex;
 
         const rootBare = bareComponentName(rootComponentName);
         const visited = new Set([rootBare]);
-        let frontier = [rootComponentName];
+        // Frontier entries carry a kind because the chain can change direction:
+        // an Apex class's parents are other Apex classes/triggers AND the LWC
+        // components that import it via @salesforce/apex — and from such an LWC
+        // parent the climb continues with the LWC rules again.
+        let frontier = [{ name: rootComponentName, kind: rootKind }];
         const edges = []; // { parent, child, kind, snippet }
         const orderedParents = []; // unique ancestor names, in discovery order
         const depthByNode = new Map([[rootBare, 0]]); // bare name -> generations from root (0 = root itself)
@@ -4303,14 +4386,19 @@ export default class OrderDashboard extends LightningElement {
             const nextFrontier = [];
             outer:
             for (const child of frontier) {
-                const parents = findDirectParentsFromIndex(child, fileIndex);
+                const parents = child.kind === 'apex'
+                    ? findDirectApexParentsFromIndex(child.name, fileIndex)
+                    : findDirectParentsFromIndex(child.name, fileIndex);
                 for (const p of parents) {
                     const pBare = bareComponentName(p.componentName);
-                    edges.push({ parent: p.componentName, child, kind: p.kind, snippet: p.snippet });
+                    edges.push({ parent: p.componentName, child: child.name, kind: p.kind, snippet: p.snippet });
                     if (!visited.has(pBare)) {
                         visited.add(pBare);
                         orderedParents.push(p.componentName);
-                        nextFrontier.push(p.componentName);
+                        // 'apex-ref' parents are Apex and keep climbing with the
+                        // Apex rules; 'lwc-apex-import' / 'js-import' / 'html-tag'
+                        // parents are LWC and climb with the LWC rules.
+                        nextFrontier.push({ name: p.componentName, kind: p.kind === 'apex-ref' ? 'apex' : 'lwc' });
                         depthByNode.set(pBare, generation);
                         if (visited.size >= maxNodes) break outer;
                     }
@@ -4324,9 +4412,10 @@ export default class OrderDashboard extends LightningElement {
             orderedParents,
             edges,
             generations: generation,
-            filesScanned: fileIndex.jsTextByName.size + fileIndex.htmlTextByName.size,
+            filesScanned: fileIndex.jsTextByName.size + fileIndex.htmlTextByName.size + (fileIndex.apexTextByName?.size || 0),
             jsFilesScanned: fileIndex.jsTextByName.size,
             htmlFilesScanned: fileIndex.htmlTextByName.size,
+            apexFilesScanned: fileIndex.apexTextByName?.size || 0,
             scannedRoot: feState.dirHandle?.name || feState.tree?.name || '(unknown)',
             fromCache: !!fileIndex.fromCache,
             scanTiming: fileIndex.timing || null,
@@ -4334,14 +4423,14 @@ export default class OrderDashboard extends LightningElement {
         };
     }
 
-    async function runTraceParents(componentName) {
+    async function runTraceParents(componentName, rootKind = 'lwc') {
         if (!feState.dirHandle && !feState.tree) {
             alert('Open a project folder first so Trace Parents can search across all components.');
             return;
         }
         let result;
         try {
-            result = await traceParentsToRoot(componentName);
+            result = await traceParentsToRoot(componentName, { rootKind });
         } catch (err) {
             console.error('Trace Parents failed', err);
             alert(`Trace Parents failed for "${componentName}". Open console and share the error.`);
@@ -4359,11 +4448,11 @@ export default class OrderDashboard extends LightningElement {
                 : result.scanTiming
                     ? `file scan: ${result.scanTiming.readMs}ms / ${result.scanTiming.totalFiles} files (${result.scanTiming.msPerFile}ms/file avg)`
                     : '';
-            debugEl.textContent = `trace: ${componentName} | root="${result.scannedRoot}" | js=${result.jsFilesScanned} html=${result.htmlFilesScanned} | generations=${result.generations} | ancestors=${result.orderedParents.length} | ${timingText}`;
+            debugEl.textContent = `trace: ${componentName} | root="${result.scannedRoot}" | js=${result.jsFilesScanned} html=${result.htmlFilesScanned} apex=${result.apexFilesScanned} | generations=${result.generations} | ancestors=${result.orderedParents.length} | ${timingText}`;
         }
 
         if (result.orderedParents.length === 0) {
-            alert(`No parent references found for "${componentName}" after scanning ${result.jsFilesScanned} JS + ${result.htmlFilesScanned} HTML files under "${result.scannedRoot}".\n\nIf you expected a parent, double-check that the folder you opened in ApexFlow actually contains that parent's source (e.g. a sibling package directory) — Trace Parents only searches the folder that was opened here.`);
+            alert(`No parent references found for "${componentName}" after scanning ${result.jsFilesScanned} JS + ${result.htmlFilesScanned} HTML + ${result.apexFilesScanned} Apex files under "${result.scannedRoot}".\n\nIf you expected a parent, double-check that the folder you opened in ApexFlow actually contains that parent's source (e.g. a sibling package directory) — Trace Parents only searches the folder that was opened here.`);
             return;
         }
 
@@ -5104,14 +5193,24 @@ export default class OrderDashboard extends LightningElement {
             };
         }
 
-        // Trace Parents option — same eligibility as Lookup Reference: walk the
-        // reverse-dependency chain (JS `c/` imports + HTML <c-…> tags) up to the root.
+        // Trace Parents option — LWC components walk the reverse-dependency
+        // chain of JS `c/` imports + HTML <c-…> tags; Apex nodes (loaded or
+        // ghost, resolvable via the workspace Apex index) walk the Apex code
+        // references instead (calls, new, extends/implements, type usage),
+        // plus @salesforce/apex imports so the chain can cross from Apex up
+        // into the LWC components that ultimately trigger it.
+        const isApexNode = !!lookupTarget && !isJsComponent && (
+            registry[lookupTarget]?.kind === 'apex'
+            || registry[lookupBase]?.kind === 'apex'
+            || feState.apexIndex?.has(lookupTarget)
+            || feState.apexIndex?.has(lookupBase)
+        );
         const traceParentsEl = document.getElementById('ctx-trace-parents');
-        traceParentsEl.style.display = isJsComponent ? 'flex' : 'none';
-        if (isJsComponent) {
+        traceParentsEl.style.display = (isJsComponent || isApexNode) ? 'flex' : 'none';
+        if (isJsComponent || isApexNode) {
             traceParentsEl.onclick = () => {
                 hideNodeContextMenu();
-                runTraceParents(lookupTarget);
+                runTraceParents(lookupTarget, isApexNode ? 'apex' : 'lwc');
             };
         }
 
@@ -5334,7 +5433,7 @@ export default class OrderDashboard extends LightningElement {
         <div class="hlp-row"><span class="hlp-key">Analyze Flow</span><span class="hlp-desc">Switch to a focused call-flow diagram for this class (up to 6 levels deep)</span></div>
         <div class="hlp-row"><span class="hlp-key">Load Class</span><span class="hlp-desc">Load an unloaded ghost node from the file index or a file picker</span></div>
         <div class="hlp-row"><span class="hlp-key">Lookup Reference</span><span class="hlp-desc">Find HTML components that embed this one via a &lt;c-…&gt; tag</span></div>
-        <div class="hlp-row"><span class="hlp-key">Trace Parents</span><span class="hlp-desc">Climb every JS `c/` import and HTML &lt;c-…&gt; reference up to the root, generation by generation, and offer to load the whole ancestor chain into the diagram</span></div>
+        <div class="hlp-row"><span class="hlp-key">Trace Parents</span><span class="hlp-desc">Climb every reference up to the root, generation by generation, and load the whole ancestor chain into the diagram. LWC nodes follow JS `c/` imports and HTML &lt;c-…&gt; tags; Apex nodes follow Apex callers (method calls, new, extends/implements, type usage) plus @salesforce/apex imports from LWC</span></div>
         <div class="hlp-row"><span class="hlp-key">Hide Children</span><span class="hlp-desc">Hide or reveal this node's outgoing edges and destination nodes without a full re-render</span></div>
         <div class="hlp-row"><span class="hlp-key">Hide JS/Apex/HTML</span><span class="hlp-desc">Peel off child edges by type — e.g. hide Apex callouts while keeping JS imports visible</span></div>
         <div class="hlp-row"><span class="hlp-key">View Code</span><span class="hlp-desc">Open the method body in a draggable, resizable code panel with syntax highlighting</span></div>
