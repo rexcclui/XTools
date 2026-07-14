@@ -140,6 +140,10 @@
         .diagram-tab .tab-count { font-size: 10px; color: #64748b; background: #1e293b; padding: 1px 6px; border-radius: 8px; flex-shrink: 0; }
         .diagram-tab .tab-close { border: none; background: transparent; color: #64748b; font-size: 11px; line-height: 1; padding: 2px 3px; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
         .diagram-tab .tab-close:hover { color: var(--danger); background: rgba(239,68,68,0.15); }
+        .diagram-tab .tab-close-armed, .diagram-tab .tab-close-armed:hover { color: #fff; background: var(--danger); font-size: 9px; font-weight: 700; }
+        .diagram-tab .tab-edit { border: none; background: transparent; color: #64748b; font-size: 11px; line-height: 1; padding: 2px 3px; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
+        .diagram-tab .tab-edit:hover { color: var(--primary); background: rgba(16,185,129,0.15); }
+        .diagram-tab .tab-name-input { background: var(--bg-main); border: 1px solid var(--primary); border-radius: 4px; color: var(--text-main); font-size: 12px; font-weight: 600; font-family: inherit; padding: 1px 5px; width: 110px; outline: none; }
         #diagram-tab-add { border: 1px dashed var(--border); background: transparent; color: #64748b; font-size: 13px; padding: 2px 9px; margin: 0 0 5px 3px; border-radius: 6px; cursor: pointer; flex-shrink: 0; align-self: center; }
         #diagram-tab-add:hover { color: var(--primary); border-color: var(--primary); }
 
@@ -1136,8 +1140,6 @@ export default class OrderDashboard extends LightningElement {
     function closeDiagramTab(id) {
         const t = getDiagramTab(id);
         if (!t || diagramTabs.length === 1) return;
-        const count = Object.keys(id === activeTabId ? registry : (t.state?.registry || {})).length;
-        if (count && !confirm(`Close "${t.name}" and discard its ${count} loaded component${count === 1 ? '' : 's'}?`)) return;
         const idx = diagramTabs.indexOf(t);
         diagramTabs.splice(idx, 1);
         if (id === activeTabId) {
@@ -1152,28 +1154,49 @@ export default class OrderDashboard extends LightningElement {
         scheduleDiagramSave();
     }
 
-    function renameDiagramTab(id) {
+    // Inline tab rename — swaps the tab's name for an <input> in place.
+    // window.prompt is unavailable inside VS Code webviews, so editing has to
+    // happen right in the tab; Enter/blur commits, Esc cancels.
+    function renameDiagramTab(id, tabEl) {
         const t = getDiagramTab(id);
-        if (!t) return;
-        const name = prompt('Tab name', t.name);
-        if (name === null) return;
-        const trimmed = name.trim();
-        if (trimmed) t.name = trimmed;
-        renderDiagramTabs();
-        scheduleDiagramSave();
+        if (!t || !tabEl || tabEl.querySelector('.tab-name-input')) return;
+        const nameEl = tabEl.querySelector('.tab-name');
+        if (!nameEl) return;
+        const input = document.createElement('input');
+        input.className = 'tab-name-input';
+        input.value = t.name;
+        input.maxLength = 60;
+        input.onclick = e => e.stopPropagation();
+        input.ondblclick = e => e.stopPropagation();
+        input.onblur = () => {
+            const trimmed = input.value.trim();
+            if (trimmed) t.name = trimmed;
+            input.remove(); // lift the in-progress-rename guard before re-rendering
+            renderDiagramTabs();
+            scheduleDiagramSave();
+        };
+        input.onkeydown = e => {
+            e.stopPropagation();
+            if (e.key === 'Enter') input.blur();
+            if (e.key === 'Escape') { input.onblur = null; input.remove(); renderDiagramTabs(); }
+        };
+        nameEl.replaceWith(input);
+        input.focus();
+        input.select();
     }
 
     function renderDiagramTabs() {
         const bar = document.getElementById('diagram-tabs');
         if (!bar) return;
+        if (bar.querySelector('.tab-name-input')) return; // don't clobber an in-progress rename
         bar.innerHTML = '';
         diagramTabs.forEach(t => {
             const count = Object.keys(t.id === activeTabId ? registry : (t.state?.registry || {})).length;
             const el = document.createElement('div');
             el.className = 'diagram-tab' + (t.id === activeTabId ? ' active' : '');
-            el.title = `${t.name} — ${count} component${count === 1 ? '' : 's'}. Double-click to rename.`;
+            el.title = `${t.name} — ${count} component${count === 1 ? '' : 's'}. Double-click (or ✎) to rename.`;
             el.onclick = () => activateDiagramTab(t.id);
-            el.ondblclick = e => { e.preventDefault(); renameDiagramTab(t.id); };
+            el.ondblclick = e => { e.preventDefault(); renameDiagramTab(t.id, el); };
             const nameEl = document.createElement('span');
             nameEl.className = 'tab-name';
             nameEl.textContent = t.name;
@@ -1182,12 +1205,40 @@ export default class OrderDashboard extends LightningElement {
             countEl.className = 'tab-count';
             countEl.textContent = count;
             el.appendChild(countEl);
+            if (t.id === activeTabId) {
+                const editEl = document.createElement('button');
+                editEl.className = 'tab-edit';
+                editEl.textContent = '✎';
+                editEl.title = 'Rename tab';
+                editEl.onclick = e => { e.stopPropagation(); renameDiagramTab(t.id, el); };
+                el.appendChild(editEl);
+            }
             if (diagramTabs.length > 1) {
                 const closeEl = document.createElement('button');
                 closeEl.className = 'tab-close';
                 closeEl.textContent = '✕';
                 closeEl.title = 'Close tab';
-                closeEl.onclick = e => { e.stopPropagation(); closeDiagramTab(t.id); };
+                // confirm() is unavailable inside VS Code webviews, so closing a
+                // tab that still holds components uses a two-step click instead.
+                closeEl.onclick = e => {
+                    e.stopPropagation();
+                    const n = Object.keys(t.id === activeTabId ? registry : (t.state?.registry || {})).length;
+                    if (n && !closeEl.dataset.armed) {
+                        closeEl.dataset.armed = '1';
+                        closeEl.textContent = 'Sure?';
+                        closeEl.classList.add('tab-close-armed');
+                        closeEl.title = `Click again to close and discard ${n} component${n === 1 ? '' : 's'}`;
+                        setTimeout(() => {
+                            if (!closeEl.isConnected) return;
+                            delete closeEl.dataset.armed;
+                            closeEl.textContent = '✕';
+                            closeEl.classList.remove('tab-close-armed');
+                            closeEl.title = 'Close tab';
+                        }, 2500);
+                        return;
+                    }
+                    closeDiagramTab(t.id);
+                };
                 el.appendChild(closeEl);
             }
             bar.appendChild(el);
@@ -5339,7 +5390,7 @@ export default class OrderDashboard extends LightningElement {
         <div class="hlp-row"><span class="hlp-key">Drag file</span><span class="hlp-desc">Drag a file from the explorer to the diagram area to load it without clicking</span></div>
         <div class="hlp-row"><span class="hlp-key">Esc</span><span class="hlp-desc">Close this help panel, the code viewer, or any open context menu</span></div>
         <div class="hlp-row"><span class="hlp-key">Clear All</span><span class="hlp-desc">The "Clear All" button in the sidebar removes every loaded class/component from the active diagram tab; other tabs are untouched</span></div>
-        <div class="hlp-row"><span class="hlp-key">Diagram tabs</span><span class="hlp-desc">Use the tab strip above the toolbar to keep several diagrams side by side — components load into the active tab. Click + for a new tab, double-click a tab to rename it. Tabs and their loaded components are saved locally and restored when you reopen the page</span></div>
+        <div class="hlp-row"><span class="hlp-key">Diagram tabs</span><span class="hlp-desc">Use the tab strip above the toolbar to keep several diagrams side by side — components load into the active tab. Click + for a new tab; rename via the ✎ icon or by double-clicking the tab. Tabs and their loaded components are saved locally and restored when you reopen the page</span></div>
       </div>
     </div>
   </div>
