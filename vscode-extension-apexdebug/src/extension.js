@@ -9,10 +9,10 @@ const { scanApexSources } = require('./apexScan');
 
 // ── sf CLI helpers (Load Debug Logs from Org) ───────────────────────────────
 
-function execCli(command) {
+function execCli(command, cwd) {
     return new Promise((resolve, reject) => {
         // exec (not execFile) so `sf.cmd` resolves through the shell on Windows.
-        cp.exec(command, { maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+        cp.exec(command, { maxBuffer: 64 * 1024 * 1024, windowsHide: true, cwd: cwd || undefined }, (err, stdout, stderr) => {
             if (err) {
                 err.stdout = stdout;
                 err.stderr = stderr;
@@ -43,9 +43,9 @@ function cliErrorMessage(err) {
 }
 
 // Run one resolved CLI command and parse its --json output.
-async function runCliJson(cmd) {
+async function runCliJson(cmd, cwd) {
     try {
-        const stdout = await execCli(cmd);
+        const stdout = await execCli(cmd, cwd);
         try {
             return JSON.parse(stdout);
         } catch (_) {
@@ -188,6 +188,38 @@ async function resolveSfCli() {
     }
     cachedCli = null;
     return null;
+}
+
+// Where to RUN the CLI. sf resolves a project-level default org
+// (.sf/config.json / .sfdx/sfdx-config.json) by walking up from its working
+// directory — the extension host's own cwd is nowhere near the user's
+// project, so a project default org would never be found without this.
+// Prefer the workspace dir (root or one level down) that actually holds a
+// Salesforce project/config marker; otherwise the first workspace folder.
+function cliWorkingDir() {
+    const markers = [
+        path.join('.sf', 'config.json'),
+        path.join('.sfdx', 'sfdx-config.json'),
+        'sfdx-project.json',
+    ];
+    const dirs = [];
+    for (const folder of (vscode.workspace.workspaceFolders || [])) {
+        const root = folder.uri.fsPath;
+        dirs.push(root);
+        try {
+            for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+                if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+                    dirs.push(path.join(root, entry.name));
+                }
+            }
+        } catch (_) { /* unreadable root */ }
+    }
+    for (const dir of dirs) {
+        for (const marker of markers) {
+            try { if (fs.existsSync(path.join(dir, marker))) return dir; } catch (_) { /* keep looking */ }
+        }
+    }
+    return dirs[0] || require('os').homedir();
 }
 
 function listLogsCmd(cli, orgFlag) {
@@ -374,6 +406,7 @@ function activate(context) {
     // `sf apex get log` and open them as viewer tabs. Reachable from the
     // viewer's toolbar button and from the Command Palette.
     async function loadLogsFromOrg() {
+        let cwd = null;
         try {
             const cli = await resolveSfCli();
             if (!cli) {
@@ -389,11 +422,12 @@ function activate(context) {
                 }
                 return;
             }
-            output.appendLine(`[${new Date().toLocaleTimeString()}] Using Salesforce CLI: ${cli.bin} (${cli.flavor})`);
+            cwd = cliWorkingDir();
+            output.appendLine(`[${new Date().toLocaleTimeString()}] Using Salesforce CLI: ${cli.bin} (${cli.flavor}), cwd: ${cwd}`);
             const orgFlag = targetOrgFlag();
             const listJson = await vscode.window.withProgress(
                 { location: vscode.ProgressLocation.Notification, title: 'Apex Debug: fetching debug log list from org…' },
-                () => runCliJson(listLogsCmd(cli, orgFlag))
+                () => runCliJson(listLogsCmd(cli, orgFlag), cwd)
             );
             const logs = Array.isArray(listJson && listJson.result) ? listJson.result : [];
             if (!logs.length) {
@@ -422,7 +456,7 @@ function activate(context) {
                     for (let i = 0; i < picked.length; i++) {
                         const l = picked[i].log;
                         progress.report({ message: `${i + 1}/${picked.length} — ${l.Id}` });
-                        const got = await runCliJson(getLogCmd(cli, l.Id, orgFlag));
+                        const got = await runCliJson(getLogCmd(cli, l.Id, orgFlag), cwd);
                         // Shape varies by CLI version: result may be the log
                         // string, { log }, or [ { log } ].
                         const r = got && got.result;
@@ -444,7 +478,12 @@ function activate(context) {
                 }
             );
         } catch (e) {
-            vscode.window.showErrorMessage(`Apex Debug: failed to load logs from org — ${String((e && e.message) || e)}`);
+            let msg = String((e && e.message) || e);
+            if (/No default environment|NoDefaultEnvError|no default.*org/i.test(msg)) {
+                msg += ` — the CLI ran in "${cwd}"; a project default org (.sf/config.json) only applies inside that project folder. ` +
+                    'Open the project as your workspace, set the apexDebug.targetOrg setting, or set a global default with "sf config set target-org <org> --global".';
+            }
+            vscode.window.showErrorMessage(`Apex Debug: failed to load logs from org — ${msg}`);
         }
     }
 
