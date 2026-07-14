@@ -112,7 +112,20 @@
         .method-pill .pill-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--border); background: transparent; flex-shrink: 0; transition: 0.15s; }
         .method-pill.enabled .pill-dot { background: var(--primary); border-color: var(--primary); }
         .method-pill .pill-name { font-size: 13px; font-weight: 600; flex: 1; }
+        .method-pill.vis-global .pill-name { color: #38bdf8; }
+        .method-pill.vis-public .pill-name { color: #34d399; }
+        .method-pill.vis-private .pill-name { color: #facc15; }
         .method-pill .pill-badge { font-size: 10px; color: #64748b; background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+        #method-picker-vars { flex-shrink: 0; border-bottom: 1px solid var(--border); padding: 8px 12px; max-height: 35%; overflow-y: auto; }
+        #method-picker-vars summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.85; user-select: none; }
+        #method-picker-vars summary:hover { opacity: 1; }
+        #method-picker-vars .var-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 2px 0 14px; font-size: 12px; font-family: monospace; }
+        #method-picker-vars .var-name { font-weight: 600; flex-shrink: 0; }
+        #method-picker-vars .var-row.vis-global .var-name { color: #38bdf8; }
+        #method-picker-vars .var-row.vis-public .var-name { color: #34d399; }
+        #method-picker-vars .var-type { color: #94a3b8; }
+        #method-picker-vars .var-value { color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #method-picker-vars .var-const { font-size: 9px; font-family: inherit; color: #0f172a; background: #f59e0b; padding: 1px 5px; border-radius: 4px; font-weight: 700; flex-shrink: 0; align-self: center; }
 
         /* VIEWPORT & ASPECT RATIO */
         #viewport { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; transition: margin-left 0.4s ease; }
@@ -557,6 +570,10 @@ body.has-intro .btn-toggle{top:46px}
             <button class="btn" onclick="exitAnalyzeFlow()" style="padding:6px 10px;" title="Back to the full architecture map"><i class="fa-solid fa-arrow-left"></i></button>
             <span id="method-picker-classname"></span>
         </div>
+        <details id="method-picker-vars" style="display:none" title="Class-level public and global fields, constants and properties">
+            <summary>Public Variables &amp; Constants</summary>
+            <div id="method-picker-vars-list"></div>
+        </details>
         <div id="method-picker-list"></div>
     </div>
 </div>
@@ -5388,12 +5405,78 @@ export default class OrderDashboard extends LightningElement {
         if (name) { openMethodPicker(name); } else { exitAnalyzeFlow(); }
     }
 
+    // Access modifier of a parsed method — the stored body starts at the
+    // modifier keyword, so the first word is the visibility.
+    function methodVisibility(body) {
+        const m = /^\s*(global|public|private|protected)\b/i.exec(body || '');
+        if (!m) return null;
+        const v = m[1].toLowerCase();
+        return v === 'protected' ? 'private' : v;
+    }
+
+    // Class-level public/global fields, constants and properties. Line-based on
+    // purpose: methods can never match because the identifier must be followed
+    // by `;`, `=` or `{ get`, never `(`.
+    function collectPublicVars(raw) {
+        const vars = [];
+        const seen = new Set();
+        const declRe = /^\s*(?:@\w+(?:\([^)]*\))?\s+)*(public|global)\s+((?:(?:static|final|transient)\s+)*)(?!(?:class|interface|enum|void|abstract|virtual)\b)([\w.<>\[\], ]+?)\s+(\w+)\s*(?:(=\s*[^;]*);|;|\{\s*get\b)/i;
+        (raw || '').split('\n').forEach(line => {
+            const m = declRe.exec(line);
+            if (!m || seen.has(m[4])) return;
+            seen.add(m[4]);
+            vars.push({
+                visibility: m[1].toLowerCase(),
+                isConst: /\bfinal\b/i.test(m[2] || '') || /^[A-Z][A-Z0-9_]*$/.test(m[4]),
+                type: m[3].trim(),
+                name: m[4],
+                value: m[5] ? m[5].replace(/^=\s*/, '').trim() : null,
+            });
+        });
+        return vars;
+    }
+
     function openMethodPicker(className, preSelectMethod) {
         document.getElementById('class-panel').style.display = 'none';
         document.getElementById('method-picker').classList.add('visible');
         document.getElementById('method-picker-classname').textContent = className;
         const listEl = document.getElementById('method-picker-list');
         listEl.innerHTML = '';
+
+        // Expandable list of the class's public/global variables and constants
+        const varsEl = document.getElementById('method-picker-vars');
+        const varsListEl = document.getElementById('method-picker-vars-list');
+        varsListEl.innerHTML = '';
+        const publicVars = registry[className].kind === 'apex' ? collectPublicVars(registry[className].raw) : [];
+        varsEl.style.display = publicVars.length ? '' : 'none';
+        varsEl.open = false;
+        varsEl.querySelector('summary').textContent = `Public Variables & Constants (${publicVars.length})`;
+        publicVars.forEach(v => {
+            const row = document.createElement('div');
+            row.className = 'var-row vis-' + v.visibility;
+            const nameEl = document.createElement('span');
+            nameEl.className = 'var-name';
+            nameEl.textContent = v.name;
+            const typeEl = document.createElement('span');
+            typeEl.className = 'var-type';
+            typeEl.textContent = v.type;
+            row.appendChild(nameEl);
+            row.appendChild(typeEl);
+            if (v.isConst) {
+                const badge = document.createElement('span');
+                badge.className = 'var-const';
+                badge.textContent = 'CONST';
+                row.appendChild(badge);
+            }
+            if (v.value) {
+                const valEl = document.createElement('span');
+                valEl.className = 'var-value';
+                valEl.textContent = '= ' + v.value;
+                valEl.title = v.value;
+                row.appendChild(valEl);
+            }
+            varsListEl.appendChild(row);
+        });
 
         const methods = Object.keys(registry[className].methods);
         if (preSelectMethod && methods.includes(preSelectMethod)) {
@@ -5414,7 +5497,9 @@ export default class OrderDashboard extends LightningElement {
             const calls = collectOrderedCalls(registry[className].methods[m], registry[className].varMap, className);
             const lines = (registry[className].methods[m].match(/\n/g) || []).length;
             const pill = document.createElement('div');
-            pill.className = 'method-pill' + (activeMethods.has(m) ? ' enabled' : '');
+            const vis = registry[className].kind === 'apex' ? methodVisibility(registry[className].methods[m]) : null;
+            pill.className = 'method-pill' + (vis ? ' vis-' + vis : '') + (activeMethods.has(m) ? ' enabled' : '');
+            if (vis) pill.title = vis === 'private' ? 'private/protected method' : vis + ' method';
             pill.innerHTML = `<span class="pill-dot"></span><span class="pill-name">${m}():${lines}</span>${calls.length > 0 ? `<span class="pill-badge">${calls.length} calls</span>` : ''}`;
             pill.addEventListener('click', () => {
                 if (activeMethods.has(m)) { activeMethods.delete(m); pill.classList.remove('enabled'); }
