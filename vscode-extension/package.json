@@ -2,7 +2,7 @@
   "name": "codegraph-apex-lwc",
   "displayName": "CodeGraph Apex/LWC Dependency",
   "description": "Visualize the dependencies between your components — an interactive map of which LWC components call which Apex classes and which classes depend on each other, plus per-class call-flow diagrams and parent tracing, right inside VS Code.",
-  "version": "0.2.7",
+  "version": "0.2.9",
   "publisher": "xer100001",
   "icon": "media/icon.png",
   "repository": {
