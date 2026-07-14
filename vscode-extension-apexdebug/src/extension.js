@@ -42,23 +42,164 @@ function cliErrorMessage(err) {
     return String(err.stderr || err.message || err).trim();
 }
 
-// Run the first available CLI from `candidates` (modern `sf`, then legacy
-// `sfdx`) and parse its --json output.
-async function runSfJson(candidates) {
-    for (const cmd of candidates) {
+// Run one resolved CLI command and parse its --json output.
+async function runCliJson(cmd) {
+    try {
+        const stdout = await execCli(cmd);
         try {
-            const stdout = await execCli(cmd);
-            try {
-                return JSON.parse(stdout);
-            } catch (_) {
-                throw new Error(`unexpected CLI output from "${cmd}": ${String(stdout).slice(0, 200)}`);
+            return JSON.parse(stdout);
+        } catch (_) {
+            throw new Error(`unexpected CLI output from "${cmd}": ${String(stdout).slice(0, 200)}`);
+        }
+    } catch (e) {
+        throw new Error(cliErrorMessage(e));
+    }
+}
+
+// ── CLI discovery ───────────────────────────────────────────────────────────
+// The extension host often runs with a minimal PATH (VS Code launched from
+// the Dock / Start menu doesn't get the shell's PATH), so `sf` working in the
+// user's terminal doesn't mean plain `cp.exec('sf …')` can find it. Resolve
+// the binary once per session: explicit setting → PATH → login-shell lookup
+// (picks up nvm/Homebrew PATH edits from shell rc files) → well-known install
+// locations.
+
+let cachedCli; // { bin, flavor: 'sf' | 'sfdx' } | null; undefined = not resolved yet
+
+function cliFlavor(binPath) {
+    return /sfdx(\.cmd|\.exe)?$/i.test(binPath) ? 'sfdx' : 'sf';
+}
+
+function cliCandidatePaths() {
+    const os = require('os');
+    const home = os.homedir();
+    const paths = [];
+    if (process.platform === 'win32') {
+        const local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+        const pf = process.env.ProgramFiles || 'C:\\Program Files';
+        const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+        paths.push(
+            path.join(local, 'sf', 'client', 'bin', 'sf.cmd'),        // sf installer
+            path.join(pf, 'sf', 'bin', 'sf.cmd'),
+            path.join(appData, 'npm', 'sf.cmd'),                      // npm -g
+            path.join(appData, 'npm', 'sfdx.cmd'),
+            path.join(local, 'sfdx', 'client', 'bin', 'sfdx.cmd'),
+        );
+    } else {
+        paths.push(
+            '/usr/local/bin/sf',                                       // macOS pkg / npm -g
+            '/opt/homebrew/bin/sf',                                    // Homebrew (Apple Silicon)
+            path.join(home, '.local', 'share', 'sf', 'client', 'bin', 'sf'),
+            path.join(home, '.npm-global', 'bin', 'sf'),
+            path.join(home, '.volta', 'bin', 'sf'),
+            '/usr/bin/sf',
+            '/usr/local/bin/sfdx',
+            '/opt/homebrew/bin/sfdx',
+        );
+        // nvm-managed node: ~/.nvm/versions/node/<version>/bin/sf
+        try {
+            const nvmDir = path.join(home, '.nvm', 'versions', 'node');
+            for (const ver of fs.readdirSync(nvmDir).sort().reverse()) {
+                paths.push(path.join(nvmDir, ver, 'bin', 'sf'));
             }
-        } catch (e) {
-            if (isCliMissing(e)) continue; // try the next CLI flavour
-            throw new Error(cliErrorMessage(e));
+        } catch (_) { /* no nvm */ }
+    }
+    return paths;
+}
+
+// A project-local CLI (npm-installed: <workspace>/node_modules/.bin/sf) is
+// common in SFDX repos and is pinned to the project — prefer it over any
+// global install. Also looks one folder level down so monorepos where the
+// package lives in a subfolder (e.g. pse/app/node_modules) still resolve.
+function workspaceCliPaths() {
+    const names = process.platform === 'win32' ? ['sf.cmd', 'sfdx.cmd'] : ['sf', 'sfdx'];
+    const paths = [];
+    for (const folder of (vscode.workspace.workspaceFolders || [])) {
+        const root = folder.uri.fsPath;
+        const dirs = [root];
+        try {
+            for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+                if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+                    dirs.push(path.join(root, entry.name));
+                }
+            }
+        } catch (_) { /* unreadable root */ }
+        for (const dir of dirs) {
+            for (const name of names) paths.push(path.join(dir, 'node_modules', '.bin', name));
         }
     }
-    throw new Error('Salesforce CLI not found. Install the "sf" CLI (https://developer.salesforce.com/tools/salesforcecli) and make sure it is on your PATH.');
+    return paths;
+}
+
+// Does `<bin> --version` run at all? (Distinguishes "missing binary" from an
+// installed CLI, whatever it prints.)
+function cliResponds(bin) {
+    return execCli(`${bin} --version`).then(() => true, err => !isCliMissing(err));
+}
+
+// Ask the user's login shell where sf lives — sources ~/.zprofile/.bash_profile
+// etc., which is where Homebrew and nvm add themselves to PATH.
+function loginShellWhich(name) {
+    if (process.platform === 'win32') return Promise.resolve(null);
+    return new Promise(resolve => {
+        const shell = process.env.SHELL || '/bin/bash';
+        cp.exec(`${shell} -l -c "command -v ${name}"`, { timeout: 5000 }, (err, stdout) => {
+            const found = String(stdout || '').trim().split('\n').pop();
+            resolve(!err && found && found.startsWith('/') ? found : null);
+        });
+    });
+}
+
+async function resolveSfCli() {
+    if (cachedCli !== undefined) return cachedCli;
+
+    // 1. Explicit setting always wins.
+    const configured = vscode.workspace.getConfiguration('apexDebug').get('sfCliPath');
+    if (configured && String(configured).trim()) {
+        cachedCli = { bin: `"${String(configured).trim()}"`, flavor: cliFlavor(configured) };
+        return cachedCli;
+    }
+    // 2. Project-local install in the workspace (node_modules/.bin/sf).
+    for (const candidate of workspaceCliPaths()) {
+        try {
+            if (fs.existsSync(candidate)) {
+                cachedCli = { bin: `"${candidate}"`, flavor: cliFlavor(candidate) };
+                return cachedCli;
+            }
+        } catch (_) { /* keep probing */ }
+    }
+    // 3. Whatever PATH the extension host does have.
+    for (const name of ['sf', 'sfdx']) {
+        if (await cliResponds(name)) { cachedCli = { bin: name, flavor: name }; return cachedCli; }
+    }
+    // 4. Login shell (macOS/Linux GUI launches).
+    for (const name of ['sf', 'sfdx']) {
+        const found = await loginShellWhich(name);
+        if (found) { cachedCli = { bin: `"${found}"`, flavor: name }; return cachedCli; }
+    }
+    // 5. Well-known install locations.
+    for (const candidate of cliCandidatePaths()) {
+        try {
+            if (fs.existsSync(candidate)) {
+                cachedCli = { bin: `"${candidate}"`, flavor: cliFlavor(candidate) };
+                return cachedCli;
+            }
+        } catch (_) { /* keep probing */ }
+    }
+    cachedCli = null;
+    return null;
+}
+
+function listLogsCmd(cli, orgFlag) {
+    return cli.flavor === 'sf'
+        ? `${cli.bin} apex list log --json${orgFlag}`
+        : `${cli.bin} force:apex:log:list --json${orgFlag}`;
+}
+
+function getLogCmd(cli, logId, orgFlag) {
+    return cli.flavor === 'sf'
+        ? `${cli.bin} apex get log --log-id ${logId} --json${orgFlag}`
+        : `${cli.bin} force:apex:log:get --logid ${logId} --json${orgFlag}`;
 }
 
 function targetOrgFlag() {
@@ -95,6 +236,15 @@ function activate(context) {
 
     const output = vscode.window.createOutputChannel('Apex Debug Log Parser');
     context.subscriptions.push(output);
+
+    // The resolved CLI is cached for the session — drop it if the override
+    // setting or the workspace (project-local node_modules) changes.
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('apexDebug.sfCliPath')) cachedCli = undefined;
+        }),
+        vscode.workspace.onDidChangeWorkspaceFolders(() => { cachedCli = undefined; })
+    );
 
     async function handleMessage(msg) {
         if (!panel) return;
@@ -225,13 +375,25 @@ function activate(context) {
     // viewer's toolbar button and from the Command Palette.
     async function loadLogsFromOrg() {
         try {
+            const cli = await resolveSfCli();
+            if (!cli) {
+                const openSettings = 'Set CLI Path';
+                const choice = await vscode.window.showErrorMessage(
+                    'Apex Debug: Salesforce CLI not found — checked the workspace\'s node_modules/.bin, PATH, your login shell, and common install locations. ' +
+                    'If it is installed, set "apexDebug.sfCliPath" to the executable\'s full path (find it with `which sf` / `where sf` in a terminal). ' +
+                    'Otherwise install it from https://developer.salesforce.com/tools/salesforcecli and restart VS Code.',
+                    openSettings
+                );
+                if (choice === openSettings) {
+                    vscode.commands.executeCommand('workbench.action.openSettings', 'apexDebug.sfCliPath');
+                }
+                return;
+            }
+            output.appendLine(`[${new Date().toLocaleTimeString()}] Using Salesforce CLI: ${cli.bin} (${cli.flavor})`);
             const orgFlag = targetOrgFlag();
             const listJson = await vscode.window.withProgress(
                 { location: vscode.ProgressLocation.Notification, title: 'Apex Debug: fetching debug log list from org…' },
-                () => runSfJson([
-                    `sf apex list log --json${orgFlag}`,
-                    `sfdx force:apex:log:list --json${orgFlag}`,
-                ])
+                () => runCliJson(listLogsCmd(cli, orgFlag))
             );
             const logs = Array.isArray(listJson && listJson.result) ? listJson.result : [];
             if (!logs.length) {
@@ -260,10 +422,7 @@ function activate(context) {
                     for (let i = 0; i < picked.length; i++) {
                         const l = picked[i].log;
                         progress.report({ message: `${i + 1}/${picked.length} — ${l.Id}` });
-                        const got = await runSfJson([
-                            `sf apex get log --log-id ${l.Id} --json${orgFlag}`,
-                            `sfdx force:apex:log:get --logid ${l.Id} --json${orgFlag}`,
-                        ]);
+                        const got = await runCliJson(getLogCmd(cli, l.Id, orgFlag));
                         // Shape varies by CLI version: result may be the log
                         // string, { log }, or [ { log } ].
                         const r = got && got.result;

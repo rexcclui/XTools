@@ -2,7 +2,7 @@
   "name": "apexdebug-log-parser",
   "displayName": "Apex Debug Log Parser",
   "description": "Salesforce Apex debug log parser, analyzer and stack tracer inside VS Code — collapsible call tree, SOQL & DML breakdown, exceptions, method timings, multi-log tabs, search and highlighting. Right-click any .log file to open it in the viewer.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "xer100001",
   "icon": "media/icon.png",
   "repository": {
@@ -40,6 +40,11 @@
           "type": "string",
           "default": "",
           "description": "Org alias or username passed to the Salesforce CLI as --target-org when listing/fetching debug logs. Leave empty to use the CLI's default org."
+        },
+        "apexDebug.sfCliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Full path to the Salesforce CLI executable (sf / sf.cmd / sfdx), e.g. /usr/local/bin/sf or <project>/node_modules/.bin/sf. Leave empty to auto-detect: workspace node_modules/.bin, PATH, your login shell's PATH, then common install locations."
         }
       }
     },
