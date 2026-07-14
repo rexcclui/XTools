@@ -27,9 +27,12 @@ downloaded and opened as its own parsed tab. No more hunting through the
 Developer Console.
 
 Requirements: the [`sf` CLI](https://developer.salesforce.com/tools/salesforcecli)
-on your PATH and an authenticated org (`sf org login web`). The CLI's default
-org is used unless you set **`apexDebug.targetOrg`** in Settings to an org
-alias/username.
+and an authenticated org (`sf org login web`). The CLI is auto-detected — a
+project-local `node_modules/.bin/sf` in your workspace is preferred, then
+PATH, your login shell's PATH, and common install locations; set
+**`apexDebug.sfCliPath`** in Settings to point at a specific executable if
+needed. The CLI's default org is used unless you set
+**`apexDebug.targetOrg`** to an org alias/username.
 
 ## Reading a parsed log
 
