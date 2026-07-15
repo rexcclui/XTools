@@ -17,6 +17,23 @@ Or run **Apex Debug Log Parser: Open Viewer** from the Command Palette and:
 - drag `.log` files onto the viewer (from VS Code's Explorer or from your OS),
 - or click **▶ Load sample** to see an example instantly.
 
+## Load debug logs straight from your org
+
+Click **⚡ Load Debug** in the viewer's toolbar (or run **Apex Debug Log
+Parser: Load Debug Logs from Org (sf CLI)** from the Command Palette). The
+extension lists your org's recent debug logs through the Salesforce CLI —
+time, operation, status, size, duration and user — and every log you pick is
+downloaded and opened as its own parsed tab. No more hunting through the
+Developer Console.
+
+Requirements: the [`sf` CLI](https://developer.salesforce.com/tools/salesforcecli)
+and an authenticated org (`sf org login web`). The CLI is auto-detected — a
+project-local `node_modules/.bin/sf` in your workspace is preferred, then
+PATH, your login shell's PATH, and common install locations; set
+**`apexDebug.sfCliPath`** in Settings to point at a specific executable if
+needed. The CLI's default org is used unless you set
+**`apexDebug.targetOrg`** to an org alias/username.
+
 ## Reading a parsed log
 
 - **Left pane** shows the raw log; **right pane** shows the call tree —

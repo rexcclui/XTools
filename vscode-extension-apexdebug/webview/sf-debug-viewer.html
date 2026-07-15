@@ -355,6 +355,7 @@ const HTML = `
     <button class="btn btn-sm" id="btn-addHide" title="Hide log lines containing this keyword">+</button>
     <div id="hideTags" class="hide-row"></div>
   </div>
+  <button class="btn btn-sm" id="btn-loadOrg" title="List recent debug logs from your org via the Salesforce CLI (sf) and load the ones you pick">⚡ Load Debug</button>
   <button class="btn btn-sm" id="btn-history" title="Recently opened logs">📚 History</button>
   <button class="btn btn-sm" id="btn-copyLog" title="Copy entire raw log to clipboard">⎘ Copy Log</button>
   <div style="width:1px;height:20px;background:var(--bd)"></div>
@@ -440,6 +441,7 @@ const HTML = `
         <h4>Getting Started</h4>
         <div class="help-r"><span class="help-k">Paste</span><span class="help-d">Paste a Salesforce debug log into the text area, then click Parse Log</span></div>
         <div class="help-r"><span class="help-k">Drop file</span><span class="help-d">Drag a .log or .txt file onto the page to open it as a new tab automatically</span></div>
+        <div class="help-r"><span class="help-k">⚡ Load Debug</span><span class="help-d">List your org's recent debug logs via the Salesforce CLI (sf) and load the ones you pick, each as its own tab — uses the CLI's default org (or the apexDebug.targetOrg setting)</span></div>
         <div class="help-r"><span class="help-k">+ tab</span><span class="help-d">Click ＋ in the tab bar to open a blank tab for a new log</span></div>
         <div class="help-r"><span class="help-k">Sample</span><span class="help-d">Click "Load Sample" to explore the UI with a built-in example log</span></div>
       </div>
@@ -2175,6 +2177,14 @@ function initAnalyzer(rootEl, fetchSource) {
   }
 
   $('btn-openSrc').addEventListener('click', openSourceFolder);
+  // "⚡ Load Debug" — the extension host runs the sf CLI, shows the native
+  // log QuickPick, and pushes the picked logs back in as openLog messages.
+  const _loadOrgBtn = $('btn-loadOrg');
+  if (_loadOrgBtn) {
+    _loadOrgBtn.addEventListener('click', () => {
+      vfsRequest('loadOrgLogs', {}).catch(e => console.error('[ApexDebug bridge] load from org failed', e));
+    });
+  }
   const _srcFallback=$('srcFolderFallback');
   if (_srcFallback) {
     _srcFallback.addEventListener('change',()=>{

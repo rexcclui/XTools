@@ -112,11 +112,40 @@
         .method-pill .pill-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--border); background: transparent; flex-shrink: 0; transition: 0.15s; }
         .method-pill.enabled .pill-dot { background: var(--primary); border-color: var(--primary); }
         .method-pill .pill-name { font-size: 13px; font-weight: 600; flex: 1; }
+        .method-pill.vis-global .pill-name { color: #38bdf8; }
+        .method-pill.vis-public .pill-name { color: #34d399; }
+        .method-pill.vis-private .pill-name { color: #facc15; }
         .method-pill .pill-badge { font-size: 10px; color: #64748b; background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+        #method-picker-vars { flex-shrink: 0; border-bottom: 1px solid var(--border); padding: 8px 12px; max-height: 35%; overflow-y: auto; }
+        #method-picker-vars summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.85; user-select: none; }
+        #method-picker-vars summary:hover { opacity: 1; }
+        #method-picker-vars .var-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 2px 0 14px; font-size: 12px; font-family: monospace; }
+        #method-picker-vars .var-name { font-weight: 600; flex-shrink: 0; }
+        #method-picker-vars .var-row.vis-global .var-name { color: #38bdf8; }
+        #method-picker-vars .var-row.vis-public .var-name { color: #34d399; }
+        #method-picker-vars .var-type { color: #94a3b8; }
+        #method-picker-vars .var-value { color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #method-picker-vars .var-const { font-size: 9px; font-family: inherit; color: #0f172a; background: #f59e0b; padding: 1px 5px; border-radius: 4px; font-weight: 700; flex-shrink: 0; align-self: center; }
 
         /* VIEWPORT & ASPECT RATIO */
         #viewport { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; transition: margin-left 0.4s ease; }
         .toolbar { height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; justify-content: space-between; align-items: center; z-index: 25; }
+
+        /* DIAGRAM TABS */
+        #diagram-tabs { display: flex; align-items: flex-end; gap: 3px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border); padding: 6px 10px 0; overflow-x: auto; flex-shrink: 0; }
+        .diagram-tab { display: flex; align-items: center; gap: 7px; max-width: 220px; padding: 6px 10px; font-size: 12px; color: var(--text-dim); border: 1px solid transparent; border-bottom: none; border-radius: 7px 7px 0 0; cursor: pointer; user-select: none; white-space: nowrap; }
+        .diagram-tab:hover { color: var(--text-main); background: rgba(148,163,184,0.08); }
+        .diagram-tab.active { color: var(--primary); background: var(--bg-main); border-color: var(--border); }
+        .diagram-tab .tab-name { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+        .diagram-tab .tab-count { font-size: 10px; color: #64748b; background: #1e293b; padding: 1px 6px; border-radius: 8px; flex-shrink: 0; }
+        .diagram-tab .tab-close { border: none; background: transparent; color: #64748b; font-size: 11px; line-height: 1; padding: 2px 3px; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
+        .diagram-tab .tab-close:hover { color: var(--danger); background: rgba(239,68,68,0.15); }
+        .diagram-tab .tab-close-armed, .diagram-tab .tab-close-armed:hover { color: #fff; background: var(--danger); font-size: 9px; font-weight: 700; }
+        .diagram-tab .tab-edit { border: none; background: transparent; color: #64748b; font-size: 11px; line-height: 1; padding: 2px 3px; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
+        .diagram-tab .tab-edit:hover { color: var(--primary); background: rgba(16,185,129,0.15); }
+        .diagram-tab .tab-name-input { background: var(--bg-main); border: 1px solid var(--primary); border-radius: 4px; color: var(--text-main); font-size: 12px; font-weight: 600; font-family: inherit; padding: 1px 5px; width: 110px; outline: none; }
+        #diagram-tab-add { border: 1px dashed var(--border); background: transparent; color: #64748b; font-size: 13px; padding: 2px 9px; margin: 0 0 5px 3px; border-radius: 6px; cursor: pointer; flex-shrink: 0; align-self: center; }
+        #diagram-tab-add:hover { color: var(--primary); border-color: var(--primary); }
 
         #diagram-wrapper { 
             flex: 1; 
@@ -557,11 +586,16 @@ body.has-intro .btn-toggle{top:46px}
             <button class="btn" onclick="exitAnalyzeFlow()" style="padding:6px 10px;" title="Back to the full architecture map"><i class="fa-solid fa-arrow-left"></i></button>
             <span id="method-picker-classname"></span>
         </div>
+        <details id="method-picker-vars" style="display:none" title="Class-level public and global fields, constants and properties">
+            <summary>Public Variables &amp; Constants</summary>
+            <div id="method-picker-vars-list"></div>
+        </details>
         <div id="method-picker-list"></div>
     </div>
 </div>
 
 <div id="viewport">
+    <div id="diagram-tabs"></div>
     <div class="toolbar">
         <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
             <h3 id="view-title" style="margin: 0 0 0 50px; font-size: 0.9rem; color: var(--text-dim);">Ready</h3>
@@ -772,8 +806,8 @@ body.has-intro .btn-toggle{top:46px}
     // it can't safely postMessage back before this listener is attached.
     vscodeApi.postMessage({ type: 'ready' });
 
-    const registry = {};
-    const innerClassNames = new Set(); // inner class names found inside loaded files
+    let registry = {};
+    let innerClassNames = new Set(); // inner class names found inside loaded files
     let focusedClass = null;
     // Set by Trace Parents to render a dedicated, isolated ancestor-chain
     // diagram instead of the registry-wide Architecture Map — see render()
@@ -1263,16 +1297,316 @@ export default class OrderDashboard extends LightningElement {
 
     // ── FILE EXPLORER ──────────────────────────────────────────────────────────
     const feState = { tree: null, search: '', loadedNames: new Set(), dirHandle: null, lwcIndex: new Map(), apexIndex: new Map(), autoLoadQueue: [], autoLoadInProgress: false, disableAutoLoadForSlowReads: false, prefetchQueue: [], prefetchInProgress: false, prefetchTimer: null };
+
+    // ── Multi-tab diagrams ──────────────────────────────────────────────────────
+    // Each tab owns an independent diagram: its own registry of loaded
+    // components plus the view state that goes with it. The active tab's state
+    // is "checked out" into the module-level variables above, so the rest of
+    // the code (parsers, render, analyze flow, trace chains) keeps targeting
+    // the active tab unchanged; switching tabs snapshots the globals back into
+    // the tab object and checks out the next one.
+    let diagramTabs = [{ id: 1, name: 'Diagram 1', state: null }];
+    let activeTabId = 1;
+    let nextDiagramTabId = 2;
+
+    function emptyTabState() {
+        return {
+            registry: {}, innerClassNames: new Set(), loadedNames: new Set(),
+            hiddenClasses: new Set(), hiddenChildEdges: new Set(), expandedMethods: new Map(),
+            collapsedMethods: new Set(), collapsedNodes: new Set(), activeMethods: new Set(),
+            focusedClass: null, selectedClassName: null,
+            traceChainMode: null, lastTraceEdges: null,
+        };
+    }
+
+    function getDiagramTab(id) { return diagramTabs.find(t => t.id === id); }
+
+    function snapshotActiveTab() {
+        const t = getDiagramTab(activeTabId);
+        if (!t) return;
+        t.state = {
+            registry, innerClassNames, loadedNames: feState.loadedNames,
+            hiddenClasses, hiddenChildEdges, expandedMethods,
+            collapsedMethods, collapsedNodes, activeMethods,
+            focusedClass, selectedClassName,
+            traceChainMode, lastTraceEdges,
+        };
+    }
+
+    function checkoutTabState(t) {
+        const s = t.state || (t.state = emptyTabState());
+        registry = s.registry; innerClassNames = s.innerClassNames; feState.loadedNames = s.loadedNames;
+        hiddenClasses = s.hiddenClasses; hiddenChildEdges = s.hiddenChildEdges; expandedMethods = s.expandedMethods;
+        collapsedMethods = s.collapsedMethods; collapsedNodes = s.collapsedNodes; activeMethods = s.activeMethods;
+        focusedClass = s.focusedClass; selectedClassName = s.selectedClassName;
+        traceChainMode = s.traceChainMode; lastTraceEdges = s.lastTraceEdges;
+    }
+
+    // Reflect the checked-out tab's mode in the sidebar: focused call-flow
+    // (method picker) when the tab was analyzing a class, architecture map
+    // otherwise.
+    function syncAnalyzeFlowUi() {
+        if (focusedClass && registry[focusedClass]) {
+            const first = activeMethods.size ? activeMethods.values().next().value : undefined;
+            openMethodPicker(focusedClass, first); // renders
+        } else {
+            focusedClass = null;
+            document.getElementById('class-panel').style.display = '';
+            document.getElementById('method-picker').classList.remove('visible');
+            render();
+        }
+    }
+
+    function activateDiagramTab(id) {
+        if (id === activeTabId) return;
+        const t = getDiagramTab(id);
+        if (!t) return;
+        snapshotActiveTab();
+        activeTabId = id;
+        checkoutTabState(t);
+        hideCodeTooltip();
+        syncAnalyzeFlowUi();
+        renderFileTree();
+        renderDiagramTabs();
+        scheduleDiagramSave();
+    }
+
+    function addDiagramTab() {
+        snapshotActiveTab();
+        const t = { id: nextDiagramTabId, name: `Diagram ${nextDiagramTabId}`, state: emptyTabState() };
+        nextDiagramTabId++;
+        diagramTabs.push(t);
+        activeTabId = t.id;
+        checkoutTabState(t);
+        hideCodeTooltip();
+        syncAnalyzeFlowUi();
+        renderFileTree();
+        renderDiagramTabs();
+        scheduleDiagramSave();
+    }
+
+    function closeDiagramTab(id) {
+        const t = getDiagramTab(id);
+        if (!t || diagramTabs.length === 1) return;
+        const idx = diagramTabs.indexOf(t);
+        diagramTabs.splice(idx, 1);
+        if (id === activeTabId) {
+            const next = diagramTabs[Math.max(0, idx - 1)];
+            activeTabId = next.id;
+            checkoutTabState(next);
+            hideCodeTooltip();
+            syncAnalyzeFlowUi();
+            renderFileTree();
+        }
+        renderDiagramTabs();
+        scheduleDiagramSave();
+    }
+
+    // Inline tab rename — swaps the tab's name for an <input> in place.
+    // window.prompt is unavailable inside VS Code webviews, so editing has to
+    // happen right in the tab; Enter/blur commits, Esc cancels.
+    function renameDiagramTab(id, tabEl) {
+        const t = getDiagramTab(id);
+        if (!t || !tabEl || tabEl.querySelector('.tab-name-input')) return;
+        const nameEl = tabEl.querySelector('.tab-name');
+        if (!nameEl) return;
+        const input = document.createElement('input');
+        input.className = 'tab-name-input';
+        input.value = t.name;
+        input.maxLength = 60;
+        input.onclick = e => e.stopPropagation();
+        input.ondblclick = e => e.stopPropagation();
+        input.onblur = () => {
+            const trimmed = input.value.trim();
+            if (trimmed) t.name = trimmed;
+            input.remove(); // lift the in-progress-rename guard before re-rendering
+            renderDiagramTabs();
+            scheduleDiagramSave();
+        };
+        input.onkeydown = e => {
+            e.stopPropagation();
+            if (e.key === 'Enter') input.blur();
+            if (e.key === 'Escape') { input.onblur = null; input.remove(); renderDiagramTabs(); }
+        };
+        nameEl.replaceWith(input);
+        input.focus();
+        input.select();
+    }
+
+    function renderDiagramTabs() {
+        const bar = document.getElementById('diagram-tabs');
+        if (!bar) return;
+        if (bar.querySelector('.tab-name-input')) return; // don't clobber an in-progress rename
+        bar.innerHTML = '';
+        diagramTabs.forEach(t => {
+            const count = Object.keys(t.id === activeTabId ? registry : (t.state?.registry || {})).length;
+            const el = document.createElement('div');
+            el.className = 'diagram-tab' + (t.id === activeTabId ? ' active' : '');
+            el.title = `${t.name} — ${count} component${count === 1 ? '' : 's'}. Double-click (or ✎) to rename.`;
+            el.onclick = () => activateDiagramTab(t.id);
+            el.ondblclick = e => { e.preventDefault(); renameDiagramTab(t.id, el); };
+            const nameEl = document.createElement('span');
+            nameEl.className = 'tab-name';
+            nameEl.textContent = t.name;
+            el.appendChild(nameEl);
+            const countEl = document.createElement('span');
+            countEl.className = 'tab-count';
+            countEl.textContent = count;
+            el.appendChild(countEl);
+            if (t.id === activeTabId) {
+                const editEl = document.createElement('button');
+                editEl.className = 'tab-edit';
+                editEl.textContent = '✎';
+                editEl.title = 'Rename tab';
+                editEl.onclick = e => { e.stopPropagation(); renameDiagramTab(t.id, el); };
+                el.appendChild(editEl);
+            }
+            if (diagramTabs.length > 1) {
+                const closeEl = document.createElement('button');
+                closeEl.className = 'tab-close';
+                closeEl.textContent = '✕';
+                closeEl.title = 'Close tab';
+                // confirm() is unavailable inside VS Code webviews, so closing a
+                // tab that still holds components uses a two-step click instead.
+                closeEl.onclick = e => {
+                    e.stopPropagation();
+                    const n = Object.keys(t.id === activeTabId ? registry : (t.state?.registry || {})).length;
+                    if (n && !closeEl.dataset.armed) {
+                        closeEl.dataset.armed = '1';
+                        closeEl.textContent = 'Sure?';
+                        closeEl.classList.add('tab-close-armed');
+                        closeEl.title = `Click again to close and discard ${n} component${n === 1 ? '' : 's'}`;
+                        setTimeout(() => {
+                            if (!closeEl.isConnected) return;
+                            delete closeEl.dataset.armed;
+                            closeEl.textContent = '✕';
+                            closeEl.classList.remove('tab-close-armed');
+                            closeEl.title = 'Close tab';
+                        }, 2500);
+                        return;
+                    }
+                    closeDiagramTab(t.id);
+                };
+                el.appendChild(closeEl);
+            }
+            bar.appendChild(el);
+        });
+        const addBtn = document.createElement('button');
+        addBtn.id = 'diagram-tab-add';
+        addBtn.textContent = '+';
+        addBtn.title = 'New diagram tab';
+        addBtn.onclick = addDiagramTab;
+        bar.appendChild(addBtn);
+    }
+
+    // ── Diagram persistence: tabs + loaded component sources survive reload ────
+    async function idbSaveDiagramState(payload) {
+        try {
+            const db = await idbOpen();
+            db.transaction(IDB_DIAGRAM_STORE, 'readwrite').objectStore(IDB_DIAGRAM_STORE).put(payload, IDB_DIAGRAM_KEY);
+        } catch (e) { console.warn('idb diagram state save failed', e); }
+    }
+
+    async function idbLoadDiagramState() {
+        try {
+            const db = await idbOpen();
+            return await new Promise((res, rej) => {
+                const req = db.transaction(IDB_DIAGRAM_STORE, 'readonly').objectStore(IDB_DIAGRAM_STORE).get(IDB_DIAGRAM_KEY);
+                req.onsuccess = e => res(e.target.result || null);
+                req.onerror = e => rej(e.target.error);
+            });
+        } catch (e) { return null; }
+    }
+
+    function serializeTabComponents(reg) {
+        return Object.entries(reg).map(([name, e]) => {
+            if (!e) return null;
+            if (e.kind === 'apex') return { name, kind: 'apex', raw: e.raw, folderPath: e.folderPath };
+            return { name, kind: e.kind, jsContent: e.jsContent || '', htmlContent: e.htmlContent || '', folderPath: e.folderPath, parentLwc: e.parentLwc };
+        }).filter(Boolean);
+    }
+
+    function serializeTabView(s) {
+        return {
+            focusedClass: s.focusedClass, selectedClassName: s.selectedClassName,
+            activeMethods: [...s.activeMethods], hiddenClasses: [...s.hiddenClasses],
+            collapsedMethods: [...s.collapsedMethods], collapsedNodes: [...s.collapsedNodes],
+            hiddenChildEdges: [...s.hiddenChildEdges],
+        };
+    }
+
+    let diagramSaveTimer = null;
+    function scheduleDiagramSave() {
+        clearTimeout(diagramSaveTimer);
+        diagramSaveTimer = setTimeout(saveDiagramState, 800);
+    }
+
+    function saveDiagramState() {
+        snapshotActiveTab();
+        idbSaveDiagramState({
+            activeTabId,
+            nextDiagramTabId,
+            tabs: diagramTabs.map(t => {
+                const s = t.state || emptyTabState();
+                return { id: t.id, name: t.name, components: serializeTabComponents(s.registry), view: serializeTabView(s) };
+            }),
+        });
+    }
+
+    function rebuildTabState(saved) {
+        const s = emptyTabState();
+        // Re-parse each saved component into this tab's registry. The parsers
+        // write through the module-level references, so temporarily point them
+        // at this tab's fresh objects.
+        const prev = { registry, innerClassNames, loadedNames: feState.loadedNames };
+        registry = s.registry; innerClassNames = s.innerClassNames; feState.loadedNames = s.loadedNames;
+        (saved.components || []).forEach(c => {
+            try {
+                if (c.kind === 'apex') {
+                    parseApex(c.raw, c.folderPath);
+                    s.loadedNames.add(`${c.name}.cls`); s.loadedNames.add(`${c.name}.java`);
+                } else {
+                    parseLwc(c.name, c.jsContent, c.htmlContent, c.folderPath, c.kind, c.parentLwc);
+                    s.loadedNames.add(`${c.name}.js`); s.loadedNames.add(`${c.name}.html`);
+                }
+            } catch (e) { console.warn('failed to restore component', c.name, e); }
+        });
+        registry = prev.registry; innerClassNames = prev.innerClassNames; feState.loadedNames = prev.loadedNames;
+        const v = saved.view || {};
+        s.focusedClass = v.focusedClass || null;
+        s.selectedClassName = v.selectedClassName || null;
+        s.activeMethods = new Set(v.activeMethods || []);
+        s.hiddenClasses = new Set(v.hiddenClasses || []);
+        s.collapsedMethods = new Set(v.collapsedMethods || []);
+        s.collapsedNodes = new Set(v.collapsedNodes || []);
+        s.hiddenChildEdges = new Set(v.hiddenChildEdges || []);
+        return s;
+    }
+
+    async function restoreDiagramState() {
+        try {
+            const saved = await idbLoadDiagramState();
+            if (saved?.tabs?.length) {
+                diagramTabs = saved.tabs.map(t => ({ id: t.id, name: t.name, state: rebuildTabState(t) }));
+                nextDiagramTabId = saved.nextDiagramTabId || Math.max(...diagramTabs.map(t => t.id)) + 1;
+                activeTabId = diagramTabs.some(t => t.id === saved.activeTabId) ? saved.activeTabId : diagramTabs[0].id;
+                checkoutTabState(getDiagramTab(activeTabId));
+                if (Object.keys(registry).length || focusedClass) syncAnalyzeFlowUi();
+                renderFileTree();
+            }
+        } catch (e) { console.warn('diagram state restore failed', e); }
+        renderDiagramTabs();
+    }
     const LWC_SKIP_DIRS = new Set(['__tests__', '__mocks__', 'node_modules', '.git', '.sfdx', '.sf', 'dist', 'build', 'target', 'out', '.next', '.cache', '.vscode']);
     const AUTO_LOAD_REL_IMPORTS = false;
 
     // ── IndexedDB persistence for the directory handle ─────────────────────────
-    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory', IDB_TREE_STORE = 'treeCache', IDB_REF_STORE = 'htmlRefCache', IDB_FILE_TEXT_STORE = 'fileTextCache';
+    const IDB_NAME = 'apexflow', IDB_DIR_STORE = 'handles', IDB_DIR_KEY = 'lastDir', IDB_HIST_STORE = 'fileHistory', IDB_TREE_STORE = 'treeCache', IDB_REF_STORE = 'htmlRefCache', IDB_FILE_TEXT_STORE = 'fileTextCache', IDB_DIAGRAM_STORE = 'diagramState', IDB_DIAGRAM_KEY = 'tabs-v1';
     const MAX_FILE_HIST = 30;
 
     function idbOpen() {
         return new Promise((res, rej) => {
-            const req = indexedDB.open(IDB_NAME, 5); // v5 adds fileTextCache store
+            const req = indexedDB.open(IDB_NAME, 6); // v5 adds fileTextCache store, v6 adds diagramState store
             req.onupgradeneeded = e => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains(IDB_DIR_STORE)) db.createObjectStore(IDB_DIR_STORE);
@@ -1280,6 +1614,7 @@ export default class OrderDashboard extends LightningElement {
                 if (!db.objectStoreNames.contains(IDB_TREE_STORE)) db.createObjectStore(IDB_TREE_STORE);
                 if (!db.objectStoreNames.contains(IDB_REF_STORE)) db.createObjectStore(IDB_REF_STORE);
                 if (!db.objectStoreNames.contains(IDB_FILE_TEXT_STORE)) db.createObjectStore(IDB_FILE_TEXT_STORE);
+                if (!db.objectStoreNames.contains(IDB_DIAGRAM_STORE)) db.createObjectStore(IDB_DIAGRAM_STORE);
             };
             req.onsuccess = e => res(e.target.result);
             req.onerror = e => rej(e.target.error);
@@ -1584,6 +1919,9 @@ export default class OrderDashboard extends LightningElement {
             if (perm === 'granted') await loadDirHandle(feState.dirHandle, true);
         } catch (e) { console.error(e); }
     }
+
+    // On load: restore the persisted diagram tabs (components survive reload)
+    restoreDiagramState();
 
     // On load: restore last handle if available
     idbLoadHandle().then(async handle => {
@@ -2942,6 +3280,8 @@ export default class OrderDashboard extends LightningElement {
 
     async function render() {
         console.time('render-total');
+        scheduleDiagramSave();   // any change that re-renders is worth persisting
+        renderDiagramTabs();     // keep per-tab component counts fresh
         console.time('render-cards');
         const list = document.getElementById('registry-list');
         list.innerHTML = "";
@@ -5388,12 +5728,78 @@ export default class OrderDashboard extends LightningElement {
         if (name) { openMethodPicker(name); } else { exitAnalyzeFlow(); }
     }
 
+    // Access modifier of a parsed method — the stored body starts at the
+    // modifier keyword, so the first word is the visibility.
+    function methodVisibility(body) {
+        const m = /^\s*(global|public|private|protected)\b/i.exec(body || '');
+        if (!m) return null;
+        const v = m[1].toLowerCase();
+        return v === 'protected' ? 'private' : v;
+    }
+
+    // Class-level public/global fields, constants and properties. Line-based on
+    // purpose: methods can never match because the identifier must be followed
+    // by `;`, `=` or `{ get`, never `(`.
+    function collectPublicVars(raw) {
+        const vars = [];
+        const seen = new Set();
+        const declRe = /^\s*(?:@\w+(?:\([^)]*\))?\s+)*(public|global)\s+((?:(?:static|final|transient)\s+)*)(?!(?:class|interface|enum|void|abstract|virtual)\b)([\w.<>\[\], ]+?)\s+(\w+)\s*(?:(=\s*[^;]*);|;|\{\s*get\b)/i;
+        (raw || '').split('\n').forEach(line => {
+            const m = declRe.exec(line);
+            if (!m || seen.has(m[4])) return;
+            seen.add(m[4]);
+            vars.push({
+                visibility: m[1].toLowerCase(),
+                isConst: /\bfinal\b/i.test(m[2] || '') || /^[A-Z][A-Z0-9_]*$/.test(m[4]),
+                type: m[3].trim(),
+                name: m[4],
+                value: m[5] ? m[5].replace(/^=\s*/, '').trim() : null,
+            });
+        });
+        return vars;
+    }
+
     function openMethodPicker(className, preSelectMethod) {
         document.getElementById('class-panel').style.display = 'none';
         document.getElementById('method-picker').classList.add('visible');
         document.getElementById('method-picker-classname').textContent = className;
         const listEl = document.getElementById('method-picker-list');
         listEl.innerHTML = '';
+
+        // Expandable list of the class's public/global variables and constants
+        const varsEl = document.getElementById('method-picker-vars');
+        const varsListEl = document.getElementById('method-picker-vars-list');
+        varsListEl.innerHTML = '';
+        const publicVars = registry[className].kind === 'apex' ? collectPublicVars(registry[className].raw) : [];
+        varsEl.style.display = publicVars.length ? '' : 'none';
+        varsEl.open = false;
+        varsEl.querySelector('summary').textContent = `Public Variables & Constants (${publicVars.length})`;
+        publicVars.forEach(v => {
+            const row = document.createElement('div');
+            row.className = 'var-row vis-' + v.visibility;
+            const nameEl = document.createElement('span');
+            nameEl.className = 'var-name';
+            nameEl.textContent = v.name;
+            const typeEl = document.createElement('span');
+            typeEl.className = 'var-type';
+            typeEl.textContent = v.type;
+            row.appendChild(nameEl);
+            row.appendChild(typeEl);
+            if (v.isConst) {
+                const badge = document.createElement('span');
+                badge.className = 'var-const';
+                badge.textContent = 'CONST';
+                row.appendChild(badge);
+            }
+            if (v.value) {
+                const valEl = document.createElement('span');
+                valEl.className = 'var-value';
+                valEl.textContent = '= ' + v.value;
+                valEl.title = v.value;
+                row.appendChild(valEl);
+            }
+            varsListEl.appendChild(row);
+        });
 
         const methods = Object.keys(registry[className].methods);
         if (preSelectMethod && methods.includes(preSelectMethod)) {
@@ -5414,7 +5820,9 @@ export default class OrderDashboard extends LightningElement {
             const calls = collectOrderedCalls(registry[className].methods[m], registry[className].varMap, className);
             const lines = (registry[className].methods[m].match(/\n/g) || []).length;
             const pill = document.createElement('div');
-            pill.className = 'method-pill' + (activeMethods.has(m) ? ' enabled' : '');
+            const vis = registry[className].kind === 'apex' ? methodVisibility(registry[className].methods[m]) : null;
+            pill.className = 'method-pill' + (vis ? ' vis-' + vis : '') + (activeMethods.has(m) ? ' enabled' : '');
+            if (vis) pill.title = vis === 'private' ? 'private/protected method' : vis + ' method';
             pill.innerHTML = `<span class="pill-dot"></span><span class="pill-name">${m}():${lines}</span>${calls.length > 0 ? `<span class="pill-badge">${calls.length} calls</span>` : ''}`;
             pill.addEventListener('click', () => {
                 if (activeMethods.has(m)) { activeMethods.delete(m); pill.classList.remove('enabled'); }
@@ -5553,7 +5961,8 @@ export default class OrderDashboard extends LightningElement {
         <div class="hlp-row"><span class="hlp-key">Search files</span><span class="hlp-desc">Type in the "Search files…" box to filter the file tree; ↑↓ to navigate, Enter to load</span></div>
         <div class="hlp-row"><span class="hlp-key">Drag file</span><span class="hlp-desc">Drag a file from the explorer to the diagram area to load it without clicking</span></div>
         <div class="hlp-row"><span class="hlp-key">Esc</span><span class="hlp-desc">Close this help panel, the code viewer, or any open context menu</span></div>
-        <div class="hlp-row"><span class="hlp-key">Clear All</span><span class="hlp-desc">The "Clear All" button in the sidebar removes every loaded class/component from the diagram; the folder index is kept so files can be re-loaded instantly</span></div>
+        <div class="hlp-row"><span class="hlp-key">Clear All</span><span class="hlp-desc">The "Clear All" button in the sidebar removes every loaded class/component from the active diagram tab; the folder index is kept so files can be re-loaded instantly</span></div>
+        <div class="hlp-row"><span class="hlp-key">Diagram tabs</span><span class="hlp-desc">Use the tab strip above the toolbar to keep several diagrams side by side — components load into the active tab. Click + for a new tab; rename via the ✎ icon or by double-clicking the tab. Tabs and their loaded components are saved locally and restored when you reopen the view</span></div>
       </div>
     </div>
   </div>
