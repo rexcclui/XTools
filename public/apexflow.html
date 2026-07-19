@@ -3019,8 +3019,21 @@ export default class OrderDashboard extends LightningElement {
             }
         });
 
-        // 2. Hide the child nodes themselves.
+        // 2. Hide the child nodes themselves — but only when no still-visible
+        // edge points at them. A node another visible parent still links to
+        // (e.g. a child shared between a traced component and its ancestors)
+        // must stay on screen, or hiding one parent's edges would erase the
+        // other parent's children too.
+        const visibleTargets = new Set();
+        edgePaths.forEach(el => {
+            if (el.style.display === 'none') return;
+            const t = el.getAttribute('data-target');
+            if (t) visibleTargets.add(t);
+        });
+        const hiddenNodes = new Set();
         hiddenTargets.forEach(id => {
+            if (visibleTargets.has(id)) return;
+            hiddenNodes.add(id);
             const targetNode = findNodeForTarget(id);
             if (targetNode) targetNode.style.display = 'none';
         });
@@ -3029,7 +3042,7 @@ export default class OrderDashboard extends LightningElement {
         edgePaths.forEach((el, i) => {
             if (el.style.display === 'none') return;
             const ls = el.getAttribute('data-source');
-            if (ls && hiddenTargets.has(ls)) {
+            if (ls && hiddenNodes.has(ls)) {
                 el.style.display = 'none';
                 if (labels[i]) labels[i].style.display = 'none';
             }
