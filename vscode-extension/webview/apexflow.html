@@ -811,7 +811,8 @@ body.has-intro .btn-toggle{top:46px}
     let focusedClass = null;
     // Set by Trace Parents to render a dedicated, isolated ancestor-chain
     // diagram instead of the registry-wide Architecture Map — see render()
-    // and runTraceParents(). { rootComponentName, nodes: Set, edges, depthByNode, generations }
+    // and runTraceParents(). { rootComponentName, nodes: Set, childNodes: Set,
+    // edges, depthByNode, kindByNode, generations, ancestorCount }
     let traceChainMode = null;
     let panZoomInstance = null;
     let selectedClassName = null;
@@ -3240,8 +3241,21 @@ export default class OrderDashboard extends LightningElement {
             }
         });
 
-        // 2. Hide the child nodes themselves.
+        // 2. Hide the child nodes themselves — but only when no still-visible
+        // edge points at them. A node another visible parent still links to
+        // (e.g. a child shared between a traced component and its ancestors)
+        // must stay on screen, or hiding one parent's edges would erase the
+        // other parent's children too.
+        const visibleTargets = new Set();
+        edgePaths.forEach(el => {
+            if (el.style.display === 'none') return;
+            const t = el.getAttribute('data-target');
+            if (t) visibleTargets.add(t);
+        });
+        const hiddenNodes = new Set();
         hiddenTargets.forEach(id => {
+            if (visibleTargets.has(id)) return;
+            hiddenNodes.add(id);
             const targetNode = findNodeForTarget(id);
             if (targetNode) targetNode.style.display = 'none';
         });
@@ -3250,7 +3264,7 @@ export default class OrderDashboard extends LightningElement {
         edgePaths.forEach((el, i) => {
             if (el.style.display === 'none') return;
             const ls = el.getAttribute('data-source');
-            if (ls && hiddenTargets.has(ls)) {
+            if (ls && hiddenNodes.has(ls)) {
                 el.style.display = 'none';
                 if (labels[i]) labels[i].style.display = 'none';
             }
@@ -3402,8 +3416,9 @@ export default class OrderDashboard extends LightningElement {
         // flow diagram to take over — the chain is still there to come back
         // to (exitAnalyzeFlow returns to it in one step, overview in two).
         if (traceChainMode && !focusedClass) {
+            const ancestorCount = traceChainMode.ancestorCount ?? (traceChainMode.nodes.size - 1);
             document.getElementById('view-title').innerText =
-                `Trace Parents: ${bareName(traceChainMode.rootComponentName)} — ${traceChainMode.nodes.size - 1} ancestor${traceChainMode.nodes.size - 1 === 1 ? '' : 's'} across ${traceChainMode.generations} generation${traceChainMode.generations === 1 ? '' : 's'}`;
+                `Trace Parents: ${bareName(traceChainMode.rootComponentName)} — ${ancestorCount} ancestor${ancestorCount === 1 ? '' : 's'} across ${traceChainMode.generations} generation${traceChainMode.generations === 1 ? '' : 's'}`;
             document.getElementById('reset-btn').style.display = "inline-block";
             // TD (top-down): edges are parent --> child, so ancestors land
             // above the target — same "who uses what sits below it" shape as
@@ -3437,8 +3452,17 @@ export default class OrderDashboard extends LightningElement {
                     return;
                 }
                 def += `  ${safeId(n)}["${prefixForName(n)}${bareName(n)}"]\n`;
-                const isTarget = n === traceChainMode.rootComponentName;
-                def += `  style ${safeId(n)} ${isTarget ? TARGET_STYLE : ANCESTOR_STYLE}\n`;
+                if (n === traceChainMode.rootComponentName) {
+                    def += `  style ${safeId(n)} ${TARGET_STYLE}\n`;
+                } else if (traceChainMode.childNodes?.has(n)) {
+                    // Children carried into the chain view keep their normal
+                    // per-kind color — the cyan ancestor style is reserved for
+                    // nodes sitting above the traced target.
+                    const childStyle = styleForName(n);
+                    if (childStyle) def += `  style ${safeId(n)} ${childStyle}\n`;
+                } else {
+                    def += `  style ${safeId(n)} ${ANCESTOR_STYLE}\n`;
+                }
             });
             // The traced target itself also gets highlighted via the existing
             // .node-focused mechanism (see focusAndHighlight, called after
@@ -4885,15 +4909,50 @@ export default class OrderDashboard extends LightningElement {
         traceChainMode = {
             rootComponentName: componentName,
             nodes: new Set([componentName, ...result.orderedParents]),
+            childNodes: new Set(),
             edges: result.edges,
             depthByNode: result.depthByNode,
             kindByNode: result.kindByNode,
             generations: result.generations,
+            ancestorCount: result.orderedParents.length,
         };
+        // The target's own children were on screen before the trace started —
+        // carry them into the chain view instead of dropping to ancestors-only,
+        // so tracing parents never makes the diagram lose what it already showed.
+        addTraceChainChildren(componentName);
         focusedClass = null;
         await render();
         renderFileTree();
         focusAndHighlight(componentName);
+    }
+
+    // Adds `className`'s own forward dependencies (its children) into the
+    // current chain view without re-rendering. Nodes added this way are
+    // remembered in traceChainMode.childNodes so render() can style them by
+    // component kind rather than as ancestors. Returns { targets, added },
+    // or null when there's no chain view / no registry entry to expand from.
+    function addTraceChainChildren(className) {
+        if (!traceChainMode) return null;
+        const entry = registry[className];
+        if (!entry) return null;
+
+        const flows = aggregateFlows(entry.raw, entry.varMap, className);
+        const targets = Object.keys(flows).filter(t => t !== className);
+
+        if (!traceChainMode.childNodes) traceChainMode.childNodes = new Set();
+        let added = 0;
+        targets.forEach(target => {
+            if (!traceChainMode.nodes.has(target)) {
+                added++;
+                traceChainMode.childNodes.add(target);
+            }
+            traceChainMode.nodes.add(target);
+            const alreadyEdge = traceChainMode.edges.some(e => e.parent === className && e.child === target);
+            if (!alreadyEdge) {
+                traceChainMode.edges.push({ parent: className, child: target, kind: 'child-expand', snippet: '' });
+            }
+        });
+        return { targets: targets.length, added };
     }
 
     // Pulls a single node's own forward dependencies (its children — the
@@ -4901,29 +4960,15 @@ export default class OrderDashboard extends LightningElement {
     // view. New children appear as ghost nodes if not already loaded, same
     // as anywhere else in the app — right-click → Load Class to load them.
     function expandTraceChainChildren(className) {
-        if (!traceChainMode) return;
-        const entry = registry[className];
-        if (!entry) return;
-
-        const flows = aggregateFlows(entry.raw, entry.varMap, className);
-        const targets = Object.keys(flows).filter(t => t !== className);
-        if (!targets.length) {
+        const result = addTraceChainChildren(className);
+        if (!result) return;
+        if (result.targets === 0) {
             alert(`"${bareComponentName(className)}" has no further children to show.`);
             return;
         }
 
-        let added = 0;
-        targets.forEach(target => {
-            if (!traceChainMode.nodes.has(target)) added++;
-            traceChainMode.nodes.add(target);
-            const alreadyEdge = traceChainMode.edges.some(e => e.parent === className && e.child === target);
-            if (!alreadyEdge) {
-                traceChainMode.edges.push({ parent: className, child: target, kind: 'child-expand', snippet: '' });
-            }
-        });
-
         render();
-        if (added === 0) {
+        if (result.added === 0) {
             console.info(`[TraceParents] "${className}"'s children were already shown in this view.`);
         }
     }
