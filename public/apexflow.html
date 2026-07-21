@@ -2621,8 +2621,20 @@ export default class OrderDashboard extends LightningElement {
         }, 410);
     }
 
+    // Remove block (/* */) and line (//) comments so structural keywords like
+    // "class" that merely appear in a doc comment (e.g. "This class will …")
+    // are never mistaken for the actual class declaration.
+    function stripApexComments(src) {
+        return String(src || '')
+            .replace(/\/\*[\s\S]*?\*\//g, ' ')
+            .replace(/\/\/[^\n]*/g, ' ');
+    }
+
     function parseApex(content, folderPath) {
-        const classNameMatch = content.match(/(?:class|interface|enum|record)\s+(\w+)/i);
+        // Detect the declaration name from comment-stripped code so a keyword
+        // inside a header comment can't be captured ahead of the real class.
+        const codeForDecls = stripApexComments(content);
+        const classNameMatch = codeForDecls.match(/\b(?:class|interface|enum|record)\s+(\w+)/i);
         if (!classNameMatch) return;
         const className = classNameMatch[1];
         const varMap = {}; 
@@ -2653,7 +2665,7 @@ export default class OrderDashboard extends LightningElement {
         const innerClassRegex = /\b(?:class|interface|enum)\s+(\w+)/g;
         let icm;
         let firstSkipped = false;
-        while ((icm = innerClassRegex.exec(content)) !== null) {
+        while ((icm = innerClassRegex.exec(codeForDecls)) !== null) {
             if (!firstSkipped) { firstSkipped = true; continue; } // skip the outer class itself
             innerClassNames.add(icm[1]);
         }
