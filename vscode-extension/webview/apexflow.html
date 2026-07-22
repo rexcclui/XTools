@@ -3676,13 +3676,13 @@ export default class OrderDashboard extends LightningElement {
                     dblClickZoomEnabled: false,
                     fit: false,
                     center: false,
-                    // fit() below zooms a diagram up to fill the whole panel
-                    // regardless of how few nodes it has — fine for a big
-                    // Architecture Map, but a small diagram (e.g. a short
-                    // Trace Parents chain) would get blown up to fill the
-                    // same space, magnifying node text along with it. Cap how
-                    // far fit() is allowed to zoom in.
-                    maxZoom: 3
+                    // Allow zooming in much further than before so dense
+                    // diagrams stay legible when inspecting a single node.
+                    // The initial fit() is clamped separately below so a small
+                    // diagram (e.g. a short Trace Parents chain) isn't blown up
+                    // to fill the whole panel on first render.
+                    minZoom: 0.1,
+                    maxZoom: 40
                 });
                 requestAnimationFrame(() => {
                     if (!panZoomInstance) return;

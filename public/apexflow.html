@@ -3389,7 +3389,12 @@ export default class OrderDashboard extends LightningElement {
                     zoomEnabled: true,
                     dblClickZoomEnabled: false,
                     fit: false,
-                    center: false
+                    center: false,
+                    // Allow zooming in much further than the library default
+                    // (10x) so dense diagrams stay legible when inspecting a
+                    // single node, and zooming out further for large maps.
+                    minZoom: 0.1,
+                    maxZoom: 40
                 });
                 requestAnimationFrame(() => {
                     if (!panZoomInstance) return;
