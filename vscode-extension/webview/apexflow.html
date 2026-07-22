@@ -5939,10 +5939,33 @@ export default class OrderDashboard extends LightningElement {
         render();
     }
 
+    // Mermaid config that mirrors mermaid.initialize() (see top of file),
+    // emitted as YAML frontmatter so copied diagrams carry the same ELK
+    // layout, dark theme, spacing and curve. Any tool that runs real Mermaid
+    // (GitHub, GitLab, mermaid.live, Obsidian, Notion, VS Code preview…) then
+    // reproduces the ApexFlow look — while the output stays editable text,
+    // not a flattened image.
+    function mermaidConfigFrontmatter() {
+        return [
+            '---',
+            'config:',
+            '  theme: dark',
+            '  layout: elk',
+            '  flowchart:',
+            '    curve: basis',
+            '    nodeSpacing: 25',
+            '    rankSpacing: 80',
+            '    padding: 22',
+            '    useMaxWidth: false',
+            '---',
+            ''
+        ].join('\n');
+    }
+
     async function copyCurrentMermaid() {
         if (!currentMermaidDefinition) return;
 
-        const textToCopy = currentMermaidDefinition;
+        const textToCopy = mermaidConfigFrontmatter() + currentMermaidDefinition;
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 await navigator.clipboard.writeText(textToCopy);
