@@ -3423,6 +3423,20 @@ export default class OrderDashboard extends LightningElement {
             return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
         }
 
+        // Scale a #rrggbb (or #rgb) color's brightness. factor 1 = unchanged,
+        // < 1 darker, > 1 lighter. Used to shade grouped link batches.
+        function shadeColor(hex, factor) {
+            const raw = String(hex || '').replace('#', '');
+            const full = raw.length === 3 ? raw.split('').map(c => c + c).join('') : raw;
+            const num = parseInt(full, 16);
+            if (isNaN(num)) return hex;
+            const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+            const r = clamp(((num >> 16) & 0xff) * factor);
+            const g = clamp(((num >> 8) & 0xff) * factor);
+            const b = clamp((num & 0xff) * factor);
+            return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        }
+
         // focusedClass wins over traceChainMode: "Analyze Flow" on a node in
         // the trace-chain view sets focusedClass, and the user expects the
         // flow diagram to take over — the chain is still there to come back
@@ -3486,20 +3500,36 @@ export default class OrderDashboard extends LightningElement {
             // LR (Left-Right) for rightward cascading flow
             console.time('build-def-nofocus');
             def = "graph LR\n";
+            // Links fanning out of one node are colored in batches of this size.
+            const LINK_GROUP_SIZE = 5;
             Object.keys(registry).filter(cName => !hiddenClasses.has(cName)).forEach(cName => {
                 const flows = aggregateFlows(registry[cName].raw, registry[cName].varMap, cName);
-                Object.keys(flows).forEach(target => {
-                    if (hiddenClasses.has(target)) return;
+                const targets = Object.keys(flows).filter(target => !hiddenClasses.has(target));
+                // When a single node fans out to more than one batch worth of
+                // children, color its outgoing links in batches of
+                // LINK_GROUP_SIZE: the first batch is brightest and each
+                // subsequent batch is progressively darker, so it's easy to
+                // eyeball how many children a busy node has.
+                const groupByBatch = targets.length > LINK_GROUP_SIZE;
+                const batchBaseColor = categoryColor(cName) || '#38bdf8';
+                targets.forEach((target, childIdx) => {
                     const items = flows[target];
                     const isTruncated = items.length > 2;
                     const label = cleanLabel(isTruncated ? items[0] + ', ' + items[1] + '…' : items.join(', '));
                     if (isTruncated) edgeLabelFull.push(items.join(', '));
                     def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
                     currentEdgeMeta.push({ source: safeId(cName), target: safeId(target) });
-                    // Color the link by the target's namespace prefix (e.g. pselib_, ffui_).
-                    const catColor = categoryColor(target);
-                    if (catColor) {
-                        styleDirectives.push(`linkStyle ${linkCounter} stroke:${catColor},stroke-width:2px`);
+                    // Grouped nodes shade their links darker per batch; otherwise
+                    // color the link by the target's namespace prefix (e.g. pselib_, ffui_).
+                    let linkColor;
+                    if (groupByBatch) {
+                        const batch = Math.floor(childIdx / LINK_GROUP_SIZE);
+                        linkColor = shadeColor(batchBaseColor, Math.max(0.35, 1 - batch * 0.2));
+                    } else {
+                        linkColor = categoryColor(target);
+                    }
+                    if (linkColor) {
+                        styleDirectives.push(`linkStyle ${linkCounter} stroke:${linkColor},stroke-width:2px`);
                     }
                     linkCounter++;
                     if (!registry[target] && !innerClassNames.has(target)) ghostNodes.add(target);
