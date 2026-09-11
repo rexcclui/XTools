@@ -134,6 +134,7 @@ body{font-family:var(--sans);font-size:13px;background:var(--bg3);color:var(--tx
 .cr{position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;background:transparent;z-index:4}
 .cr:hover{background:rgba(55,138,221,0.45)}
 .jv{padding:4px 7px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;display:block;font-family:var(--mono);font-size:12px;color:var(--tx);cursor:default}.jv:not(.jv-nu):hover{cursor:text}
+.jv-wrap{max-width:clamp(240px,32vw,640px)}
 .jv-nu{color:var(--tx3);font-style:italic}.jv-t{color:#00ff88}.jv-f{color:#ff4444}.jv-n{color:#ff8c00}
 .nx{display:inline-flex;align-items:center;justify-content:center;min-width:14px;padding:0 4px;height:14px;border:0.5px solid var(--bd2);border-radius:3px;cursor:pointer;font-size:9px;font-weight:700;background:yellow;color:#1a1a18;user-select:none;flex-shrink:0;white-space:nowrap}
 .cp-btn{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:0.5px solid var(--bd2);border-radius:3px;cursor:pointer;font-size:9px;background:var(--bg2);color:var(--tx3);user-select:none;flex-shrink:0;opacity:0;transition:opacity .1s}
@@ -255,6 +256,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
 <div id="ctx-menu">
   <div id="ctx-locate-other" class="ctx-item" onclick="ctxLocateOtherSide()" style="display:none"><span>⇆</span> Locate on other side</div>
   <div id="ctx-edit-node" class="ctx-item" onclick="ctxEditNode()" style="display:none"><span>✎</span> Edit</div>
+  <div id="ctx-wrap-cell" class="ctx-item" onclick="ctxToggleWrap()" style="display:none"><span>↩</span> Wrap text in cell</div>
   <div id="ctx-copy-json" class="ctx-item" onclick="ctxCopyJSON()"><span>⎘</span> Copy node JSON</div>
   <div id="ctx-list-view" class="ctx-item" onclick="ctxToggleListView()" style="display:none"><span>▦</span> List items as a table</div>
   <div id="ctx-parse-json" class="ctx-item" onclick="ctxParseJSON()"><span>⊞</span> Convert string to JSON table</div>
@@ -334,7 +336,7 @@ div:hover>.cp-btn,.cp-btn:hover{opacity:1}
         <div class="help-row"><span class="help-key">+N / −</span><span class="help-desc">Click the yellow badge to expand an array/object; − to collapse</span></div>
         <div class="help-row"><span class="help-key">col +/−</span><span class="help-desc">Toggle button in the table header expands or collapses all values in that column</span></div>
         <div class="help-row"><span class="help-key">⎘ node</span><span class="help-desc">Hover any nested node to reveal its copy button and copy that value as JSON</span></div>
-        <div class="help-row"><span class="help-key">Right-click</span><span class="help-desc">✎ Edit (rename key / change value) · ⎘ Copy node JSON · ⊞ Convert string to JSON table · ↵ Convert Encode · ⇄ Compare selected nodes</span></div>
+        <div class="help-row"><span class="help-key">Right-click</span><span class="help-desc">✎ Edit (rename key / change value) · ↩ Wrap text in cell (wrap a long value onto multiple lines) · ⎘ Copy node JSON · ⊞ Convert string to JSON table · ↵ Convert Encode · ⇄ Compare selected nodes</span></div>
       </div>
       <div class="help-sec">
         <h4>Editing (Bi-Directional Sync)</h4>
@@ -429,6 +431,7 @@ function syncAll(){
 function ensureCellStateShape(s){
   if(!s.parsedPaths)s.parsedPaths={};
   if(!s.arrayViewModes)s.arrayViewModes={};
+  if(!s.wrappedPaths)s.wrappedPaths={};
   return s;
 }
 function cs(id){
@@ -583,7 +586,7 @@ function rV(val,level,path,cid,s){
   if(val===null)return`<span class="jv jv-nu" ${dp}>null</span>`;
   if(typeof val==='boolean')return`<span class="jv ${val?'jv-t':'jv-f'}" ${dp}>${val}</span>`;
   if(typeof val==='number')return`<span class="jv jv-n" ${dp}>${val}</span>`;
-  if(typeof val==='string'){let d=val===''?'<em style="color:var(--tx3)">""</em>':escH(val);return`<span class="jv" ${dp}>${d}</span>`;}
+  if(typeof val==='string'){let d=val===''?'<em style="color:var(--tx3)">""</em>':escH(val);const wc=(s.wrappedPaths&&s.wrappedPaths[path])?' jv-wrap':'';return`<span class="jv${wc}" ${dp}>${d}</span>`;}
   if(typeof val==='object'){
     const open=_exp[path]===true||(_exp[path]!==false&&level<3);
     const count=Array.isArray(val)?val.length:Object.keys(val).length;
@@ -1706,6 +1709,18 @@ function ctxToggleListView(){
   rebuildGP(cellId);
   saveAppState();
 }
+function ctxToggleWrap(){
+  if(!_ctxTarget)return;
+  const {cid,path}=_ctxTarget;
+  hideCtxMenu();
+  if(!cid||!path)return;
+  const cellId=cellIdFromCid(cid);
+  const s=cs(cellId);
+  if(s.wrappedPaths[path])delete s.wrappedPaths[path];
+  else s.wrappedPaths[path]=true;
+  rebuildGP(cellId);
+  saveAppState();
+}
 // Single document-level handler for node selection - never stacks
 document.addEventListener('click',e=>{
   // Must click inside a grid-panel or src-pretty
@@ -1936,7 +1951,13 @@ document.addEventListener('contextmenu',e=>{
   document.getElementById('ctx-compare').style.display=_sel.length===2?'flex':'none';
   const canEdit=inGrid&&v!==undefined&&(typeof v==='string'||typeof v==='number'||typeof v==='boolean'||v===null);
   document.getElementById('ctx-edit-node').style.display=canEdit?'flex':'none';
-  if(!canLocate&&!hasSelection&&v===undefined&&!isJsonStr&&!hasEncoded&&!canToggleList&&_sel.length!==2&&!canEdit){hideCtxMenu();return;}
+  const canWrap=inGrid&&typeof v==='string'&&targetPath;
+  const wrapItem=document.getElementById('ctx-wrap-cell');
+  const wrapCellId=cid?cellIdFromCid(cid):null;
+  const isWrapped=canWrap&&wrapCellId&&cs(wrapCellId).wrappedPaths[targetPath];
+  wrapItem.style.display=canWrap?'flex':'none';
+  if(canWrap)wrapItem.innerHTML=isWrapped?'<span>↔</span> Unwrap text in cell':'<span>↩</span> Wrap text in cell';
+  if(!canLocate&&!hasSelection&&v===undefined&&!isJsonStr&&!hasEncoded&&!canToggleList&&_sel.length!==2&&!canEdit&&!canWrap){hideCtxMenu();return;}
   const vw=window.innerWidth,vh=window.innerHeight;
   m.style.display='block';
   m.style.left=(e.clientX+220>vw?e.clientX-220:e.clientX)+'px';
@@ -2020,7 +2041,8 @@ function saveAppState(){
           text:v.text||'',
           title:v.title||'',
           pretty:!!v.pretty,
-          arrayViewModes:v.arrayViewModes||{}
+          arrayViewModes:v.arrayViewModes||{},
+          wrappedPaths:v.wrappedPaths||{}
         }]))),
         cR:[...(tab.cR||new Set())],
         rowHeights:Array.isArray(tab.rowHeights)?tab.rowHeights:[1,1,1,1,1,1,1,1],
@@ -2040,7 +2062,7 @@ function loadAppState(){
       cols:Math.max(1,Math.min(5,tab.cols||1)),
       rows:Math.max(1,Math.min(8,tab.rows||1)),
       cells:Object.fromEntries(Object.entries(tab.cells||{}).map(([k,v])=>[k,{
-        text:v.text||'',title:v.title||'',pretty:!!v.pretty,parsedPaths:{},arrayViewModes:v.arrayViewModes||{}
+        text:v.text||'',title:v.title||'',pretty:!!v.pretty,parsedPaths:{},arrayViewModes:v.arrayViewModes||{},wrappedPaths:v.wrappedPaths||{}
       }])),
       cR:new Set(Array.isArray(tab.cR)?tab.cR:[]),
       rowHeights:Array.isArray(tab.rowHeights)&&tab.rowHeights.length?tab.rowHeights:[1,1,1,1,1,1,1,1],
