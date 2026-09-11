@@ -4814,6 +4814,11 @@ export default class OrderDashboard extends LightningElement {
         (fileIndex.apexTextByName || new Map()).forEach((entry, candidateName) => {
             const key = candidateName.toLowerCase();
             if (key === bareLower || matched.has(key)) return;
+            // Skip Apex test classes (*Test.cls) — a test that exercises this
+            // class is noise in a "who really calls this" trace, not a genuine
+            // parent. Same convention indexApexFromTree uses to keep test
+            // classes out of the class index.
+            if (/Test\.cls$/i.test(entry.fileName || `${candidateName}.cls`)) return;
             const line = entry.stripped.split('\n').find(l => useRe.test(l));
             if (line) {
                 matched.add(key);
