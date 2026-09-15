@@ -3232,7 +3232,11 @@ export default class OrderDashboard extends LightningElement {
                     const isTruncated = items.length > 2;
                     const label = cleanLabel(isTruncated ? items[0] + ', ' + items[1] + '…' : items.join(', '));
                     if (isTruncated) edgeLabelFull.push(items.join(', '));
-                    def += `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`;
+                    // A bare type-dependency edge carries no label; emit a plain
+                    // arrow rather than `-- "" -->`, which Mermaid 12 rejects.
+                    def += label
+                        ? `  ${safeId(cName)} -- "${label}" --> ${safeId(target)}\n`
+                        : `  ${safeId(cName)} --> ${safeId(target)}\n`;
                     currentEdgeMeta.push({ source: safeId(cName), target: safeId(target) });
                     // Grouped nodes shade their links darker per batch; otherwise
                     // color the link by the target's namespace prefix (e.g. pselib_, ffui_).
