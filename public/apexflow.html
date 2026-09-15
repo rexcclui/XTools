@@ -4710,6 +4710,62 @@ export default class OrderDashboard extends LightningElement {
             }
         }
 
+        // Signature / declared-type dependency edges.
+        // The passes above only surface a class when it is *used* — a method
+        // call, a `new`, a builder/factory chain, or a `Class.InnerType`
+        // reference. Plain parameter, field, return, and local-variable types
+        // never became edges, even though they are the ONLY dependency an
+        // interface (or a DTO/POJO with no method bodies) expresses. So an
+        // interface like `AISUM_SummaryOutput generateSummary(Id,
+        // AISUM_SummaryConfiguration, AISUM_SummaryOutput.OutputFormat)` linked
+        // to nothing. This pass resolves the declared types and emits an edge
+        // for each one that names a real class (loaded → solid node, unloaded →
+        // ghost), so the map reflects a class's declared type dependencies.
+
+        // Register a type-reference edge, filtering primitives, self-references,
+        // and inner classes of already-loaded files (they are not their own node).
+        function addTypeRef(target, label) {
+            if (!target || target === sourceName) return;
+            if (SYSTEM_TYPES.has(target.toLowerCase())) return;
+            if (!/^[A-Za-z_]\w*$/.test(target)) return;
+            if (innerClassNames.has(target)) return;
+            if (!aggregated[target]) aggregated[target] = [];
+            if (label && !aggregated[target].includes(label)) aggregated[target].unshift(label);
+        }
+
+        // Resolve every class-name token in a type expression, covering generic
+        // arguments (Map<Id, List<Foo>> -> Foo) and inner types (Foo.Bar -> Foo,
+        // labeled `Bar` to match the inner-type-reference pass). A bare class
+        // type contributes an unlabeled edge — the arrow already names it.
+        function emitTypeDeps(typeStr) {
+            const tokens = String(typeStr || '').match(/[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*/g) || [];
+            tokens.forEach(tok => {
+                const dot = tok.indexOf('.');
+                const outer = dot > -1 ? tok.slice(0, dot) : tok;
+                if (SYSTEM_TYPES.has(outer.toLowerCase())) return;
+                addTypeRef(outer, dot > -1 ? tok.slice(dot + 1) : null);
+            });
+        }
+
+        // Parameter, field, and local-variable types are already collected in
+        // vMap (varName -> declared type) by parseApex.
+        Object.values(vMap).forEach(typeStr => emitTypeDeps(typeStr));
+
+        // Method return types are not in vMap. Match `[annotations] [modifiers]
+        // ReturnType methodName(` at a statement boundary so interface methods
+        // (which carry no modifiers) are caught too; skip `void` and control
+        // keywords. Requires `Type name(` so bare calls like `System.debug(`
+        // (no space before `(`) never match.
+        const sigReturnRegex = /(?:^|[;{}])\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|private|protected|global|static|final|abstract|virtual|override|webservice|testmethod|transient)\s+)*([A-Za-z_][\w.]*\s*(?:<[^;{}()]*>)?\s*(?:\[\s*\])?)\s+(\w+)\s*\(/g;
+        let sr;
+        while ((sr = sigReturnRegex.exec(content)) !== null) {
+            const retType = sr[1].trim();
+            const mName = sr[2];
+            if (['if', 'for', 'while', 'switch', 'catch', 'return', 'new'].includes(mName)) continue;
+            if (/^void\b/i.test(retType)) continue;
+            emitTypeDeps(retType);
+        }
+
         return aggregated;
     }
 
