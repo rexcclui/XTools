@@ -512,14 +512,20 @@ function pathAtPos(text,pos,cid){
 
 /* ══ GRID RENDER ══ */
 function renderGrid(){
-  // Capture live textarea values before wiping DOM so no typed/pasted content is lost
-  if(G&&G.cells){
+  const go=document.getElementById('go');
+  // Capture live textarea values before wiping DOM so no typed/pasted content is lost.
+  // Only do this when the rendered grid actually belongs to the current tab (G):
+  // when switching tabs the DOM still holds the previous tab's textareas while G
+  // already points at the new tab, and capturing then would overwrite the new tab's
+  // cells with the old tab's text. switchTab() already flushes via syncAll() first.
+  if(G&&G.cells&&go&&go.dataset.tabId===String(G.id)){
     document.querySelectorAll('textarea[id^="ta-"]').forEach(ta=>{
       const id=ta.id.replace('ta-','');
       if(G.cells[id])G.cells[id].text=ta.value;
     });
   }
-  const go=document.getElementById('go');go.innerHTML='';
+  go.innerHTML='';
+  if(G)go.dataset.tabId=String(G.id);
   const ra=document.createElement('div');ra.className='rows-area';
   go.appendChild(ra); // append early so children are live in DOM
   for(let r=0;r<G.rows;r++){
