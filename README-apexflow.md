@@ -53,6 +53,7 @@ A browser-based tool for visualising Salesforce Apex, Java, and Lightning Web Co
   - **Hide / Show Child Nodes** (analyze-flow mode) — collapse / expand a method's call subtree
   - **View Code** — open the method body in a draggable code panel
   - **View Source** — open the full file (concatenated `.js` + `.html` for LWC) in a centered modal with the folder path
+  - **Go to Call Site** (analyze-flow mode) — on a child method node or class subgraph (including unloaded ones like `? A: Risk__c`), jump to the line in the parent method that makes the call; one entry per call site when there are several. Opens the file at that line in VS Code, or shows it with the line highlighted in the browser
 - Right-click on edges: shows the full relationship list as a contextual menu
 - Widened transparent hit-area overlay (20 px) on all edge paths for easier right-click targeting
 - Edge tooltips display complete method lists as a bulleted list

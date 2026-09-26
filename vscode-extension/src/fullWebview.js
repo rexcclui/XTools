@@ -98,7 +98,8 @@ function activateFullWebview(context, output) {
                         preview: true,
                     });
                     if (typeof msg.line === 'number' && msg.line >= 0) {
-                        const pos = new vscode.Position(msg.line, 0);
+                        const col = typeof msg.column === 'number' && msg.column >= 0 ? msg.column : 0;
+                        const pos = new vscode.Position(msg.line, col);
                         editor.selection = new vscode.Selection(pos, pos);
                         editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
                     }
