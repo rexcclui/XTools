@@ -507,6 +507,7 @@ body.has-intro .btn-toggle{top:46px}
     <div class="ctx-item" id="ctx-trace-parents" style="display:none"><i class="fa-solid fa-sitemap"></i><span>Trace Parents</span></div>
     <div class="ctx-item" id="ctx-view-code"><i class="fa-solid fa-code"></i><span>View Code</span></div>
     <div class="ctx-item" id="ctx-view-source" style="display:none"><i class="fa-solid fa-file-lines"></i><span>Source</span></div>
+    <div id="ctx-callsites"></div>
 </div>
 
 <div id="edge-context-menu">
@@ -646,6 +647,9 @@ body.has-intro .btn-toggle{top:46px}
     // edge classes we used to identify edges by, so after render we stamp
     // data-source/data-target onto each path + label using this list.
     let currentEdgeMeta = [];
+    // Analyze Flow: flow node id -> [{ className, methodName, offsets, ... }]
+    // — the parent method(s) that call this node, for Go to Call Site.
+    let flowCallSites = {};
     // Per-parent edge hides — entries are "<fromSafeId>|<toSafeId>". These collapse
     // a specific edge in place via CSS (no re-render), so the diagram stays put and
     // other parents that reference the same target keep their edge.
@@ -2825,7 +2829,7 @@ export default class OrderDashboard extends LightningElement {
 
     function collectOrderedCallsLwc(entry, methodBody) {
         const calls = [];
-        const seen = new Set();
+        const seen = new Map();
         let seq = 1;
 
         // Look for an import line in the body to identify the linked target + member.
@@ -2844,8 +2848,9 @@ export default class OrderDashboard extends LightningElement {
             if (target && member) {
                 const key = `${target}.${member}`;
                 if (!seen.has(key)) {
-                    seen.add(key);
-                    calls.push({ target, method: member, sequenceLabel: String(seq++) });
+                    const call = { target, method: member, sequenceLabel: String(seq++), offsets: [importMatch.index] };
+                    seen.set(key, call);
+                    calls.push(call);
                 }
             }
         }
@@ -2856,9 +2861,10 @@ export default class OrderDashboard extends LightningElement {
         while ((h = htmlRefRegex.exec(methodBody || '')) !== null) {
             const camel = kebabToCamelComponent(h[1]);
             const key = `${camel}.html`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            calls.push({ target: camel, method: 'html', sequenceLabel: String(seq++) });
+            if (seen.has(key)) { seen.get(key).offsets.push(h.index); continue; }
+            const call = { target: camel, method: 'html', sequenceLabel: String(seq++), offsets: [h.index] };
+            seen.set(key, call);
+            calls.push(call);
         }
 
         return calls;
@@ -3113,6 +3119,7 @@ export default class OrderDashboard extends LightningElement {
         let styleDirectives = [];
         currentRenderedEdgeStyles = [];
         currentEdgeMeta = [];
+        flowCallSites = {};
         let edgeLabelFull = [];
 
         // Components referenced as visual children through <c-...> template tags,
@@ -3281,7 +3288,16 @@ export default class OrderDashboard extends LightningElement {
                 return { id: `l${level}__${classId}__class`, label: registry[className] ? className : `? ${className}`, className, methodName: null };
             }
 
-            function collectFlowDepth(parentNodeId, calls, depth, edgeColor) {
+            // Remember where each flow node is called from (parent class/method
+            // + offsets into the parent's method body) for Go to Call Site.
+            function recordCallSite(nodeId, parentClass, parentMethod, call) {
+                if (!parentClass || !parentMethod || !call.offsets?.length) return;
+                const sites = flowCallSites[nodeId] || (flowCallSites[nodeId] = []);
+                if (sites.some(s => s.className === parentClass && s.methodName === parentMethod)) return;
+                sites.push({ className: parentClass, methodName: parentMethod, offsets: call.offsets.slice().sort((a, b) => a - b), targetClass: call.target, label: call.sequenceLabel });
+            }
+
+            function collectFlowDepth(parentNodeId, calls, depth, edgeColor, parentClass, parentMethod) {
                 if (depth > MAX_FLOW_DEPTH) return;
                 calls.forEach(call => {
                     const targetClass = call.target;
@@ -3290,6 +3306,7 @@ export default class OrderDashboard extends LightningElement {
 
                     // Case 1: exact class+method already in chart — repoint edge to existing node
                     if (canonicalNodes[canonKey]) {
+                        recordCallSite(canonicalNodes[canonKey], parentClass, parentMethod, call);
                         allFlowEdges.push({ from: parentNodeId, to: canonicalNodes[canonKey], label: call.sequenceLabel, color: edgeColor, depth });
                         return;
                     }
@@ -3300,6 +3317,7 @@ export default class OrderDashboard extends LightningElement {
 
                     const node = buildNode(placeDepth, targetClass, call.method);
                     canonicalNodes[canonKey] = node.id;
+                    recordCallSite(node.id, parentClass, parentMethod, call);
                     if (classFirstDepth[targetClass] === undefined) classFirstDepth[targetClass] = placeDepth;
 
                     if (!depthNodeMap[placeDepth][node.id]) {
@@ -3314,7 +3332,7 @@ export default class OrderDashboard extends LightningElement {
                             color: nodeColor, seq: globalSeq++
                         };
                         if (!isCollapsed && subCalls.length > 0) {
-                            collectFlowDepth(node.id, subCalls, placeDepth + 1, nodeColor);
+                            collectFlowDepth(node.id, subCalls, placeDepth + 1, nodeColor, targetClass, call.method);
                         }
                     }
                     allFlowEdges.push({ from: parentNodeId, to: node.id, label: call.sequenceLabel, color: edgeColor, depth });
@@ -3336,7 +3354,7 @@ export default class OrderDashboard extends LightningElement {
                     if (!isCollapsed) {
                         const entryBlockColor = getBlockColor(`entry:${entryMethod}`);
                         const calls = collectOrderedCalls(registry[focusedClass].methods[entryMethod], registry[focusedClass].varMap, focusedClass);
-                        collectFlowDepth(entryNodeId, calls, 1, entryBlockColor);
+                        collectFlowDepth(entryNodeId, calls, 1, entryBlockColor, focusedClass, entryMethod);
                     }
                 });
 
@@ -3594,6 +3612,179 @@ export default class OrderDashboard extends LightningElement {
         return null;
     }
 
+    // ── Go to Call Site (Analyze Flow) ─────────────────────────────────────
+    // Each flow node remembers which parent method(s) call it and where
+    // (offsets into the parent's method body, see collectOrderedCalls /
+    // recordCallSite). These helpers map that back to a file line.
+    function lookupMethodBody(className, methodName) {
+        const methods = registry[className]?.methods;
+        if (!methods || !methodName) return null;
+        if (methods[methodName] !== undefined) return methods[methodName];
+        const lower = String(methodName).toLowerCase();
+        const key = Object.keys(methods).find(k => k.toLowerCase() === lower);
+        return key !== undefined ? methods[key] : null;
+    }
+
+    // Returns { className, methodName, which, text, line, column } — `text` is
+    // the file content holding the call (Apex raw, LWC .js or .html) and
+    // `line`/`column` are 0-based within it. Falls back to the method body
+    // alone when it can't be found verbatim in the file text.
+    function locateCallSite(className, methodName, offset) {
+        const entry = registry[className];
+        const body = lookupMethodBody(className, methodName);
+        if (!entry || body == null) return null;
+        const candidates = entry.kind === 'apex'
+            ? [{ which: 'apex', text: entry.raw || '' }]
+            : [{ which: 'js', text: entry.jsContent || '' }, { which: 'html', text: entry.htmlContent || '' }, { which: 'raw', text: entry.raw || '' }];
+        let hit = candidates.find(c => c.text && c.text.includes(body));
+        let pos = hit ? hit.text.indexOf(body) + offset : offset;
+        if (!hit) {
+            // LWC member bodies are stitched together from separate lines
+            // (import + usages), so look for the call's own line instead.
+            const lineStart = body.lastIndexOf('\n', offset - 1) + 1;
+            const lineEnd = body.indexOf('\n', offset);
+            const lineText = body.slice(lineStart, lineEnd < 0 ? undefined : lineEnd).trim();
+            hit = lineText && candidates.find(c => c.text && c.text.includes(lineText));
+            if (hit) {
+                const lineIdx = hit.text.indexOf(lineText);
+                pos = lineIdx + Math.max(0, offset - lineStart - (body.slice(lineStart).length - body.slice(lineStart).trimStart().length));
+            } else {
+                hit = { which: 'body', text: body };
+            }
+        }
+        const before = hit.text.slice(0, pos);
+        return {
+            className, methodName, which: hit.which, text: hit.text,
+            line: before.split('\n').length - 1,
+            column: before.length - (before.lastIndexOf('\n') + 1),
+        };
+    }
+
+    // Call sites of every flow node belonging to `cls` (a subgraph header).
+    function callSitesForClass(cls) {
+        const out = [];
+        const seen = new Set();
+        Object.values(flowCallSites).forEach(sites => sites.forEach(site => {
+            if (site.targetClass !== cls && bareComponentName(site.targetClass) !== cls) return;
+            const offsets = site.offsets.filter(o => !seen.has(`${site.className}|${site.methodName}|${o}`));
+            offsets.forEach(o => seen.add(`${site.className}|${site.methodName}|${o}`));
+            if (offsets.length) out.push({ ...site, offsets });
+        }));
+        return out;
+    }
+
+    function flowNodeIdFromElement(el) {
+        const m = (el?.id || '').match(/flowchart-(l\d+__.+)-\d+$/);
+        return m ? m[1] : null;
+    }
+
+    // Fill the context menu's call-site slot; returns how many items it added.
+    function populateCallSiteMenu(sites) {
+        const box = document.getElementById('ctx-callsites');
+        box.innerHTML = '';
+        const locs = [];
+        (sites || []).forEach(site => site.offsets.forEach(offset => {
+            const loc = locateCallSite(site.className, site.methodName, offset);
+            if (loc) locs.push(loc);
+        }));
+        const MAX_ITEMS = 12;
+        locs.slice(0, MAX_ITEMS).forEach(loc => {
+            const el = document.createElement('div');
+            el.className = 'ctx-item';
+            el.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i><span></span>';
+            const where = `${bareComponentName(loc.className)}.${loc.methodName}():${loc.line + 1}`;
+            el.querySelector('span').textContent = locs.length === 1 ? `Go to Call Site (${where})` : `Call Site: ${where}`;
+            el.title = (loc.text.split('\n')[loc.line] || '').trim();
+            el.onclick = () => { hideNodeContextMenu(); openCallSite(loc); };
+            box.appendChild(el);
+        });
+        if (locs.length > MAX_ITEMS) {
+            const more = document.createElement('div');
+            more.className = 'ctx-item';
+            more.style.cssText = 'opacity:0.6;cursor:default;';
+            more.textContent = `… ${locs.length - MAX_ITEMS} more call sites`;
+            box.appendChild(more);
+        }
+        return locs.length;
+    }
+
+    let callSiteMarkLine = null;
+
+    function clearCallSiteMark() {
+        callSiteMarkLine = null;
+        document.querySelectorAll('#code-tooltip .callsite-hl').forEach(el => el.remove());
+    }
+
+    // Overlay a highlight bar on `line` of the code panel and scroll it into view.
+    function markCallSiteLine(line, scroll) {
+        document.querySelectorAll('#code-tooltip .callsite-hl').forEach(el => el.remove());
+        callSiteMarkLine = line;
+        const codeEl = document.getElementById('tooltip-code');
+        const pre = codeEl.parentElement;
+        const body = document.getElementById('code-tooltip-body');
+        const lineCount = Math.max(1, codeEl.textContent.split('\n').length);
+        const codeRect = codeEl.getBoundingClientRect();
+        const preRect = pre.getBoundingClientRect();
+        const lineH = codeRect.height / lineCount;
+        if (!lineH) return;
+        if (getComputedStyle(pre).position === 'static') pre.style.position = 'relative';
+        const hl = document.createElement('div');
+        hl.className = 'callsite-hl';
+        const top = codeRect.top - preRect.top + pre.scrollTop + line * lineH;
+        hl.style.cssText = `position:absolute;left:0;right:0;top:${top}px;height:${lineH}px;background:rgba(250,204,21,0.18);border-left:3px solid #facc15;pointer-events:none;`;
+        pre.appendChild(hl);
+        if (scroll) {
+            const hlRect = hl.getBoundingClientRect();
+            const bodyRect = body.getBoundingClientRect();
+            body.scrollTop += (hlRect.top - bodyRect.top) - body.clientHeight / 2;
+        }
+    }
+
+    function refreshCallSiteMark() {
+        if (callSiteMarkLine === null) return;
+        if (document.getElementById('code-tooltip').style.display === 'none') return;
+        requestAnimationFrame(() => markCallSiteLine(callSiteMarkLine, false));
+    }
+
+    // In-page fallback: show the file holding the call with the line highlighted.
+    function showCallSitePanel(loc) {
+        const tooltip = document.getElementById('code-tooltip');
+        const titleEl = document.getElementById('tooltip-title');
+        const codeEl = document.getElementById('tooltip-code');
+        const tabsContainer = document.getElementById('code-tooltip-tabs');
+        tabsContainer.classList.remove('visible');
+        tabsContainer.innerHTML = '';
+        document.getElementById('tooltip-font-controls').style.display = 'flex';
+        clearCallSiteMark();
+
+        titleEl.textContent = '';
+        titleEl.appendChild(document.createTextNode(`Call site: ${bareComponentName(loc.className)}.${loc.methodName}() — line ${loc.line + 1}`));
+        const folder = registry[loc.className]?.folderPath;
+        if (folder) {
+            const pathEl = document.createElement('span');
+            pathEl.style.cssText = 'margin-left:10px;font-weight:400;font-size:11px;color:#94a3b8;';
+            pathEl.textContent = `📂 ${folder}`;
+            titleEl.appendChild(pathEl);
+        }
+        const lang = loc.which === 'html' ? 'markup' : (loc.which === 'js' || loc.which === 'raw') ? 'javascript' : 'java';
+        codeEl.className = `language-${lang}`;
+        codeEl.textContent = loc.text;
+        codeEl.style.fontSize = tooltipFontSize + 'px';
+        if (window.Prism) try { Prism.highlightElement(codeEl); } catch (e) { /* highlight is best-effort */ }
+
+        tooltip.style.width = '90vw';
+        tooltip.style.height = '85vh';
+        tooltip.style.left = '5vw';
+        tooltip.style.top = '7vh';
+        tooltip.style.display = 'flex';
+        tooltipInteractionGuardUntil = Date.now() + 300;
+        requestAnimationFrame(() => markCallSiteLine(loc.line, true));
+    }
+
+    function openCallSite(loc) {
+        if (loc) showCallSitePanel(loc);
+    }
+
     // Open the loaded node's full source in the existing draggable code panel,
     // sized large. For LWC components both .js and .html are concatenated. The
     // source folder path is shown at the top of the title bar so it's easy to
@@ -3601,6 +3792,7 @@ export default class OrderDashboard extends LightningElement {
     function showSourceModal(name) {
         const entry = registry[name];
         if (!entry) return;
+        clearCallSiteMark();
         const tooltip = document.getElementById('code-tooltip');
         const titleEl = document.getElementById('tooltip-title');
         const codeEl = document.getElementById('tooltip-code');
@@ -3704,6 +3896,7 @@ export default class OrderDashboard extends LightningElement {
             tooltipFontSize += 2;
             document.getElementById('tooltip-code').style.fontSize = tooltipFontSize + 'px';
             localStorage.setItem('tooltipFontSize', tooltipFontSize);
+            refreshCallSiteMark();
         }
     }
 
@@ -3712,6 +3905,7 @@ export default class OrderDashboard extends LightningElement {
             tooltipFontSize -= 2;
             document.getElementById('tooltip-code').style.fontSize = tooltipFontSize + 'px';
             localStorage.setItem('tooltipFontSize', tooltipFontSize);
+            refreshCallSiteMark();
         }
     }
 
@@ -4489,6 +4683,7 @@ export default class OrderDashboard extends LightningElement {
 
     function hideCodeTooltip() {
         document.getElementById('code-tooltip').style.display = 'none';
+        clearCallSiteMark();
     }
 
     async function copyTooltipCode() {
@@ -4720,6 +4915,7 @@ export default class OrderDashboard extends LightningElement {
         // so the method name itself doesn't match as a bare call
         const braceIdx = rawContent.indexOf('{');
         const content = braceIdx >= 0 ? rawContent.slice(braceIdx) : rawContent;
+        const bodyOffset = braceIdx >= 0 ? braceIdx : 0;
 
         // Build a local vMap copy extended with for-each loop variables
         // e.g. "for (SMAC_ImpactAnalysisRequestContext context : contexts)" -> context -> SMAC_ImpactAnalysisRequestContext
@@ -4799,7 +4995,7 @@ export default class OrderDashboard extends LightningElement {
 
         const loopRanges = detectLoopRanges(content);
         let seq = 1;
-        const seenCalls = new Set();
+        const seenCalls = new Map();
 
         function addCall(target, methodName, index, options = {}) {
             if (!target || !methodName) return;
@@ -4810,16 +5006,27 @@ export default class OrderDashboard extends LightningElement {
                 return;
             }
 
-            const loopTag = getLoopTag(index, loopRanges);
+            // Offsets are relative to the whole method body (rawContent), so a
+            // call can be mapped back to its line in the source file (Go to
+            // Call Site). Repeat calls to the same target keep one diagram edge
+            // but remember every occurrence.
+            const offset = bodyOffset + index;
             const callKey = `${target}.${methodName}`;
-            if (seenCalls.has(callKey)) return;
+            const existing = seenCalls.get(callKey);
+            if (existing) {
+                if (!existing.offsets.includes(offset)) existing.offsets.push(offset);
+                return;
+            }
 
-            seenCalls.add(callKey);
-            calls.push({
+            const loopTag = getLoopTag(index, loopRanges);
+            const call = {
                 target,
                 method: methodName,
-                sequenceLabel: `${seq}${loopTag}`
-            });
+                sequenceLabel: `${seq}${loopTag}`,
+                offsets: [offset]
+            };
+            seenCalls.set(callKey, call);
+            calls.push(call);
             seq++;
         }
 
@@ -4956,14 +5163,20 @@ export default class OrderDashboard extends LightningElement {
             // Resolve class name: prefer label text match against registry / known unloaded names
             const labelEl = cluster.querySelector('.cluster-label text, .nodeLabel, foreignObject span, text');
             const rawLabel = (labelEl?.textContent || '').trim();
-            const labelName = rawLabel.startsWith('? ') ? rawLabel.slice(2).trim() : rawLabel;
+            // Strip both the ghost marker and the kind prefix ("? apex: Foo" →
+            // "Foo") — registry keys never carry the prefix.
+            const labelName = (rawLabel.startsWith('? ') ? rawLabel.slice(2).trim() : rawLabel).replace(/^(js|html|apex|a):\s*/i, '');
 
             // Match against registry or safeId reverse-lookup
             const known = Object.keys(registry).find(k => k === labelName || safeId(k) === safeId(labelName));
 
             // Only attach to unloaded (ghost) class subgraphs — label starts with "? " or not in registry
             const isGhost = rawLabel.startsWith('? ') || (labelName && !known);
-            if (!isGhost || !labelName) return;
+            if (!labelName) return;
+            // Analyze Flow: any subgraph (loaded or ghost) can jump to the
+            // lines that call into it; outside of that only ghosts get a menu.
+            const clsSites = focusedClass ? callSitesForClass(known || labelName) : [];
+            if (!isGhost && !clsSites.length) return;
 
             cluster.style.cursor = 'context-menu';
             const rect = cluster.querySelector('rect');
@@ -4981,11 +5194,18 @@ export default class OrderDashboard extends LightningElement {
                 document.getElementById('ctx-hide-html-children').style.display = 'none';
                 document.getElementById('ctx-view-code').style.display = 'none';
                 document.getElementById('ctx-view-source').style.display = 'none';
+                ['ctx-lookup-reference', 'ctx-trace-parents', 'ctx-show-trace-children'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
                 const loadEl = document.getElementById('ctx-load-class');
-                loadEl.style.display = 'flex';
-                loadEl.querySelector('span').textContent = `Load "${labelName}"`;
-                loadEl.onclick = () => { hideNodeContextMenu(); loadClassByName(labelName); };
-                const mw = 200, mh = 50;
+                loadEl.style.display = isGhost ? 'flex' : 'none';
+                if (isGhost) {
+                    loadEl.querySelector('span').textContent = `Load "${labelName}"`;
+                    loadEl.onclick = () => { hideNodeContextMenu(); loadClassByName(labelName); };
+                }
+                const siteCount = populateCallSiteMenu(clsSites);
+                const mw = 280, mh = 50 + Math.min(siteCount, 13) * 30;
                 menu.style.left = Math.min(e.clientX, window.innerWidth - mw) + 'px';
                 menu.style.top = Math.min(e.clientY, window.innerHeight - mh) + 'px';
                 menu.style.display = 'block';
@@ -5175,6 +5395,11 @@ export default class OrderDashboard extends LightningElement {
                 runTraceParents(lookupTarget);
             };
         }
+
+        // Go to Call Site — Analyze Flow method nodes jump to the line in the
+        // parent method that calls them (entry nodes have no caller).
+        const flowNodeId = focusedClass ? flowNodeIdFromElement(node) : null;
+        populateCallSiteMenu(flowNodeId ? flowCallSites[flowNodeId] : null);
 
         // View Code option — only if method body exists
         const hasCode = className && methodName && registry[className]?.methods?.[methodName];
@@ -5444,6 +5669,7 @@ export default class OrderDashboard extends LightningElement {
         <div class="hlp-row"><span class="hlp-key">Hide JS/Apex/HTML</span><span class="hlp-desc">Peel off child edges by type — e.g. hide Apex callouts while keeping JS imports visible</span></div>
         <div class="hlp-row"><span class="hlp-key">View Code</span><span class="hlp-desc">Open the method body in a draggable, resizable code panel with syntax highlighting</span></div>
         <div class="hlp-row"><span class="hlp-key">View Source</span><span class="hlp-desc">Open the full file (or concatenated .js + .html for LWC) in a centered modal</span></div>
+        <div class="hlp-row"><span class="hlp-key">Go to Call Site</span><span class="hlp-desc">Analyze Flow: right-click a child node or class box to jump to the line in the parent method that makes the call</span></div>
       </div>
       <div class="hlp-sec">
         <h4>Analyze Flow Mode</h4>
